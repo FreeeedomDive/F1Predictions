@@ -1,0 +1,7 @@
+.git
+.gradle
+**/build
+**/.idea
+*.md
+**/application-local.yml
+frontend/node_modules

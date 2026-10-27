@@ -1,0 +1,20 @@
+spring:
+  flyway:
+    enabled: true
+
+f1:
+  discord:
+    enabled: false
+
+management:
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  tracing:
+    export:
+      enabled: false
+  logging:
+    export:
+      otlp:
+        enabled: false

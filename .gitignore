@@ -1,0 +1,25 @@
+HELP.md
+.gradle
+build/
+application-local.yml
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+
+### VS Code ###
+.vscode/
+
+### Claude Code ###
+.claude/settings.local.json
+
+### Frontend ###
+node_modules/
+src/frontend/dist/
+src/frontend/.env.local

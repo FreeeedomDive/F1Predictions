@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: f1-predictions-migrator
+  main:
+    web-application-type: none
+    banner-mode: "off"
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    validate-on-migrate: true

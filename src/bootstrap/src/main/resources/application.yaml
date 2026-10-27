@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: f1-predictions
+  threads:
+    virtual:
+      enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    # Migrations are applied by the migrator image (a Helm sync job), never by the service.
+    enabled: false
+
+server:
+  port: 8080
+
+f1:
+  discord:
+    enabled: false
+    token: ""
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  otlp:
+    metrics:
+      export:
+        url: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/metrics
+        aggregation-temporality: cumulative
+        base-time-unit: seconds
+        step: 60s
+  opentelemetry:
+    tracing:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/traces
+    logging:
+      export:
+        otlp:
+          endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318}/v1/logs
+  tracing:
+    sampling:
+      probability: 1.0
