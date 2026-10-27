@@ -1,0 +1,88 @@
+name: Detect Changes
+
+on:
+  workflow_call:
+    inputs:
+      base-ref:
+        description: 'Branch to diff the whole current ref against (e.g. master). Empty = last commit only.'
+        type: string
+        required: false
+        default: ''
+    outputs:
+      backend:
+        description: "Backend modules or shared build files changed"
+        value: ${{ jobs.detect.outputs.backend }}
+      frontend:
+        description: "Frontend changed"
+        value: ${{ jobs.detect.outputs.frontend }}
+      migrate:
+        description: "Schema, migrator or shared build files changed"
+        value: ${{ jobs.detect.outputs.migrate }}
+      nginx:
+        description: "Nginx changed"
+        value: ${{ jobs.detect.outputs.nginx }}
+
+jobs:
+  detect:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.check.outputs.backend }}
+      frontend: ${{ steps.check.outputs.frontend }}
+      migrate: ${{ steps.check.outputs.migrate }}
+      nginx: ${{ steps.check.outputs.nginx }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed paths
+        id: check
+        env:
+          BASE_REF: ${{ inputs.base-ref }}
+        run: |
+          if [ -n "$BASE_REF" ]; then
+            git fetch --no-tags origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
+            BASE=$(git merge-base "origin/$BASE_REF" HEAD)
+          else
+            BASE="HEAD^"
+          fi
+
+          CHANGED=$(git diff --name-only "$BASE" HEAD)
+
+          backend=false
+          frontend=false
+          migrate=false
+          nginx=false
+
+          # Schema migrations or migrator module -> rebuild migrator
+          if echo "$CHANGED" | grep -qE '^src/(schema|migrator)/|^src/Dockerfile\.migrator$'; then
+            migrate=true
+          fi
+
+          # Backend modules -> rebuild backend
+          if echo "$CHANGED" | grep -qE '^src/(domain|application|infrastructure|api-contract|discord-bot|bootstrap)/|^src/Dockerfile$'; then
+            backend=true
+          fi
+
+          # Shared Gradle build files -> rebuild both backend and migrator
+          if echo "$CHANGED" | grep -qE '^src/(buildSrc|gradle)/|^src/settings\.gradle\.kts$|^src/gradlew(\.bat)?$'; then
+            backend=true
+            migrate=true
+          fi
+
+          if echo "$CHANGED" | grep -qE '^src/frontend/'; then
+            frontend=true
+          fi
+
+          if echo "$CHANGED" | grep -qE '^nginx/'; then
+            nginx=true
+          fi
+
+          {
+            echo "backend=$backend"
+            echo "frontend=$frontend"
+            echo "migrate=$migrate"
+            echo "nginx=$nginx"
+          } >> "$GITHUB_OUTPUT"

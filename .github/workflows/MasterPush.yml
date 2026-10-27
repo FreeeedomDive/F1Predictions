@@ -1,0 +1,13 @@
+name: Master Push
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy
+    uses: ./.github/workflows/MasterDeployment.yml
+    secrets: inherit

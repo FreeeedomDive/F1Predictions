@@ -1,0 +1,109 @@
+name: Deploy Backend
+
+on:
+  workflow_call:
+    inputs:
+      deploy_migrator:
+        type: boolean
+        default: false
+      deploy_backend:
+        type: boolean
+        default: false
+  workflow_dispatch:
+    inputs:
+      deploy_migrator:
+        description: 'Build & deploy migrator'
+        type: boolean
+        default: true
+      deploy_backend:
+        description: 'Build & deploy backend'
+        type: boolean
+        default: true
+
+env:
+  MIGRATOR_IMAGE: f1predictionsmigrator
+  BACKEND_IMAGE: f1predictionsapi
+  VALUES_FILE: values/f1-predictions/api.yaml
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          build-root-directory: src
+
+      - name: Build jars
+        working-directory: src
+        run: ./gradlew :bootstrap:bootJar :migrator:bootJar -x test
+
+      - name: Stage jars
+        run: |
+          mkdir -p out
+          cp "$(find src/bootstrap/build/libs -name '*.jar' -not -name '*-plain.jar')" out/app.jar
+          cp "$(find src/migrator/build/libs -name '*.jar' -not -name '*-plain.jar')" out/migrator.jar
+
+      - name: Log in to Docker Registry
+        env:
+          DOCKER_REGISTRY_IP: ${{ secrets.DOCKER_REGISTRY_IP }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_REGISTRY_LOGIN }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+        run: |
+          echo "$DOCKER_PASSWORD" | docker login $DOCKER_REGISTRY_IP \
+            -u $DOCKER_USERNAME --password-stdin
+
+      - name: Build & push migrator image
+        if: ${{ inputs.deploy_migrator }}
+        env:
+          DOCKER_REGISTRY_IP: ${{ secrets.DOCKER_REGISTRY_IP }}
+        run: |
+          docker build out -f src/Dockerfile.migrator \
+            -t $DOCKER_REGISTRY_IP/$MIGRATOR_IMAGE:${{ github.sha }}
+          docker push $DOCKER_REGISTRY_IP/$MIGRATOR_IMAGE:${{ github.sha }}
+
+      - name: Build & push backend image
+        if: ${{ inputs.deploy_backend }}
+        env:
+          DOCKER_REGISTRY_IP: ${{ secrets.DOCKER_REGISTRY_IP }}
+        run: |
+          docker build out -f src/Dockerfile \
+            -t $DOCKER_REGISTRY_IP/$BACKEND_IMAGE:${{ github.sha }}
+          docker push $DOCKER_REGISTRY_IP/$BACKEND_IMAGE:${{ github.sha }}
+
+      - name: Update image tags in config repo
+        env:
+          CONFIG_REPO_TOKEN: ${{ secrets.CONFIG_REPO_TOKEN }}
+          DEPLOY_MIGRATOR: ${{ inputs.deploy_migrator }}
+          DEPLOY_BACKEND: ${{ inputs.deploy_backend }}
+          SHA: ${{ github.sha }}
+        run: |
+          git clone https://x-access-token:$CONFIG_REPO_TOKEN@github.com/FreeeedomDive/argocd-config.git
+          FILE="argocd-config/$VALUES_FILE"
+          PARTS=""
+
+          if [ "$DEPLOY_MIGRATOR" = "true" ]; then
+            yq e ".migration.image.tag = \"$SHA\"" -i "$FILE"
+            PARTS="$MIGRATOR_IMAGE"
+          fi
+
+          if [ "$DEPLOY_BACKEND" = "true" ]; then
+            yq e ".image.tag = \"$SHA\"" -i "$FILE"
+            PARTS="${PARTS:+$PARTS, }$BACKEND_IMAGE"
+          fi
+
+          git -C argocd-config config user.email "ci@github.com"
+          git -C argocd-config config user.name "GitHub Actions"
+          git -C argocd-config commit -am "deploy: $PARTS $SHA"
+          git -C argocd-config push

@@ -1,0 +1,34 @@
+name: Master Deployment
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  detect-changes:
+    name: Detect Changes for Deployments
+    uses: ./.github/workflows/DetectChanges.yml
+
+  deploy_backend:
+    name: Deploy Backend & Migrator
+    needs: [detect-changes]
+    if: ${{ (needs.detect-changes.outputs.migrate == 'true' || needs.detect-changes.outputs.backend == 'true') && !failure() && !cancelled() }}
+    uses: ./.github/workflows/DeployBackend.yml
+    with:
+      deploy_migrator: ${{ needs.detect-changes.outputs.migrate == 'true' }}
+      deploy_backend: ${{ needs.detect-changes.outputs.backend == 'true' }}
+    secrets: inherit
+
+  deploy_frontend:
+    name: Deploy Frontend
+    needs: [detect-changes, deploy_backend]
+    if: ${{ needs.detect-changes.outputs.frontend == 'true' && !failure() && !cancelled() }}
+    uses: ./.github/workflows/DeployFrontend.yml
+    secrets: inherit
+
+  deploy_nginx:
+    name: Deploy Nginx
+    needs: [detect-changes]
+    if: ${{ needs.detect-changes.outputs.nginx == 'true' && !failure() && !cancelled() }}
+    uses: ./.github/workflows/DeployNginx.yml
+    secrets: inherit
