@@ -2,6 +2,8 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
 
+    <springProperty scope="context" name="consoleThreshold" source="logging.threshold.console" defaultValue="WARN"/>
+
     <appender name="OTEL" class="io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender">
         <captureExperimentalAttributes>true</captureExperimentalAttributes>
         <captureKeyValuePairAttributes>true</captureKeyValuePairAttributes>
@@ -11,7 +13,7 @@
 
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-            <level>WARN</level>
+            <level>${consoleThreshold}</level>
         </filter>
         <encoder>
             <pattern>%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd'T'HH:mm:ss.SSSXXX}} ${LOG_LEVEL_PATTERN:-%5p} ${PID:-} --- [%15.15t] ${LOG_CORRELATION_PATTERN:-}%-40.40logger{39} : %m %kvp%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}</pattern>

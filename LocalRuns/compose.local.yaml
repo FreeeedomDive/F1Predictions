@@ -1,3 +1,5 @@
+name: f1predictions
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -15,7 +17,7 @@ services:
     ports:
       - "8089:80"
     volumes:
-      - ./nginx/nginx.local.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx/nginx.local.conf:/etc/nginx/nginx.conf:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
