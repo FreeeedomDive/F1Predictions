@@ -9,16 +9,14 @@ spring:
       ddl-auto: validate
     open-in-view: false
   flyway:
-    # Migrations are applied by the migrator image (a Helm sync job), never by the service.
     enabled: false
 
 server:
   port: 8080
 
-f1:
-  discord:
-    enabled: false
-    token: ""
+discord:
+  enabled: false
+  token: ""
 
 management:
   endpoints:
