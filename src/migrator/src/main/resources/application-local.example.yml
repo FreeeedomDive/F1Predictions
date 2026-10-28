@@ -1,6 +1,0 @@
-# Copy to application-local.yml (gitignored) and fill in.
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:55432/f1predictions
-    username: f1predictions
-    password: f1predictions
