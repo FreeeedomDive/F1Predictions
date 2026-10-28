@@ -1,10 +1,8 @@
 package com.xdd.f1.infrastructure.persistence.league;
 
+import com.xdd.f1.application.league.LeagueNotFoundException;
 import com.xdd.f1.application.league.LeagueRepository;
-import com.xdd.f1.domain.league.League;
-import com.xdd.f1.domain.league.LeagueId;
-import com.xdd.f1.domain.league.LeagueSettings;
-import com.xdd.f1.domain.league.LeagueSource;
+import com.xdd.f1.domain.league.*;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -40,6 +38,12 @@ public class LeagueRepositoryAdapter implements LeagueRepository {
     public void create(League league) {
         var entity = toEntity(league);
         repository.save(entity);
+    }
+
+    @Override
+    public void updateNotificationsChannel(LeagueId id, String channelId) {
+        var league = repository.findById(id.value()).orElseThrow(() -> new LeagueNotFoundException(id));
+        league.settings.notificationsChannelId = channelId;
     }
 
     private League toDomain(LeagueEntity entity) {

@@ -11,4 +11,5 @@ public interface LeagueRepository {
     Optional<League> findByDiscordId(long guildId);
     List<League> findAll();
     void create(League league);
+    void updateNotificationsChannel(LeagueId id, String channelId);
 }

@@ -3,11 +3,16 @@ package com.xdd.f1.bootstrap.league;
 import com.xdd.f1.application.league.LeagueRepository;
 import com.xdd.f1.application.league.LeagueService;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
+import com.xdd.f1.domain.league.LeagueId;
+import com.xdd.f1.application.league.LeagueNotFoundException;
 import com.xdd.f1.domain.league.LeagueSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 class LeagueServiceIntegrationTest extends AbstractIntegrationTest {
 
@@ -41,7 +46,7 @@ class LeagueServiceIntegrationTest extends AbstractIntegrationTest {
     @Test
     void createsDiscordLeagueAndFindsItByGuildId() {
         var guildId = 1L;
-        var name = "Test server";
+        var name = "Test server 1";
 
         var created = service.ensureDiscordLeague(guildId, name);
 
@@ -58,7 +63,7 @@ class LeagueServiceIntegrationTest extends AbstractIntegrationTest {
     @Test
     void returnsExistingDiscordLeagueOnRepeatedCall() {
         var guildId = 2L;
-        var name = "Existing server";
+        var name = "Existing server 2";
 
         var first = service.ensureDiscordLeague(guildId, name);
         var second = service.ensureDiscordLeague(guildId, name);
@@ -68,5 +73,40 @@ class LeagueServiceIntegrationTest extends AbstractIntegrationTest {
         var loaded = repository.findByDiscordId(guildId).orElseThrow();
 
         assertThat(loaded.id()).isEqualTo(first.id());
+    }
+
+    @Test
+    void updatesNotificationsChannel() {
+        var guildId = 3L;
+        var name = "Server 3";
+        var league = service.ensureDiscordLeague(guildId, name);
+        var channelId = "some-channel-id";
+
+        service.updateNotificationsChannel(league.id(), channelId);
+
+        var loaded = repository.findByDiscordId(guildId).orElseThrow();
+        assertThat(loaded.settings().notificationsChannelId()).isEqualTo(channelId);
+    }
+
+    @Test
+    void erasesNotificationsChannel() {
+        var guildId = 4L;
+        var name = "Server 4";
+        var league = service.ensureDiscordLeague(guildId, name);
+        var channelId = "some-channel-id";
+        service.updateNotificationsChannel(league.id(), channelId);
+
+        service.updateNotificationsChannel(league.id(), null);
+
+        var loaded = repository.findByDiscordId(guildId).orElseThrow();
+        assertThat(loaded.settings().notificationsChannelId()).isNull();
+    }
+
+    @Test
+    void throwsOnUpdatingNotificationsChannelForNonExistingLeague() {
+        var channelId = "some-channel-id";
+
+        assertThatThrownBy(() -> service.updateNotificationsChannel(new LeagueId(UUID.randomUUID()), channelId))
+                .isInstanceOf(LeagueNotFoundException.class);
     }
 }

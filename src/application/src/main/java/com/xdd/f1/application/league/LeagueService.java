@@ -1,9 +1,6 @@
 package com.xdd.f1.application.league;
 
-import com.xdd.f1.domain.league.League;
-import com.xdd.f1.domain.league.LeagueId;
-import com.xdd.f1.domain.league.LeagueSettings;
-import com.xdd.f1.domain.league.LeagueSource;
+import com.xdd.f1.domain.league.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,5 +44,10 @@ public class LeagueService {
         );
         repository.create(league);
         return league;
+    }
+
+    @Transactional
+    public void updateNotificationsChannel(LeagueId id, String channelId) {
+        repository.updateNotificationsChannel(id, channelId);
     }
 }
