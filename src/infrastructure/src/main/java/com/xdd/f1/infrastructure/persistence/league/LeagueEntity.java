@@ -3,6 +3,7 @@ package com.xdd.f1.infrastructure.persistence.league;
 import jakarta.persistence.*;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -37,6 +38,13 @@ public class LeagueEntity {
     )
     LeagueSettingsEntity settings;
 
+    @OneToMany(mappedBy = "league", fetch = FetchType.LAZY)
+    List<LeagueParticipantEntity> participants;
+
     protected LeagueEntity() {
+    }
+
+    public UUID getId() {
+        return id;
     }
 }
