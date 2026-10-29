@@ -2,9 +2,9 @@ spring:
   flyway:
     enabled: true
 
-f1:
-  discord:
-    enabled: false
+discord:
+  enabled: false
+  token: ""
 
 management:
   otlp:

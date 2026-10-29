@@ -1,9 +1,10 @@
 name: Master Push
 
 on:
-  push:
-    branches:
-      - master
+  # Keep deployment manual until the MVP is ready.
+  # push:
+  #   branches:
+  #     - master
   workflow_dispatch:
 
 jobs:

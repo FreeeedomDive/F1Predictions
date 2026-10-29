@@ -39,8 +39,7 @@ dependencies {
 }
 
 tasks.bootRun {
-    // The repository root, where compose.yaml lives: spring-boot-docker-compose starts Postgres
-    // from there on bootRun.
-    workingDir = rootProject.projectDir.parentFile
+    // Match IntelliJ's working directory so the local Compose path resolves consistently.
+    workingDir = rootProject.projectDir
     args("--spring.profiles.active=local")
 }
