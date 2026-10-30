@@ -18,6 +18,9 @@ discord:
   enabled: false
   token: ""
 
+sessions:
+  hash-secret: ${SESSION_HASH_SECRET}
+
 management:
   endpoints:
     web:
@@ -52,6 +55,9 @@ spring:
     compose:
       # Local runs use src/ as their working directory in both IntelliJ and Gradle.
       file: ../LocalRuns/compose.local.yaml
+
+sessions:
+  hash-secret: ${SESSION_HASH_SECRET:local-development-only-session-hash-key}
 
 logging:
   threshold:

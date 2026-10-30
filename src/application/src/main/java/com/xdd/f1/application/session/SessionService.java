@@ -5,13 +5,13 @@ import com.xdd.f1.domain.user.UserId;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.crypto.Mac;
+import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.HexFormat;
+import java.security.GeneralSecurityException;
 import java.time.Clock;
+import java.time.Duration;
+import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,11 +20,13 @@ public class SessionService {
 
     private final SessionRepository sessionRepository;
     private final Clock clock;
+    private final SecretKey sessionHashKey;
     private static final Duration SESSION_TTL = Duration.ofDays(7);
 
-    public SessionService(SessionRepository sessionRepository, Clock clock) {
+    public SessionService(SessionRepository sessionRepository, Clock clock, SecretKey sessionHashKey) {
         this.sessionRepository = sessionRepository;
         this.clock = clock;
+        this.sessionHashKey = sessionHashKey;
     }
 
     @Transactional
@@ -61,17 +63,18 @@ public class SessionService {
         return sessionRepository.deleteExpired(clock.instant());
     }
 
-    private static String getHash(String token) {
+    private String getHash(String token) {
         try {
-            var digest = MessageDigest.getInstance("SHA-256");
-            var bytes = digest.digest(
+            var mac = Mac.getInstance("HmacSHA256");
+            mac.init(sessionHashKey);
+            var bytes = mac.doFinal(
                     token.getBytes(StandardCharsets.UTF_8)
             );
 
             return HexFormat.of().formatHex(bytes);
-        } catch (NoSuchAlgorithmException exception) {
+        } catch (GeneralSecurityException exception) {
             throw new IllegalStateException(
-                    "SHA-256 is not available",
+                    "Failed to compute the session token HMAC",
                     exception
             );
         }

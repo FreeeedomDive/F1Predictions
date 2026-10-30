@@ -6,8 +6,12 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 
 public interface SessionJpaRepository extends JpaRepository<SessionEntity, String> {
+    List<SessionEntity> findByUser_Id(UUID userId);
+
     @Modifying
     @Query("""
         delete from SessionEntity s

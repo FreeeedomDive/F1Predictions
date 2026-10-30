@@ -26,4 +26,8 @@ public class SessionEntity {
 
     protected SessionEntity() {
     }
+
+    public String getHash() {
+        return hash;
+    }
 }

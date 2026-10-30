@@ -6,6 +6,9 @@ discord:
   enabled: false
   token: ""
 
+sessions:
+  hash-secret: integration-test-session-hash-key
+
 management:
   otlp:
     metrics:
