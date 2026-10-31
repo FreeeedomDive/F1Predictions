@@ -1,8 +1,8 @@
 package com.xdd.f1.discord.configuration;
 
 import com.xdd.f1.contract.league.LeagueApi;
-import com.xdd.f1.discord.commands.AbstractCommand;
-import com.xdd.f1.discord.commands.CommandListener;
+import com.xdd.f1.discord.commands.core.AbstractCommand;
+import com.xdd.f1.discord.commands.core.CommandListener;
 import com.xdd.f1.discord.league.LeagueGuildListener;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.JDABuilder;
@@ -17,7 +17,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Configuration
-@EnableConfigurationProperties(DiscordProperties.class)
+@EnableConfigurationProperties({
+        DiscordProperties.class,
+        WebAppProperties.class
+})
 @ConditionalOnProperty(
         prefix = "discord",
         name = "enabled",
