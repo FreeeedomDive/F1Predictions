@@ -1,6 +1,8 @@
 package com.xdd.f1.bootstrap.session;
 
 import com.xdd.f1.application.session.SessionService;
+import com.xdd.f1.bootstrap.auth.AllowAnonymous;
+import com.xdd.f1.bootstrap.auth.SessionCookie;
 import com.xdd.f1.contract.session.AuthRequestDto;
 import com.xdd.f1.contract.session.AuthResponseDto;
 import org.springframework.http.HttpHeaders;
@@ -15,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Clock;
 import java.time.Duration;
 
+@AllowAnonymous
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -43,7 +46,7 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        var cookie = ResponseCookie.from("f1_session", request.token())
+        var cookie = ResponseCookie.from(SessionCookie.NAME, request.token())
                 .httpOnly(true)
                 .secure(true)
                 .sameSite("Lax")
