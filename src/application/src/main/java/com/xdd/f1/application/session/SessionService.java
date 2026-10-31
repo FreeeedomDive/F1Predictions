@@ -59,6 +59,15 @@ public class SessionService {
     }
 
     @Transactional
+    public void revoke(String token) {
+        if (token == null || token.isBlank()) {
+            return;
+        }
+
+        sessionRepository.deleteByHash(getHash(token));
+    }
+
+    @Transactional
     public int deleteExpired() {
         return sessionRepository.deleteExpired(clock.instant());
     }

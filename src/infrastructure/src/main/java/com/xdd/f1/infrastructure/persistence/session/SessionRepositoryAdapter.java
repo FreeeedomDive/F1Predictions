@@ -42,6 +42,11 @@ public class SessionRepositoryAdapter implements SessionRepository {
     }
 
     @Override
+    public void deleteByHash(String hash) {
+        sessionJpaRepository.deleteById(hash);
+    }
+
+    @Override
     public int deleteExpired(Instant now) {
         return sessionJpaRepository.deleteExpired(now);
     }

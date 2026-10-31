@@ -6,7 +6,6 @@ import com.xdd.f1.bootstrap.auth.AuthenticatedUser;
 import com.xdd.f1.bootstrap.auth.CurrentUser;
 import com.xdd.f1.contract.user.MeResponseDto;
 import com.xdd.f1.contract.user.UserLeagueDto;
-import com.xdd.f1.domain.user.UserId;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
