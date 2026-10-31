@@ -7,8 +7,9 @@ import com.xdd.f1.contract.session.AuthRequestDto;
 import com.xdd.f1.contract.session.AuthResponseDto;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,11 +47,7 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        var cookie = ResponseCookie.from(SessionCookie.NAME, request.token())
-                .httpOnly(true)
-                .secure(true)
-                .sameSite("Lax")
-                .path("/")
+        var cookie = SessionCookie.builder(request.token())
                 .maxAge(maxAgeSeconds)
                 .build();
 
@@ -59,5 +56,17 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(response);
 
+    }
+
+    @DeleteMapping
+    public ResponseEntity<Void> logout(
+            @CookieValue(name = SessionCookie.NAME, required = false) String token
+    ) {
+        sessionService.revoke(token);
+        var cookie = SessionCookie.builder("").maxAge(0).build();
+
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .build();
     }
 }

@@ -2,6 +2,7 @@ package com.xdd.f1.infrastructure.persistence.league;
 
 import com.xdd.f1.application.league.LeagueParticipantNotFoundException;
 import com.xdd.f1.application.league.LeagueParticipantRepository;
+import com.xdd.f1.application.league.UserLeague;
 import com.xdd.f1.domain.league.LeagueId;
 import com.xdd.f1.domain.league.LeagueParticipant;
 import com.xdd.f1.domain.league.LeagueParticipantId;
@@ -9,6 +10,7 @@ import com.xdd.f1.domain.user.UserId;
 import com.xdd.f1.infrastructure.persistence.user.UserJpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -32,6 +34,19 @@ public class LeagueParticipantRepositoryAdapter implements LeagueParticipantRepo
     public Optional<LeagueParticipant> findByLeagueAndUser(LeagueId leagueId, UserId userId) {
         var entity = leagueParticipantJpaRepository.findByLeague_IdAndUser_Id(leagueId.value(), userId.value());
         return entity.map(this::toDomain);
+    }
+
+    @Override
+    public List<UserLeague> findLeaguesByUserId(UserId userId) {
+        return leagueParticipantJpaRepository.findLeaguesByUserId(userId.value())
+                .stream()
+                .map(row -> new UserLeague(
+                        new LeagueId(row.getLeagueId()),
+                        new LeagueParticipantId(row.getParticipantId()),
+                        row.getLeagueName(),
+                        row.getParticipantName()
+                ))
+                .toList();
     }
 
     @Override

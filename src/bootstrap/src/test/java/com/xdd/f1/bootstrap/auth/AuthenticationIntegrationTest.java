@@ -12,6 +12,9 @@ import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.HttpHeaders;
@@ -28,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -143,5 +147,43 @@ class AuthenticationIntegrationTest extends AbstractIntegrationTest {
     void leavesHealthEndpointOutsideApiAuthentication() throws Exception {
         mvc.perform(get("/actuator/health").cookie(new Cookie(SessionCookie.NAME, "unknown-token")))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void logsOutCurrentSessionAndKeepsOtherSessionsActive() throws Exception {
+        var token = sessions.create(userId);
+        var otherToken = sessions.create(userId);
+
+        mvc.perform(delete("/api/v1/auth").cookie(new Cookie(SessionCookie.NAME, token)))
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().value(SessionCookie.NAME, ""))
+                .andExpect(cookie().maxAge(SessionCookie.NAME, 0))
+                .andExpect(cookie().path(SessionCookie.NAME, "/"))
+                .andExpect(cookie().httpOnly(SessionCookie.NAME, true))
+                .andExpect(cookie().secure(SessionCookie.NAME, true));
+
+        mvc.perform(get("/api/v1/me").cookie(new Cookie(SessionCookie.NAME, token)))
+                .andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/v1/me").cookie(new Cookie(SessionCookie.NAME, otherToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.userId").value(userId.value().toString()));
+
+        mvc.perform(delete("/api/v1/auth").cookie(new Cookie(SessionCookie.NAME, token)))
+                .andExpect(status().isNoContent());
+    }
+
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"unknown-token"})
+    void clearsCookieEvenWhenSessionIsMissing(String token) throws Exception {
+        var request = delete("/api/v1/auth");
+        if (token != null) {
+            request.cookie(new Cookie(SessionCookie.NAME, token));
+        }
+
+        mvc.perform(request)
+                .andExpect(status().isNoContent())
+                .andExpect(cookie().value(SessionCookie.NAME, ""))
+                .andExpect(cookie().maxAge(SessionCookie.NAME, 0));
     }
 }

@@ -9,5 +9,6 @@ public interface SessionRepository {
     void create(Session session);
     Optional<Session> findByHash(String hash);
     void updateLastUsedAt(String hash, Instant lastUsedAt);
+    void deleteByHash(String hash);
     int deleteExpired(Instant now);
 }

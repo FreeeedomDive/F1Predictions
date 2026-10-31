@@ -20,6 +20,7 @@ discord:
 
 sessions:
   hash-secret: ${SESSION_HASH_SECRET}
+  cleanup-interval: PT1H
 
 management:
   endpoints:
