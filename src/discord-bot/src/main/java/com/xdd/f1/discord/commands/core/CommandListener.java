@@ -1,4 +1,4 @@
-package com.xdd.f1.discord.commands;
+package com.xdd.f1.discord.commands.core;
 
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;

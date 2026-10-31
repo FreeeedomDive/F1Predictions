@@ -1,14 +1,12 @@
 package com.xdd.f1.discord.commands.settings;
 
 import com.xdd.f1.contract.league.LeagueApi;
-import com.xdd.f1.discord.commands.*;
-import net.dv8tion.jda.api.Permission;
+import com.xdd.f1.discord.commands.core.*;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
 import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import java.util.Objects;
 import java.util.concurrent.ExecutorService;
@@ -44,7 +42,7 @@ public class NotificationsChannelCommand extends AbstractCommand {
     }
 
     @Override
-    protected String getErrorMessage(CommandContext context) {
+    protected String validateInput(CommandContext context) {
         var modeOption = context.event().getOption("mode");
 
         if (modeOption == null) {

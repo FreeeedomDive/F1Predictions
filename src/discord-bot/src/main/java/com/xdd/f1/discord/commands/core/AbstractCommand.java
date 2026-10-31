@@ -1,4 +1,4 @@
-package com.xdd.f1.discord.commands;
+package com.xdd.f1.discord.commands.core;
 
 import com.xdd.f1.contract.league.LeagueApi;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -13,7 +13,7 @@ public abstract class AbstractCommand {
     private final Logger log;
 
     protected abstract CommandDefinition definition();
-    protected abstract String getErrorMessage(CommandContext context);
+    protected abstract String validateInput(CommandContext context);
     protected abstract String executeWithResponse(CommandContext context);
 
     protected AbstractCommand(
@@ -46,9 +46,9 @@ public abstract class AbstractCommand {
                                         guildId,
                                         guildName
                                 );
-                                var context = new CommandContext(event, league);
+                                var context = new CommandContext(event, league, member);
 
-                                var errorMessage = getErrorMessage(context);
+                                var errorMessage = validateInput(context);
 
                                 if (!errorMessage.isEmpty()) {
                                     hook.editOriginal(errorMessage).queue();

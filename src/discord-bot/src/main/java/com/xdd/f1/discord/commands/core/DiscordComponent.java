@@ -1,4 +1,4 @@
-package com.xdd.f1.discord.commands;
+package com.xdd.f1.discord.commands.core;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
