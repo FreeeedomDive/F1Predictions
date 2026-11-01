@@ -4,6 +4,7 @@ CREATE TABLE races
     season   integer     NOT NULL,
     round    integer     NOT NULL,
     type     varchar(16) NOT NULL,
+    name     text        NOT NULL,
     status   varchar(16) NOT NULL,
     open_at  timestamptz NOT NULL,
     close_at timestamptz NOT NULL,
