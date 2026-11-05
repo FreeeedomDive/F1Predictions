@@ -40,6 +40,7 @@ class LeagueServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(loaded.source()).isEqualTo(new LeagueSource.Manual());
         assertThat(loaded.settings()).isNotNull();
         assertThat(loaded.settings().notificationsChannelId()).isNull();
+        assertThat(loaded.settings().sprintsEnabled()).isFalse();
         assertThat(loaded.createdAt()).isNotNull();
     }
 
@@ -58,6 +59,7 @@ class LeagueServiceIntegrationTest extends AbstractIntegrationTest {
                 .isEqualTo(new LeagueSource.Discord(guildId));
         assertThat(loaded.settings()).isNotNull();
         assertThat(loaded.settings().notificationsChannelId()).isNull();
+        assertThat(loaded.settings().sprintsEnabled()).isFalse();
     }
 
     @Test
@@ -100,6 +102,7 @@ class LeagueServiceIntegrationTest extends AbstractIntegrationTest {
 
         var loaded = repository.findByDiscordId(guildId).orElseThrow();
         assertThat(loaded.settings().notificationsChannelId()).isNull();
+        assertThat(loaded.settings().sprintsEnabled()).isFalse();
     }
 
     @Test

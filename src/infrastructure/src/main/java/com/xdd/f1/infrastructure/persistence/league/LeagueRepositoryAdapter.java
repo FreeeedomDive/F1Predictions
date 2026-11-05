@@ -52,7 +52,16 @@ public class LeagueRepositoryAdapter implements LeagueRepository {
             case MANUAL -> new LeagueSource.Manual();
         };
 
-        return new League(new LeagueId(entity.id), entity.name, source, new LeagueSettings(entity.settings.notificationsChannelId), entity.createdAt);
+        return new League(
+                new LeagueId(entity.id),
+                entity.name,
+                source,
+                new LeagueSettings(
+                        entity.settings.notificationsChannelId,
+                        entity.settings.sprintsEnabled
+                ),
+                entity.createdAt
+        );
     }
 
     private LeagueEntity toEntity(League league) {
@@ -74,6 +83,7 @@ public class LeagueRepositoryAdapter implements LeagueRepository {
 
         var leagueSettingsEntity = new LeagueSettingsEntity();
         leagueSettingsEntity.notificationsChannelId = league.settings().notificationsChannelId();
+        leagueSettingsEntity.sprintsEnabled = league.settings().sprintsEnabled();
 
         leagueEntity.settings = leagueSettingsEntity;
         leagueSettingsEntity.league = leagueEntity;

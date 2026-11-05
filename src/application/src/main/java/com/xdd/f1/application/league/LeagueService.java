@@ -28,7 +28,7 @@ public class LeagueService {
                 new LeagueId(UUID.randomUUID()),
                 name,
                 new LeagueSource.Manual(),
-                new LeagueSettings(null),
+                new LeagueSettings(null, false),
                 Instant.now()
         );
         repository.create(league);
@@ -46,7 +46,7 @@ public class LeagueService {
                 new LeagueId(UUID.randomUUID()),
                 name,
                 new LeagueSource.Discord(guildId),
-                new LeagueSettings(null),
+                new LeagueSettings(null, false),
                 Instant.now()
         );
         repository.create(league);

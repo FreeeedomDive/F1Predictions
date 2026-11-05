@@ -1,8 +1,7 @@
 CREATE TABLE users
 (
     id         uuid PRIMARY KEY,
-    created_at timestamptz NOT NULL,
-    version    bigint      NOT NULL
+    created_at timestamptz NOT NULL
 );
 
 create table user_identities
