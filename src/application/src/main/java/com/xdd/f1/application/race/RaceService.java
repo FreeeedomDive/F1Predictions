@@ -52,7 +52,7 @@ public class RaceService {
                 openAt,
                 closeAt
         );
-        raceRepository.createOrUpdate(race);
+        raceRepository.create(race);
         return race;
     }
 
@@ -71,20 +71,20 @@ public class RaceService {
     public void openRacePredictions(RaceId id) {
         var race = raceRepository.findById(id).orElseThrow(() -> new RaceNotFoundException(id));
         var updatedRace = race.open();
-        raceRepository.createOrUpdate(updatedRace);
+        raceRepository.update(updatedRace);
     }
 
     @Transactional
     public void closeRacePredictions(RaceId id) {
         var race = raceRepository.findById(id).orElseThrow(() -> new RaceNotFoundException(id));
         var updatedRace = race.close();
-        raceRepository.createOrUpdate(updatedRace);
+        raceRepository.update(updatedRace);
     }
 
     @Transactional
     public void finishRace(RaceId id) {
         var race = raceRepository.findById(id).orElseThrow(() -> new RaceNotFoundException(id));
         var updatedRace = race.finish();
-        raceRepository.createOrUpdate(updatedRace);
+        raceRepository.update(updatedRace);
     }
 }
