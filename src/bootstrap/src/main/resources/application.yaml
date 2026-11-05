@@ -22,6 +22,11 @@ sessions:
   hash-secret: ${SESSION_HASH_SECRET}
   cleanup-interval: PT1H
 
+races:
+  transition-scheduler:
+    enabled: true
+    interval: PT1M
+
 management:
   endpoints:
     web:

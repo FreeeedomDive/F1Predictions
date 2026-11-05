@@ -9,7 +9,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -57,14 +59,23 @@ public class RaceService {
     }
 
     @Transactional
-    public void processScheduledTransitions() {
+    public Map<RaceId, RaceStatus> processScheduledTransitions() {
         var now = clock.instant();
+        var result = new HashMap<RaceId, RaceStatus>();
 
         raceRepository.findRacesToOpen(now)
-                .forEach(race -> openRacePredictions(race.id()));
+                .forEach(race -> {
+                    openRacePredictions(race.id());
+                    result.put(race.id(), RaceStatus.OPEN);
+                });
 
         raceRepository.findRacesToClose(now)
-                .forEach(race -> closeRacePredictions(race.id()));
+                .forEach(race -> {
+                    closeRacePredictions(race.id());
+                    result.put(race.id(), RaceStatus.CLOSED);
+                });
+
+        return result;
     }
 
     @Transactional
