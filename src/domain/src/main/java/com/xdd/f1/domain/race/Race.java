@@ -31,4 +31,29 @@ public record Race(
             throw new IllegalArgumentException("Open time must be before close time");
         }
     }
+
+    public Race open() {
+        return changeStatus(RaceStatus.SCHEDULED, RaceStatus.OPEN);
+    }
+
+    public Race close() {
+        return changeStatus(RaceStatus.OPEN, RaceStatus.CLOSED);
+    }
+
+    public Race finish() {
+        return changeStatus(RaceStatus.CLOSED, RaceStatus.FINISHED);
+    }
+
+    private Race changeStatus(RaceStatus requiredOldStatus, RaceStatus newStatus) {
+        if (status != requiredOldStatus) {
+            throw new IllegalStateException("Race must be in status " + requiredOldStatus + " to be changed to " + newStatus);
+        }
+
+        if (requiredOldStatus == newStatus){
+            return this;
+        }
+
+
+        return new Race(id, season, round, type, name, newStatus, openAt, closeAt);
+    }
 }
