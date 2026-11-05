@@ -29,6 +29,8 @@ public class RaceTransitionScheduler {
     )
     public void scheduleRaceTransitions() {
         var result = raceService.processScheduledTransitions();
-        LOGGER.info("Processed race transitions: {}", result);
+        if (!result.isEmpty()){
+            LOGGER.info("Processed race transitions: {}", result);
+        }
     }
 }

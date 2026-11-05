@@ -92,21 +92,14 @@ public class RaceService {
             ).findFirst();
             if (existingRace.isEmpty()) {
                 create(e.season(), e.round(), e.type(), e.name(), e.openAt(), e.closeAt());
-            } else if (!existingRace.get().name().equals(e.name())
-                    || !existingRace.get().openAt().equals(e.openAt())
-                    || !existingRace.get().closeAt().equals(e.closeAt())
-            ){
-                var updatedRace = new Race(
-                        existingRace.get().id(),
-                        existingRace.get().season(),
-                        existingRace.get().round(),
-                        existingRace.get().type(),
-                        e.name(),
-                        existingRace.get().status(),
-                        e.openAt(),
-                        e.closeAt()
-                );
-                raceRepository.update(updatedRace);
+            } else {
+                var currentRace = existingRace.get();
+                var updatedRace = currentRace
+                        .rename(e.name())
+                        .reschedule(e.openAt(), e.closeAt());
+                if (!updatedRace.equals(currentRace)) {
+                    raceRepository.update(updatedRace);
+                }
             }
         });
     }

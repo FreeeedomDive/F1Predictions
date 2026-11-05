@@ -24,6 +24,14 @@ public record Race(RaceId id, int season, int round, RaceType type, String name,
         }
     }
 
+    public Race rename(String newName) {
+        return new Race(id, season, round, type, newName, status, openAt, closeAt);
+    }
+
+    public Race reschedule(Instant newOpenAt, Instant newCloseAt) {
+        return new Race(id, season, round, type, name, status, newOpenAt, newCloseAt);
+    }
+
     public Race open() {
         return changeStatus(RaceStatus.SCHEDULED, RaceStatus.OPEN);
     }
