@@ -1,4 +1,4 @@
-package com.xdd.f1.infrastructure.persistence.race.jolpica;
+package com.xdd.f1.infrastructure.http.jolpica;
 
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.service.annotation.GetExchange;

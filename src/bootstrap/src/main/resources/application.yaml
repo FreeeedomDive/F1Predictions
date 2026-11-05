@@ -26,6 +26,10 @@ races:
   transition-scheduler:
     enabled: true
     interval: PT1M
+  calendar-sync:
+    enabled: true
+    season: 2027
+    interval: PT1D
 
 jolpica:
   base-url: https://api.jolpi.ca/ergast/f1

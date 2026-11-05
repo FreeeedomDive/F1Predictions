@@ -1,6 +1,6 @@
 package com.xdd.f1.bootstrap.race;
 
-import com.xdd.f1.infrastructure.persistence.race.jolpica.JolpicaClient;
+import com.xdd.f1.infrastructure.http.jolpica.JolpicaClient;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

@@ -12,6 +12,8 @@ sessions:
 races:
   transition-scheduler:
     enabled: false
+  calendar-sync:
+    enabled: false
 
 management:
   otlp:

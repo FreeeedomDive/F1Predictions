@@ -1,4 +1,4 @@
-package com.xdd.f1.infrastructure.persistence.race.jolpica;
+package com.xdd.f1.infrastructure.http.jolpica;
 
 import com.xdd.f1.application.race.RaceCalendarEntry;
 import com.xdd.f1.application.race.RaceCalendarProvider;

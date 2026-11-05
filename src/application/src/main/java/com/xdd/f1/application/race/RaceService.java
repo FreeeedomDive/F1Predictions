@@ -17,13 +17,16 @@ import java.util.UUID;
 @Service
 public class RaceService {
     private final RaceRepository raceRepository;
+    private final RaceCalendarProvider raceCalendarProvider;
     private final Clock clock;
 
     public RaceService(
             RaceRepository raceRepository,
+            RaceCalendarProvider raceCalendarProvider,
             Clock clock
     ) {
         this.raceRepository = raceRepository;
+        this.raceCalendarProvider = raceCalendarProvider;
         this.clock = clock;
     }
 
@@ -76,6 +79,36 @@ public class RaceService {
                 });
 
         return result;
+    }
+
+    @Transactional
+    public void syncCalendar(int season) {
+        var currentSeason = raceRepository.findAllBySeason(season);
+        var seasonEntries = raceCalendarProvider.loadSeason(season);
+        seasonEntries.forEach(e -> {
+            var existingRace = currentSeason.stream().filter(r ->
+                    r.round() == e.round()
+                    && r.type() == e.type()
+            ).findFirst();
+            if (existingRace.isEmpty()) {
+                create(e.season(), e.round(), e.type(), e.name(), e.openAt(), e.closeAt());
+            } else if (!existingRace.get().name().equals(e.name())
+                    || !existingRace.get().openAt().equals(e.openAt())
+                    || !existingRace.get().closeAt().equals(e.closeAt())
+            ){
+                var updatedRace = new Race(
+                        existingRace.get().id(),
+                        existingRace.get().season(),
+                        existingRace.get().round(),
+                        existingRace.get().type(),
+                        e.name(),
+                        existingRace.get().status(),
+                        e.openAt(),
+                        e.closeAt()
+                );
+                raceRepository.update(updatedRace);
+            }
+        });
     }
 
     @Transactional
