@@ -12,6 +12,7 @@ otel-logback-appender = "2.28.0-alpha"
 spring-boot-starter = { module = "org.springframework.boot:spring-boot-starter" }
 spring-boot-starter-jdbc = { module = "org.springframework.boot:spring-boot-starter-jdbc" }
 spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
+spring-boot-starter-restclient = { module = "org.springframework.boot:spring-boot-starter-restclient" }
 spring-boot-starter-webclient = { module = "org.springframework.boot:spring-boot-starter-webclient" }
 spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
 spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
@@ -22,6 +23,7 @@ postgresql = { module = "org.postgresql:postgresql" }
 spring-context = { module = "org.springframework:spring-context" }
 spring-tx = { module = "org.springframework:spring-tx" }
 spring-web = { module = "org.springframework:spring-web" }
+jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations" }
 
 # Phase 2 / later stages: messaging, auth, sessions. Not wired into any module yet.
 spring-boot-starter-amqp = { module = "org.springframework.boot:spring-boot-starter-amqp" }

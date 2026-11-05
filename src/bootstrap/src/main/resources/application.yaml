@@ -27,6 +27,9 @@ races:
     enabled: true
     interval: PT1M
 
+jolpica:
+  base-url: https://api.jolpi.ca/ergast/f1
+
 management:
   endpoints:
     web:
