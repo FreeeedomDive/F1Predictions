@@ -119,6 +119,27 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
                 .isInstanceOf(RaceNotFoundException.class);
     }
 
+    @Test
+    void doesNothingIfRaceIsAlreadyOpened() {
+        var toOpen = createRace(2027, 1, "Bahrain Grand Prix", NOW, NOW.plusSeconds(3600));
+        service.openRacePredictions(toOpen.id());
+
+        service.openRacePredictions(toOpen.id());
+
+        assertThat(service.getById(toOpen.id()).status()).isEqualTo(RaceStatus.OPEN);
+    }
+
+    @Test
+    void doesNothingIfRaceIsAlreadyClosed() {
+        var toClose = createRace(2027, 1, "Bahrain Grand Prix", NOW, NOW.plusSeconds(3600));
+        service.openRacePredictions(toClose.id());
+        service.closeRacePredictions(toClose.id());
+
+        service.closeRacePredictions(toClose.id());
+
+        assertThat(service.getById(toClose.id()).status()).isEqualTo(RaceStatus.CLOSED);
+    }
+
     private Race createRace(int season, int round, String name, Instant openAt, Instant closeAt) {
         return service.create(season, round, RaceType.RACE, name, openAt, closeAt);
     }

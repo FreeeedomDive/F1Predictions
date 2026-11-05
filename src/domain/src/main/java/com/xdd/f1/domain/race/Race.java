@@ -3,16 +3,8 @@ package com.xdd.f1.domain.race;
 import java.time.Instant;
 import java.util.Objects;
 
-public record Race(
-        RaceId id,
-        int season,
-        int round,
-        RaceType type,
-        String name,
-        RaceStatus status,
-        Instant openAt,
-        Instant closeAt
-) {
+public record Race(RaceId id, int season, int round, RaceType type, String name, RaceStatus status, Instant openAt,
+                   Instant closeAt) {
     public Race {
         Objects.requireNonNull(id, "Race ID must not be null");
         if (season <= 0) {
@@ -45,14 +37,13 @@ public record Race(
     }
 
     private Race changeStatus(RaceStatus requiredOldStatus, RaceStatus newStatus) {
-        if (status != requiredOldStatus) {
-            throw new IllegalStateException("Race must be in status " + requiredOldStatus + " to be changed to " + newStatus);
-        }
-
-        if (requiredOldStatus == newStatus){
+        if (status == newStatus) {
             return this;
         }
 
+        if (status != requiredOldStatus) {
+            throw new IllegalStateException("Race must be in status " + requiredOldStatus + " to be changed to " + newStatus);
+        }
 
         return new Race(id, season, round, type, name, newStatus, openAt, closeAt);
     }
