@@ -58,6 +58,14 @@ public class LeagueService {
         return participantRepository.findLeaguesByUserId(userId);
     }
 
+    @Transactional(readOnly = true)
+    public List<League> findAllDiscordLeagues() {
+        var leagues = repository.findAll();
+        return leagues.stream()
+                .filter(league -> league.source() instanceof LeagueSource.Discord)
+                .toList();
+    }
+
     @Transactional
     public void updateNotificationsChannel(LeagueId id, String channelId) {
         repository.updateNotificationsChannel(id, channelId);

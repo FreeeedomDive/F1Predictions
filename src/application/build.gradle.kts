@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     api(project(":domain"))
+    implementation(project(":api-contract"))
 
     implementation(libs.spring.context)
     implementation(libs.spring.tx)

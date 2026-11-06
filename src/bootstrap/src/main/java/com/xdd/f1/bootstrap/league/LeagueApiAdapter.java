@@ -8,6 +8,7 @@ import com.xdd.f1.domain.league.League;
 import com.xdd.f1.domain.league.LeagueId;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -28,6 +29,13 @@ public class LeagueApiAdapter implements LeagueApi {
     @Override
     public void updateNotificationsChannel(UUID leagueId, String channelId) {
         service.updateNotificationsChannel(new LeagueId(leagueId), channelId);
+    }
+
+    @Override
+    public List<LeagueDto> findDiscordLeagues() {
+        return service.findAllDiscordLeagues().stream()
+                .map(this::toDto)
+                .toList();
     }
 
     private LeagueDto toDto(League league) {

@@ -1,9 +1,12 @@
 package com.xdd.f1.application.race;
 
+import com.xdd.f1.contract.race.RaceClosedEvent;
+import com.xdd.f1.contract.race.RaceOpenedEvent;
 import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
 import com.xdd.f1.domain.race.RaceType;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,15 +21,18 @@ import java.util.UUID;
 public class RaceService {
     private final RaceRepository raceRepository;
     private final RaceCalendarProvider raceCalendarProvider;
+    private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
     public RaceService(
             RaceRepository raceRepository,
             RaceCalendarProvider raceCalendarProvider,
+            ApplicationEventPublisher eventPublisher,
             Clock clock
     ) {
         this.raceRepository = raceRepository;
         this.raceCalendarProvider = raceCalendarProvider;
+        this.eventPublisher = eventPublisher;
         this.clock = clock;
     }
 
@@ -88,7 +94,7 @@ public class RaceService {
         seasonEntries.forEach(e -> {
             var existingRace = currentSeason.stream().filter(r ->
                     r.round() == e.round()
-                    && r.type() == e.type()
+                            && r.type() == e.type()
             ).findFirst();
             if (existingRace.isEmpty()) {
                 create(e.season(), e.round(), e.type(), e.name(), e.openAt(), e.closeAt());
@@ -108,6 +114,15 @@ public class RaceService {
     public void openRacePredictions(RaceId id) {
         var race = raceRepository.findById(id).orElseThrow(() -> new RaceNotFoundException(id));
         var updatedRace = race.open();
+        if (race.equals(updatedRace)) {
+            return;
+        }
+        eventPublisher.publishEvent(new RaceOpenedEvent(
+                updatedRace.id().value(),
+                updatedRace.name(),
+                String.valueOf(updatedRace.type()),
+                updatedRace.closeAt()
+        ));
         raceRepository.update(updatedRace);
     }
 
@@ -115,6 +130,10 @@ public class RaceService {
     public void closeRacePredictions(RaceId id) {
         var race = raceRepository.findById(id).orElseThrow(() -> new RaceNotFoundException(id));
         var updatedRace = race.close();
+        if (race.equals(updatedRace)) {
+            return;
+        }
+        eventPublisher.publishEvent(new RaceClosedEvent(updatedRace.id().value(), updatedRace.name(), String.valueOf(updatedRace.type())));
         raceRepository.update(updatedRace);
     }
 

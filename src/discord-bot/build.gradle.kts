@@ -11,4 +11,5 @@ dependencies {
     implementation(libs.jda)
     implementation(libs.spring.context)
     implementation(libs.spring.boot.starter)
+    implementation(libs.spring.modulith.events.api)
 }
