@@ -10,6 +10,9 @@ spring:
     open-in-view: false
   flyway:
     enabled: false
+  modulith:
+    events:
+      republish-outstanding-events-on-restart: true
 
 server:
   port: 8080
@@ -33,6 +36,8 @@ races:
 
 jolpica:
   base-url: https://api.jolpi.ca/ergast/f1
+  connect-timeout: PT3S
+  read-timeout: PT10S
 
 management:
   endpoints:

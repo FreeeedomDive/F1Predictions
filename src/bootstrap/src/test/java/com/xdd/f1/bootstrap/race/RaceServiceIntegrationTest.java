@@ -1,24 +1,40 @@
 package com.xdd.f1.bootstrap.race;
 
+import com.xdd.f1.application.league.LeagueParticipantService;
+import com.xdd.f1.application.league.LeagueRepository;
 import com.xdd.f1.application.race.RaceCalendarEntry;
 import com.xdd.f1.application.race.RaceCalendarProvider;
+import com.xdd.f1.application.race.RaceCalendarSyncService;
 import com.xdd.f1.application.race.RaceNotFoundException;
 import com.xdd.f1.application.race.RaceService;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
+import com.xdd.f1.domain.league.League;
+import com.xdd.f1.domain.league.LeagueId;
+import com.xdd.f1.domain.league.LeagueSettings;
+import com.xdd.f1.domain.league.LeagueSource;
 import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
 import com.xdd.f1.domain.race.RaceType;
+import com.xdd.f1.domain.user.UserId;
+import com.xdd.f1.domain.user.UserIdentityId;
+import com.xdd.f1.domain.user.UserIdentitySource;
+import com.xdd.f1.infrastructure.persistence.league.LeagueJpaRepository;
 import com.xdd.f1.infrastructure.persistence.race.RaceJpaRepository;
+import com.xdd.f1.infrastructure.persistence.user.UserJpaRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,6 +47,14 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
 
     private final RaceService service;
     private final RaceJpaRepository jpaRepository;
+    private final RaceCalendarSyncService calendarSync;
+    private final LeagueRepository leagues;
+    private final LeagueParticipantService participants;
+    private final LeagueJpaRepository leagueJpaRepository;
+    private final UserJpaRepository userJpaRepository;
+
+    private LeagueId createdLeagueId;
+    private UserId createdUserId;
 
     @MockitoBean
     private Clock clock;
@@ -39,19 +63,39 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
     private RaceCalendarProvider calendarProvider;
 
     @Autowired
-    RaceServiceIntegrationTest(RaceService service, RaceJpaRepository jpaRepository) {
+    RaceServiceIntegrationTest(
+            RaceService service,
+            RaceJpaRepository jpaRepository,
+            RaceCalendarSyncService calendarSync,
+            LeagueRepository leagues,
+            LeagueParticipantService participants,
+            LeagueJpaRepository leagueJpaRepository,
+            UserJpaRepository userJpaRepository
+    ) {
         this.service = service;
         this.jpaRepository = jpaRepository;
+        this.calendarSync = calendarSync;
+        this.leagues = leagues;
+        this.participants = participants;
+        this.leagueJpaRepository = leagueJpaRepository;
+        this.userJpaRepository = userJpaRepository;
     }
 
     @BeforeEach
     void setUp() {
         when(clock.instant()).thenReturn(NOW);
+        when(clock.getZone()).thenReturn(ZoneOffset.UTC);
     }
 
     @AfterEach
     void cleanUp() {
         jpaRepository.deleteAll();
+        if (createdUserId != null) {
+            userJpaRepository.deleteById(createdUserId.value());
+        }
+        if (createdLeagueId != null) {
+            leagueJpaRepository.deleteById(createdLeagueId.value());
+        }
     }
 
     @Test
@@ -152,7 +196,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         var sprint = calendarEntry(RaceType.SPRINT, "Bahrain Grand Prix", NOW, NOW.plusSeconds(3600));
         when(calendarProvider.loadSeason(2027)).thenReturn(List.of(race, sprint));
 
-        service.syncCalendar(2027);
+        calendarSync.syncCalendar(2027);
 
         var races = service.findAllBySeason(2027);
         assertThat(races).hasSize(2);
@@ -176,13 +220,13 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
     void syncCalendarUpdatesExistingRaceAndDoesNotCreateDuplicates() {
         var initial = calendarEntry(RaceType.RACE, "Old Grand Prix", NOW.plusSeconds(7200), NOW.plusSeconds(10800));
         when(calendarProvider.loadSeason(2027)).thenReturn(List.of(initial));
-        service.syncCalendar(2027);
+        calendarSync.syncCalendar(2027);
         var created = service.findAllBySeason(2027).getFirst();
         service.openRacePredictions(created.id());
         var updated = calendarEntry(RaceType.RACE, "Updated Grand Prix", NOW.plusSeconds(14400), NOW.plusSeconds(18000));
         when(calendarProvider.loadSeason(2027)).thenReturn(List.of(updated));
 
-        service.syncCalendar(2027);
+        calendarSync.syncCalendar(2027);
 
         var races = service.findAllBySeason(2027);
         assertThat(races).hasSize(1);
@@ -193,9 +237,47 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(actual.openAt()).isEqualTo(updated.openAt());
         assertThat(actual.closeAt()).isEqualTo(updated.closeAt());
 
-        service.syncCalendar(2027);
+        calendarSync.syncCalendar(2027);
 
         assertThat(service.findAllBySeason(2027)).hasSize(1);
+    }
+
+    @Test
+    void rollsBackAllCalendarChangesWhenAnEntryIsInvalid() {
+        var valid = calendarEntry(RaceType.RACE, "Valid race", NOW, NOW.plusSeconds(3600));
+        var invalid = calendarEntry(RaceType.SPRINT, "Invalid race", NOW.plusSeconds(3600), NOW);
+        when(calendarProvider.loadSeason(2027)).thenReturn(List.of(valid, invalid));
+
+        assertThatThrownBy(() -> calendarSync.syncCalendar(2027))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(service.findAllBySeason(2027)).isEmpty();
+    }
+
+    @ParameterizedTest(name = "sprintsEnabled={0}")
+    @ValueSource(booleans = {false, true})
+    void includesSprintsOnlyWhenEnabledForLeague(boolean sprintsEnabled) {
+        createdLeagueId = new LeagueId(UUID.randomUUID());
+        leagues.create(new League(
+                createdLeagueId,
+                "Sprint settings test league",
+                new LeagueSource.Manual(),
+                new LeagueSettings(null, sprintsEnabled),
+                NOW
+        ));
+        var identity = new UserIdentityId(UserIdentitySource.MANUAL, UUID.randomUUID().toString());
+        var participant = participants.ensureParticipant(createdLeagueId, identity, "Test participant");
+        createdUserId = participant.userId();
+        var race = createRace(2027, 1, "Grand Prix", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
+        var sprint = service.create(2027, 1, RaceType.SPRINT, "Grand Prix", NOW, NOW.plusSeconds(1800));
+
+        var calendar = service.findSeasonCalendarForLeague(createdUserId, createdLeagueId, Optional.of(2027));
+
+        if (sprintsEnabled) {
+            assertThat(calendar).containsExactlyInAnyOrder(race, sprint);
+        } else {
+            assertThat(calendar).containsExactly(race);
+        }
     }
 
     private Race createRace(int season, int round, String name, Instant openAt, Instant closeAt) {

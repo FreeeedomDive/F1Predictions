@@ -1,6 +1,6 @@
 package com.xdd.f1.bootstrap.race;
 
-import com.xdd.f1.application.race.RaceService;
+import com.xdd.f1.application.race.RaceCalendarSyncService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -13,18 +13,19 @@ import org.springframework.stereotype.Component;
 )
 public class RaceCalendarSyncScheduler {
 
-    private final RaceService raceService;
+    private final RaceCalendarSyncService syncService;
     private final RaceCalendarSyncProperties properties;
 
-    public RaceCalendarSyncScheduler(RaceService raceService, RaceCalendarSyncProperties properties) {
-        this.raceService = raceService;
+    public RaceCalendarSyncScheduler(RaceCalendarSyncService syncService, RaceCalendarSyncProperties properties) {
+        this.syncService = syncService;
         this.properties = properties;
     }
 
     @Scheduled(
-            fixedDelayString = "${races.calendar-sync.interval}"
+            fixedDelayString = "${races.calendar-sync.interval}",
+            scheduler = "raceCalendarTaskScheduler"
     )
     public void syncCalendar() {
-        raceService.syncCalendar(properties.season());
+        syncService.syncCalendar(properties.season());
     }
 }

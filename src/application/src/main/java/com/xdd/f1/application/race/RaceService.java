@@ -23,7 +23,6 @@ import java.util.*;
 @Service
 public class RaceService {
     private final RaceRepository raceRepository;
-    private final RaceCalendarProvider raceCalendarProvider;
     private final LeagueAccessGuard leagueAccessGuard;
     private final LeagueRepository leagueRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -31,14 +30,12 @@ public class RaceService {
 
     public RaceService(
             RaceRepository raceRepository,
-            RaceCalendarProvider raceCalendarProvider,
             LeagueAccessGuard leagueAccessGuard,
             LeagueRepository leagueRepository,
             ApplicationEventPublisher eventPublisher,
             Clock clock
     ) {
         this.raceRepository = raceRepository;
-        this.raceCalendarProvider = raceCalendarProvider;
         this.leagueAccessGuard = leagueAccessGuard;
         this.leagueRepository = leagueRepository;
         this.eventPublisher = eventPublisher;
@@ -107,9 +104,8 @@ public class RaceService {
     }
 
     @Transactional
-    public void syncCalendar(int season) {
+    public void applyCalendar(int season, List<RaceCalendarEntry> seasonEntries) {
         var currentSeason = raceRepository.findAllBySeason(season);
-        var seasonEntries = raceCalendarProvider.loadSeason(season);
         seasonEntries.forEach(e -> {
             var existingRace = currentSeason.stream().filter(r ->
                     r.round() == e.round()

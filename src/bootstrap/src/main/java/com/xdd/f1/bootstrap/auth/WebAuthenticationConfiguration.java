@@ -19,7 +19,7 @@ public class WebAuthenticationConfiguration implements WebMvcConfigurer {
 
     @Override
     public void addInterceptors(@NonNull InterceptorRegistry registry) {
-        registry.addInterceptor(authentication).addPathPatterns("/api/v1/**");
+        registry.addInterceptor(authentication).addPathPatterns("/api/v1/**", "/adminApi/v1/**");
     }
 
     @Override

@@ -4,14 +4,14 @@ import com.xdd.f1.application.race.RaceService;
 import com.xdd.f1.bootstrap.auth.AuthenticatedUser;
 import com.xdd.f1.bootstrap.auth.CurrentUser;
 import com.xdd.f1.domain.race.RaceId;
-import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-@Controller
+@RestController
 @RequestMapping("/adminApi/v1/races")
 public class AdminRaceController {
 
