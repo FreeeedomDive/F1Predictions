@@ -48,6 +48,7 @@ export function useChangeRacePredictionsStatus() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['admin', 'races'] }),
         queryClient.invalidateQueries({ queryKey: ['races'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin', 'raceLineups'] }),
       ])
     },
   })
