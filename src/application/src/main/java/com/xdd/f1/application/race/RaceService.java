@@ -3,6 +3,7 @@ package com.xdd.f1.application.race;
 import com.xdd.f1.application.league.LeagueAccessGuard;
 import com.xdd.f1.application.league.LeagueNotFoundException;
 import com.xdd.f1.application.league.LeagueRepository;
+import com.xdd.f1.application.race.lineup.RaceLineupService;
 import com.xdd.f1.contract.race.RaceClosedEvent;
 import com.xdd.f1.contract.race.RaceOpenedEvent;
 import com.xdd.f1.domain.league.LeagueId;
@@ -25,6 +26,7 @@ public class RaceService {
     private final RaceRepository raceRepository;
     private final LeagueAccessGuard leagueAccessGuard;
     private final LeagueRepository leagueRepository;
+    private final RaceLineupService lineupService;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
@@ -32,12 +34,14 @@ public class RaceService {
             RaceRepository raceRepository,
             LeagueAccessGuard leagueAccessGuard,
             LeagueRepository leagueRepository,
+            RaceLineupService lineupService,
             ApplicationEventPublisher eventPublisher,
             Clock clock
     ) {
         this.raceRepository = raceRepository;
         this.leagueAccessGuard = leagueAccessGuard;
         this.leagueRepository = leagueRepository;
+        this.lineupService = lineupService;
         this.eventPublisher = eventPublisher;
         this.clock = clock;
     }
@@ -132,6 +136,7 @@ public class RaceService {
         if (race.equals(updatedRace)) {
             return;
         }
+        lineupService.ensureForRace(race);
         eventPublisher.publishEvent(new RaceOpenedEvent(
                 updatedRace.id().value(),
                 updatedRace.name(),

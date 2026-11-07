@@ -64,6 +64,17 @@ public class RaceLineupService {
         return lineup;
     }
 
+    @Transactional
+    public void ensureForRace(Race race) {
+        if (lineupRepository.findByRaceId(race.id()).isPresent()) {
+            return;
+        }
+
+        var previous = lineupRepository.findLatestBefore(race.closeAt())
+                .orElseThrow(() -> new RaceLineupNotPreparedException(race.id()));
+        lineupRepository.createIfAbsent(new RaceLineup(race.id(), previous.teams()));
+    }
+
     private RaceLineupEditor toEditor(Race race) {
         var saved = lineupRepository.findByRaceId(race.id());
         var teams = saved.or(() -> lineupRepository.findLatestBefore(race.closeAt()))

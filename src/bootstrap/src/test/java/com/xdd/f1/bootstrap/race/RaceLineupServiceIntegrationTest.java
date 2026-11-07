@@ -2,6 +2,7 @@ package com.xdd.f1.bootstrap.race;
 
 import com.xdd.f1.application.race.RaceService;
 import com.xdd.f1.application.race.lineup.RaceLineupNotEditableException;
+import com.xdd.f1.application.race.lineup.RaceLineupNotPreparedException;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.application.race.lineup.RaceLineupService;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
@@ -20,6 +21,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -27,9 +29,15 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
 class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
@@ -38,24 +46,24 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
 
     private final RaceService service;
     private final RaceJpaRepository jpaRepository;
-    private final RaceLineupRepository lineups;
     private final RaceLineupService lineupService;
     private final TransactionTemplate transactions;
 
     @MockitoBean
     private Clock clock;
 
+    @MockitoSpyBean
+    private RaceLineupRepository lineups;
+
     @Autowired
     RaceLineupServiceIntegrationTest(
             RaceService service,
             RaceJpaRepository jpaRepository,
-            RaceLineupRepository lineups,
             RaceLineupService lineupService,
             PlatformTransactionManager transactionManager
     ) {
         this.service = service;
         this.jpaRepository = jpaRepository;
-        this.lineups = lineups;
         this.lineupService = lineupService;
         this.transactions = new TransactionTemplate(transactionManager);
     }
@@ -121,6 +129,7 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
         var race = createRace(2027, 2, "Grand Prix", NOW.plusSeconds(60), NOW.plusSeconds(7200));
         var sprint = service.create(2027, 2, RaceType.SPRINT, "Grand Prix", NOW.plusSeconds(120), NOW.plusSeconds(3600));
         var otherSeason = createRace(2026, 1, "Other season", NOW, NOW.plusSeconds(1800));
+        lineupService.save(lineup(otherSeason, "McLaren", "Lando Norris"));
         service.openRacePredictions(otherSeason.id());
 
         assertThat(lineupService.findTarget(2027).orElseThrow().race()).isEqualTo(sprint);
@@ -162,6 +171,8 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.SCHEDULED);
 
         service.openRacePredictions(race.id());
+        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(beforeOpening.teams());
+        assertThat(lineupService.getForEditing(race.id()).prepared()).isTrue();
         var whileOpen = new RaceLineup(race.id(), List.of(new Team(
                 new TeamBranding("McLaren", "MCL", "#FFFFFF", "#FF8000"),
                 List.of(new Driver("Oscar Piastri"), new Driver("Lando Norris"))
@@ -222,6 +233,107 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
         assertThatThrownBy(() -> lineupService.save(lineup(race, "Ferrari", "Lando Norris")))
                 .isInstanceOf(RaceLineupNotEditableException.class);
         assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(initial.teams());
+    }
+
+    @Test
+    void inheritsSprintLineupWhenOpeningRaceAndDoesNotRecopyOnRepeatedOpening() {
+        var sprint = service.create(2027, 1, RaceType.SPRINT, "Grand Prix", NOW, NOW.plusSeconds(3600));
+        var race = createRace(2027, 1, "Grand Prix", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
+        var original = lineup(sprint, "McLaren", "Lando Norris");
+        lineupService.save(original);
+        service.openRacePredictions(sprint.id());
+        service.closeRacePredictions(sprint.id());
+
+        service.openRacePredictions(race.id());
+
+        var inherited = transactions.execute(status -> lineups.findByRaceId(race.id()));
+        assertThat(inherited).contains(new RaceLineup(race.id(), original.teams()));
+        assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.OPEN);
+
+        var edited = lineup(race, "Ferrari", "Lando Norris");
+        lineupService.save(edited);
+        service.openRacePredictions(race.id());
+
+        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(edited.teams());
+        assertThat(lineupService.getForEditing(sprint.id()).teams()).isEqualTo(original.teams());
+    }
+
+    @Test
+    void rejectsOpeningWithoutPreparedOrEarlierLineup() {
+        var race = createRace(2027, 1, "Grand Prix", NOW, NOW.plusSeconds(3600));
+
+        assertThatThrownBy(() -> service.openRacePredictions(race.id()))
+                .isInstanceOf(RaceLineupNotPreparedException.class);
+
+        assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.SCHEDULED);
+        assertThat(lineupService.getForEditing(race.id()).prepared()).isFalse();
+    }
+
+    @Test
+    void rollsBackInheritedLineupTogetherWithOpening() {
+        var previous = createRace(2027, 1, "Previous Grand Prix", NOW, NOW.plusSeconds(3600));
+        var race = createRace(2027, 2, "Grand Prix", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
+        lineupService.save(lineup(previous, "McLaren", "Lando Norris"));
+
+        transactions.executeWithoutResult(status -> {
+            service.openRacePredictions(race.id());
+            assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.OPEN);
+            assertThat(lineupService.getForEditing(race.id()).prepared()).isTrue();
+            status.setRollbackOnly();
+        });
+
+        assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.SCHEDULED);
+        assertThat(lineupService.getForEditing(race.id()).prepared()).isFalse();
+    }
+
+    @ParameterizedTest(name = "editorFirst={0}")
+    @ValueSource(booleans = {false, true})
+    void openingAndEditorCanConcurrentlyCreateTheSameLineup(boolean editorFirst) throws Exception {
+        var previous = createRace(2027, 1, "Previous Grand Prix", NOW, NOW.plusSeconds(3600));
+        var race = createRace(2027, 2, "Grand Prix", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
+        var original = lineup(previous, "McLaren", "Lando Norris");
+        var edited = lineup(race, "Ferrari", "Lewis Hamilton");
+        lineupService.save(original);
+
+        var firstInserted = new CountDownLatch(1);
+        var competingInsert = new CountDownLatch(1);
+        var attempts = new AtomicInteger();
+        // Hold the first insert uncommitted until the other transaction also tries to create the lineup.
+        doAnswer(invocation -> {
+            if (attempts.incrementAndGet() == 1) {
+                var created = invocation.callRealMethod();
+                firstInserted.countDown();
+                assertThat(competingInsert.await(10, TimeUnit.SECONDS)).isTrue();
+                return created;
+            }
+            competingInsert.countDown();
+            return invocation.callRealMethod();
+        }).when(lineups).createIfAbsent(argThat(lineup -> lineup.raceId().equals(race.id())));
+
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> {
+                if (editorFirst) {
+                    lineupService.save(edited);
+                } else {
+                    service.openRacePredictions(race.id());
+                }
+            });
+            assertThat(firstInserted.await(10, TimeUnit.SECONDS)).isTrue();
+            var second = executor.submit(() -> {
+                if (editorFirst) {
+                    service.openRacePredictions(race.id());
+                } else {
+                    lineupService.save(edited);
+                }
+            });
+            first.get(10, TimeUnit.SECONDS);
+            second.get(10, TimeUnit.SECONDS);
+        }
+
+        var saved = transactions.execute(status -> lineups.findByRaceId(race.id()));
+        assertThat(saved).contains(edited);
+        assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.OPEN);
+        assertThat(lineupService.getForEditing(previous.id()).teams()).isEqualTo(original.teams());
     }
 
     private Race createRace(int season, int round, String name, Instant openAt, Instant closeAt) {
