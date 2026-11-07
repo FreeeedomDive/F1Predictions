@@ -122,6 +122,7 @@ public class RaceLineupService {
                 race.name(),
                 race.type().name(),
                 team.branding().name(),
+                team.branding().backgroundColor(),
                 replacements.stream()
                         .map(replacement -> new DriverReplacementDto(
                                 replacement.previousDriver().name(), replacement.newDriver().name()

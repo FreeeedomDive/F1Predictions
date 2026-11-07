@@ -8,6 +8,7 @@ public record RaceDriversReplacedEvent(
         String raceName,
         String raceType,
         String teamName,
+        String teamColor,
         List<DriverReplacementDto> replacements
 ) {
 }
