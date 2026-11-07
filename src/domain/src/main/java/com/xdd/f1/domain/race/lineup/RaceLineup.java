@@ -28,4 +28,29 @@ public record RaceLineup(RaceId raceId, List<Team> teams) {
             throw new DomainValidationException("Driver must occur only once in a race lineup");
         }
     }
+
+    public RaceLineup replaceDriver(Driver previousDriver, Driver newDriver) {
+        Objects.requireNonNull(previousDriver, "Previous driver must not be null");
+        Objects.requireNonNull(newDriver, "New driver must not be null");
+        var drivers = teams.stream().flatMap(team -> team.drivers().stream()).toList();
+        if (!drivers.contains(previousDriver)) {
+            if (drivers.contains(newDriver)) {
+                return this;
+            }
+            throw new DomainValidationException("Driver not found in race lineup: " + previousDriver.name());
+        }
+        if (previousDriver.equals(newDriver)) {
+            return this;
+        }
+
+        var updatedTeams = teams.stream()
+                .map(team -> new Team(
+                        team.branding(),
+                        team.drivers().stream()
+                                .map(driver -> driver.equals(previousDriver) ? newDriver : driver)
+                                .toList()
+                ))
+                .toList();
+        return new RaceLineup(raceId, updatedTeams);
+    }
 }

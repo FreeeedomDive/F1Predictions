@@ -6,6 +6,7 @@ import com.xdd.f1.application.race.lineup.RaceLineupNotPreparedException;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.application.race.lineup.RaceLineupService;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
+import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceStatus;
 import com.xdd.f1.domain.race.RaceType;
@@ -333,6 +334,95 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
         var saved = transactions.execute(status -> lineups.findByRaceId(race.id()));
         assertThat(saved).contains(edited);
         assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.OPEN);
+        assertThat(lineupService.getForEditing(previous.id()).teams()).isEqualTo(original.teams());
+    }
+
+    @ParameterizedTest(name = "predictionsOpen={0}")
+    @ValueSource(booleans = {false, true})
+    void replacesDriverOnlyInTargetRaceAndKeepsRepeatedReplacementIdempotent(boolean predictionsOpen) {
+        var previous = createRace(2027, 1, "Previous Grand Prix", NOW, NOW.plusSeconds(3600));
+        var race = service.create(2027, 2, RaceType.SPRINT, "Grand Prix", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
+        var future = createRace(2027, 2, "Grand Prix", NOW.plusSeconds(7200), NOW.plusSeconds(10800));
+        var previousDriver = new Driver("Lando Norris");
+        var newDriver = new Driver("Max Verstappen");
+        var original = new RaceLineup(previous.id(), List.of(
+                new Team(
+                        new TeamBranding("McLaren", "MCL", "#FF8000", "#000000"),
+                        List.of(previousDriver, new Driver("Oscar Piastri"))
+                ),
+                new Team(
+                        new TeamBranding("Ferrari", "FER", "#E80020", "#FFFFFF"),
+                        List.of(new Driver("Charles Leclerc"), new Driver("Lewis Hamilton"))
+                )
+        ));
+        lineupService.save(original);
+        lineupService.save(new RaceLineup(future.id(), original.teams()));
+        if (predictionsOpen) {
+            service.openRacePredictions(race.id());
+        }
+
+        var replaced = lineupService.replaceDriver(race.id(), previousDriver, newDriver);
+
+        var expected = new RaceLineup(race.id(), List.of(
+                new Team(original.teams().getFirst().branding(), List.of(newDriver, new Driver("Oscar Piastri"))),
+                original.teams().getLast()
+        ));
+        assertThat(replaced).isEqualTo(expected);
+        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(expected.teams());
+        assertThat(lineupService.getForEditing(race.id()).prepared()).isTrue();
+
+        assertThat(lineupService.replaceDriver(race.id(), previousDriver, newDriver)).isEqualTo(expected);
+        assertThat(lineupService.replaceDriver(race.id(), newDriver, newDriver)).isEqualTo(expected);
+        lineupService.save(expected);
+        if (!predictionsOpen) {
+            service.openRacePredictions(race.id());
+        }
+
+        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(expected.teams());
+        assertThat(lineupService.getForEditing(previous.id()).teams()).isEqualTo(original.teams());
+        assertThat(lineupService.getForEditing(future.id()).teams()).isEqualTo(original.teams());
+    }
+
+    @Test
+    void rejectsInvalidOrClosedRaceReplacementWithoutChangingLineup() {
+        var race = createRace(2027, 1, "Grand Prix", NOW, NOW.plusSeconds(3600));
+        var previousDriver = new Driver("Lando Norris");
+        var teammate = new Driver("Oscar Piastri");
+        var original = new RaceLineup(race.id(), List.of(new Team(
+                new TeamBranding("McLaren", "MCL", "#FF8000", "#000000"),
+                List.of(previousDriver, teammate)
+        )));
+        lineupService.save(original);
+
+        assertThatThrownBy(() -> lineupService.replaceDriver(race.id(), previousDriver, teammate))
+                .isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> lineupService.replaceDriver(
+                race.id(), new Driver("Unknown driver"), new Driver("Max Verstappen")
+        )).isInstanceOf(DomainValidationException.class);
+
+        service.openRacePredictions(race.id());
+        service.closeRacePredictions(race.id());
+        assertThatThrownBy(() -> lineupService.replaceDriver(race.id(), previousDriver, new Driver("Max Verstappen")))
+                .isInstanceOf(RaceLineupNotEditableException.class);
+
+        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(original.teams());
+    }
+
+    @Test
+    void rollsBackReplacementTogetherWithNewLineup() {
+        var previous = createRace(2027, 1, "Previous Grand Prix", NOW, NOW.plusSeconds(3600));
+        var race = createRace(2027, 2, "Grand Prix", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
+        var original = lineup(previous, "McLaren", "Lando Norris");
+        lineupService.save(original);
+
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+            lineupService.replaceDriver(race.id(), new Driver("Lando Norris"), new Driver("Max Verstappen"));
+            assertThat(lineupService.getForEditing(race.id()).prepared()).isTrue();
+            throw new IllegalStateException("Replacement rolled back");
+        })).isInstanceOf(IllegalStateException.class).hasMessage("Replacement rolled back");
+
+        assertThat(lineupService.getForEditing(race.id()).prepared()).isFalse();
+        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(original.teams());
         assertThat(lineupService.getForEditing(previous.id()).teams()).isEqualTo(original.teams());
     }
 
