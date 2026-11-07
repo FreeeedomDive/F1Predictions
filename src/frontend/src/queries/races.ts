@@ -14,20 +14,23 @@ function retryCalendarQuery(failureCount: number, error: Error) {
   return failureCount < 1
 }
 
-export function useRaceCalendar(leagueId: string | undefined, season: number) {
+export function useRaceCalendar(leagueId: string | undefined, season: number | null) {
   return useQuery({
     queryKey: ['races', leagueId, season],
-    queryFn: leagueId ? ({ signal }) => getRaceCalendar(leagueId, season, signal) : skipToken,
+    queryFn:
+      leagueId && season !== null
+        ? ({ signal }) => getRaceCalendar(leagueId, season, signal)
+        : skipToken,
     staleTime: 30_000,
     refetchInterval: 60_000,
     retry: retryCalendarQuery,
   })
 }
 
-export function useAdminRaceCalendar(season: number) {
+export function useAdminRaceCalendar(season: number | null) {
   return useQuery({
     queryKey: ['admin', 'races', season],
-    queryFn: ({ signal }) => getAdminRaceCalendar(season, signal),
+    queryFn: season !== null ? ({ signal }) => getAdminRaceCalendar(season, signal) : skipToken,
     staleTime: 30_000,
     refetchInterval: 60_000,
     retry: retryCalendarQuery,

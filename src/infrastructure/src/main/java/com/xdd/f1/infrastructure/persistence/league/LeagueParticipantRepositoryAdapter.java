@@ -44,7 +44,8 @@ public class LeagueParticipantRepositoryAdapter implements LeagueParticipantRepo
                         new LeagueId(row.getLeagueId()),
                         new LeagueParticipantId(row.getParticipantId()),
                         row.getLeagueName(),
-                        row.getParticipantName()
+                        row.getParticipantName(),
+                        row.getFirstSeason()
                 ))
                 .toList();
     }

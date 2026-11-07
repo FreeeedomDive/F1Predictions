@@ -14,7 +14,6 @@ import {
 import { isAxiosError } from 'axios'
 import { Navigate } from 'react-router'
 import { isUnauthorized } from '../api/session'
-import { CURRENT_SEASON } from '../app/season'
 import RaceTable from '../components/calendar/RaceTable'
 import { useLeague } from '../context/league'
 import { useRaceCalendar } from '../queries/races'
@@ -36,8 +35,8 @@ function EmptyCalendar({ title, description }: { title: string; description: str
 }
 
 export default function CalendarPage() {
-  const { selectedLeague } = useLeague()
-  const calendar = useRaceCalendar(selectedLeague?.leagueId, CURRENT_SEASON)
+  const { selectedLeague, selectedSeason } = useLeague()
+  const calendar = useRaceCalendar(selectedLeague?.leagueId, selectedSeason)
 
   if (calendar.isError && isUnauthorized(calendar.error)) {
     return <Navigate to="/auth" replace />
@@ -64,14 +63,15 @@ export default function CalendarPage() {
               Calendar
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              {selectedLeague ? `${selectedLeague.leagueName} · ${CURRENT_SEASON}` : CURRENT_SEASON}
+              {selectedLeague?.leagueName ?? 'No league selected'}
+              {selectedSeason !== null && ` · ${selectedSeason}`}
             </Typography>
           </Stack>
           <Tooltip title="Refresh calendar">
             <span>
               <IconButton
                 aria-label="Refresh calendar"
-                disabled={!selectedLeague || calendar.isFetching}
+                disabled={!selectedLeague || selectedSeason === null || calendar.isFetching}
                 onClick={() => void calendar.refetch()}
               >
                 <RefreshRounded />
@@ -84,6 +84,11 @@ export default function CalendarPage() {
           <EmptyCalendar
             title="No leagues available"
             description="Your calendar will appear once you join a league."
+          />
+        ) : selectedSeason === null ? (
+          <EmptyCalendar
+            title="No seasons available"
+            description="This league's first season has not started yet."
           />
         ) : calendar.isPending ? (
           <Stack spacing={1} role="status" aria-label="Loading calendar">
@@ -106,7 +111,7 @@ export default function CalendarPage() {
           </Alert>
         ) : calendar.data.length === 0 ? (
           <EmptyCalendar
-            title={`No races in ${CURRENT_SEASON}`}
+            title={`No races in ${selectedSeason}`}
             description="There are no calendar entries for this league in the selected season."
           />
         ) : (

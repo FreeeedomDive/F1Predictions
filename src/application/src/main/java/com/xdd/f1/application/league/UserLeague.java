@@ -7,6 +7,7 @@ public record UserLeague(
         LeagueId leagueId,
         LeagueParticipantId participantId,
         String leagueName,
-        String participantName
+        String participantName,
+        int firstSeason
 ) {
 }

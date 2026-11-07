@@ -293,7 +293,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
                 createdLeagueId,
                 "Sprint settings test league",
                 new LeagueSource.Manual(),
-                new LeagueSettings(null, sprintsEnabled),
+                new LeagueSettings(null, sprintsEnabled, 2026),
                 NOW
         ));
         var identity = new UserIdentityId(UserIdentitySource.MANUAL, UUID.randomUUID().toString());

@@ -18,9 +18,11 @@ public interface LeagueParticipantJpaRepository extends JpaRepository<LeaguePart
         select l.id as leagueId,
                p.id as participantId,
                l.name as leagueName,
-               p.displayName as participantName
+               p.displayName as participantName,
+               s.firstSeason as firstSeason
         from LeagueParticipantEntity p
         join p.league l
+        join l.settings s
         where p.user.id = :userId
         order by p.joinedAt
         """)

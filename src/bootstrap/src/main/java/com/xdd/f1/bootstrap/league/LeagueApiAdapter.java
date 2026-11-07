@@ -44,7 +44,8 @@ public class LeagueApiAdapter implements LeagueApi {
                 league.name(),
                 new LeagueSettingsDto(
                         league.settings().notificationsChannelId(),
-                        league.settings().sprintsEnabled()
+                        league.settings().sprintsEnabled(),
+                        league.settings().firstSeason()
                 ),
                 league.createdAt()
         );

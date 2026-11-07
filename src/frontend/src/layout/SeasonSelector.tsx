@@ -1,17 +1,37 @@
 import { FormControl, InputLabel, MenuItem, Select } from '@mui/material'
-import { CURRENT_SEASON } from '../app/season'
 
-export default function SeasonSelector() {
+export default function SeasonSelector({
+  seasons,
+  value,
+  onChange,
+}: {
+  seasons: number[]
+  value: number | null
+  onChange: (season: number) => void
+}) {
   return (
-    <FormControl fullWidth size="small" disabled>
-      <InputLabel id="season-selector-label">Season</InputLabel>
-      <Select<number>
+    <FormControl fullWidth size="small" disabled={seasons.length <= 1}>
+      <InputLabel id="season-selector-label" shrink>
+        Season
+      </InputLabel>
+      <Select<number | ''>
         labelId="season-selector-label"
         id="season-selector"
         label="Season"
-        value={CURRENT_SEASON}
+        displayEmpty
+        value={value ?? ''}
+        onChange={(event) => onChange(Number(event.target.value))}
       >
-        <MenuItem value={CURRENT_SEASON}>{CURRENT_SEASON}</MenuItem>
+        {seasons.length === 0 && (
+          <MenuItem value="" disabled>
+            No seasons available
+          </MenuItem>
+        )}
+        {seasons.map((season) => (
+          <MenuItem key={season} value={season}>
+            {season}
+          </MenuItem>
+        ))}
       </Select>
     </FormControl>
   )

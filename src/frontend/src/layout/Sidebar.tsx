@@ -22,7 +22,7 @@ import SeasonSelector from './SeasonSelector'
 import SignOutButton from './SignOutButton'
 
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
-  const { selectedLeague } = useLeague()
+  const { selectedLeague, seasons, selectedSeason, selectSeason } = useLeague()
   const name = selectedLeague?.participantName || 'F1 player'
   const initials = name
     .trim()
@@ -45,7 +45,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       <Divider />
       <Stack spacing={2}>
         <LeagueSelector />
-        <SeasonSelector />
+        <SeasonSelector seasons={seasons} value={selectedSeason} onChange={selectSeason} />
       </Stack>
       <List component="nav" disablePadding aria-label="Navigation">
         <ListItemButton

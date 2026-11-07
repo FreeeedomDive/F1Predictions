@@ -11,4 +11,6 @@ public interface UserLeagueProjection {
     String getLeagueName();
 
     String getParticipantName();
+
+    int getFirstSeason();
 }

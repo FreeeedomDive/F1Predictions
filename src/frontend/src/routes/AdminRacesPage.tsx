@@ -15,8 +15,8 @@ import {
 import { isAxiosError } from 'axios'
 import { Navigate } from 'react-router'
 import { isUnauthorized } from '../api/session'
-import { CURRENT_SEASON } from '../app/season'
 import RaceTable from '../components/calendar/RaceTable'
+import { useLeague } from '../context/league'
 import { useAdminRaceCalendar, useChangeRacePredictionsStatus } from '../queries/races'
 
 const timeZone = new Intl.DateTimeFormat().resolvedOptions().timeZone.replaceAll('_', ' ')
@@ -36,7 +36,8 @@ function actionErrorMessage(error: Error | null, action: 'open' | 'close') {
 }
 
 export default function AdminRacesPage() {
-  const calendar = useAdminRaceCalendar(CURRENT_SEASON)
+  const { selectedSeason } = useLeague()
+  const calendar = useAdminRaceCalendar(selectedSeason)
   const transition = useChangeRacePredictionsStatus()
   const action = transition.variables?.action ?? 'open'
 
@@ -63,14 +64,15 @@ export default function AdminRacesPage() {
               Race administration
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              All races and sprints · {CURRENT_SEASON}
+              All races and sprints
+              {selectedSeason !== null && ` · ${selectedSeason}`}
             </Typography>
           </Stack>
           <Tooltip title="Refresh calendar">
             <span>
               <IconButton
                 aria-label="Refresh calendar"
-                disabled={calendar.isFetching || transition.isPending}
+                disabled={selectedSeason === null || calendar.isFetching || transition.isPending}
                 onClick={() => void calendar.refetch()}
               >
                 <RefreshRounded />
@@ -79,7 +81,11 @@ export default function AdminRacesPage() {
           </Tooltip>
         </Stack>
 
-        {calendar.isPending ? (
+        {selectedSeason === null ? (
+          <Alert severity="info">
+            No seasons available. This league's first season has not started yet.
+          </Alert>
+        ) : calendar.isPending ? (
           <Stack spacing={1} role="status" aria-label="Loading calendar">
             {[0, 1, 2, 3, 4].map((index) => (
               <Skeleton key={index} variant="rounded" height={56} />
@@ -102,7 +108,7 @@ export default function AdminRacesPage() {
           <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 }, textAlign: 'center' }}>
             <EditCalendarRounded sx={{ color: 'text.secondary', fontSize: 36, mb: 1.5 }} />
             <Typography variant="h6" sx={{ mb: 1 }}>
-              No races in {CURRENT_SEASON}
+              No races in {selectedSeason}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               The season calendar has not been imported yet.

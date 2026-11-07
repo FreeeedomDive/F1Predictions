@@ -5,7 +5,8 @@ import com.xdd.f1.domain.user.UserId;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
+import java.time.Clock;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,23 +14,27 @@ import java.util.UUID;
 public class LeagueService {
     private final LeagueRepository repository;
     private final LeagueParticipantRepository participantRepository;
+    private final Clock clock;
 
     public LeagueService(
             LeagueRepository repository,
-            LeagueParticipantRepository participantRepository
+            LeagueParticipantRepository participantRepository,
+            Clock clock
     ) {
         this.repository = repository;
         this.participantRepository = participantRepository;
+        this.clock = clock;
     }
 
     @Transactional
     public League createManual(String name) {
+        var now = clock.instant();
         var league = new League(
                 new LeagueId(UUID.randomUUID()),
                 name,
                 new LeagueSource.Manual(),
-                new LeagueSettings(null, false),
-                Instant.now()
+                new LeagueSettings(null, false, now.atZone(ZoneOffset.UTC).getYear()),
+                now
         );
         repository.create(league);
         return league;
@@ -42,12 +47,13 @@ public class LeagueService {
             return existing.get();
         }
 
+        var now = clock.instant();
         var league = new League(
                 new LeagueId(UUID.randomUUID()),
                 name,
                 new LeagueSource.Discord(guildId),
-                new LeagueSettings(null, false),
-                Instant.now()
+                new LeagueSettings(null, false, now.atZone(ZoneOffset.UTC).getYear()),
+                now
         );
         repository.create(league);
         return league;

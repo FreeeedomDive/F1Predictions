@@ -15,5 +15,6 @@ CREATE TABLE league_settings
     league_id                uuid PRIMARY KEY REFERENCES leagues (id) ON DELETE CASCADE,
     notifications_channel_id text,
     sprints_enabled          boolean NOT NULL DEFAULT false,
+    first_season             integer NOT NULL,
     version                  bigint  NOT NULL
 );

@@ -5,6 +5,9 @@ export interface LeagueContextValue {
   profile: MeResponseDto
   selectedLeague: UserLeagueDto | null
   selectLeague: (leagueId: string) => void
+  seasons: number[]
+  selectedSeason: number | null
+  selectSeason: (season: number) => void
 }
 
 export const LeagueContext = createContext<LeagueContextValue | null>(null)

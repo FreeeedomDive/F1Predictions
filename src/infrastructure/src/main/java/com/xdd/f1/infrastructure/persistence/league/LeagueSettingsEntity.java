@@ -17,6 +17,9 @@ public class LeagueSettingsEntity {
     @Column(name = "sprints_enabled", nullable = false)
     boolean sprintsEnabled;
 
+    @Column(name = "first_season", nullable = false)
+    int firstSeason;
+
     @Version
     @Column(name = "version", nullable = false)
     Long version;
