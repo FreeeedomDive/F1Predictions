@@ -44,7 +44,6 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -288,7 +287,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "sprintsEnabled={0}")
     @ValueSource(booleans = {false, true})
-    void includesSprintsOnlyWhenEnabledForLeague(boolean sprintsEnabled) {
+    void includesSprintsOnlyWhenEnabledForLeague(boolean sprintsEnabled) throws Exception {
         createdLeagueId = new LeagueId(UUID.randomUUID());
         leagues.create(new League(
                 createdLeagueId,
@@ -303,12 +302,20 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         var race = createRace(2027, 1, "Grand Prix", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
         var sprint = service.create(2027, 1, RaceType.SPRINT, "Grand Prix", NOW, NOW.plusSeconds(1800));
 
-        var calendar = service.findSeasonCalendarForLeague(createdUserId, createdLeagueId, Optional.of(2027));
+        var calendar = mvc.perform(get("/api/v1/leagues/{leagueId}/races", createdLeagueId.value())
+                        .param("season", "2027")
+                        .cookie(new Cookie(SessionCookie.NAME, sessions.create(createdUserId))))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.data").isArray());
 
         if (sprintsEnabled) {
-            assertThat(calendar).containsExactlyInAnyOrder(race, sprint);
+            calendar.andExpect(jsonPath("$.data.length()").value(2))
+                    .andExpect(jsonPath("$.data[0].id").value(sprint.id().value().toString()))
+                    .andExpect(jsonPath("$.data[1].id").value(race.id().value().toString()));
         } else {
-            assertThat(calendar).containsExactly(race);
+            calendar.andExpect(jsonPath("$.data.length()").value(1))
+                    .andExpect(jsonPath("$.data[0].id").value(race.id().value().toString()));
         }
     }
 
@@ -324,11 +331,17 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
 
         mvc.perform(get("/adminApi/v1/races").param("season", "2027").cookie(cookie))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].id").value(sprint.id().value().toString()))
-                .andExpect(jsonPath("$[0].type").value("SPRINT"))
-                .andExpect(jsonPath("$[1].id").value(race.id().value().toString()))
-                .andExpect(jsonPath("$[1].type").value("RACE"));
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value(sprint.id().value().toString()))
+                .andExpect(jsonPath("$.data[0].type").value("SPRINT"))
+                .andExpect(jsonPath("$.data[1].id").value(race.id().value().toString()))
+                .andExpect(jsonPath("$.data[1].type").value("RACE"));
+
+        mvc.perform(get("/adminApi/v1/races").param("season", "2028").cookie(cookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
     }
 
     @Test

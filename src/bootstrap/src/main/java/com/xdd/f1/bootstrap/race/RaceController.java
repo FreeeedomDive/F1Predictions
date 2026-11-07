@@ -3,6 +3,7 @@ package com.xdd.f1.bootstrap.race;
 import com.xdd.f1.application.race.RaceService;
 import com.xdd.f1.bootstrap.auth.AuthenticatedUser;
 import com.xdd.f1.bootstrap.auth.CurrentUser;
+import com.xdd.f1.contract.common.ListResponseDto;
 import com.xdd.f1.contract.race.RaceDto;
 import com.xdd.f1.domain.league.LeagueId;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,7 +12,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,11 +26,11 @@ public class RaceController {
     }
 
     @GetMapping()
-    public List<RaceDto> getRaces(
+    public ListResponseDto<RaceDto> getRaces(
             @CurrentUser AuthenticatedUser user,
             @PathVariable UUID leagueId,
             @RequestParam Optional<Integer> season) {
         var races = raceService.findSeasonCalendarForLeague(user.id(), new LeagueId(leagueId), season);
-        return races.stream().map(RaceDtoMapper::toDto).toList();
+        return new ListResponseDto<>(races.stream().map(RaceDtoMapper::toDto).toList());
     }
 }

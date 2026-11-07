@@ -1,3 +1,4 @@
+import type { ListResponseDto } from '../dto/listResponse'
 import type { RaceDto } from '../dto/race'
 import { api } from './client'
 
@@ -6,22 +7,22 @@ export async function getRaceCalendar(
   season: number,
   signal: AbortSignal,
 ): Promise<RaceDto[]> {
-  const response = await api.get<RaceDto[]>(
+  const response = await api.get<ListResponseDto<RaceDto>>(
     `/api/v1/leagues/${encodeURIComponent(leagueId)}/races`,
     { params: { season }, signal },
   )
-  return response.data
+  return response.data.data
 }
 
 export async function getAdminRaceCalendar(
   season: number,
   signal: AbortSignal,
 ): Promise<RaceDto[]> {
-  const response = await api.get<RaceDto[]>('/adminApi/v1/races', {
+  const response = await api.get<ListResponseDto<RaceDto>>('/adminApi/v1/races', {
     params: { season },
     signal,
   })
-  return response.data
+  return response.data.data
 }
 
 export async function openRacePredictions(raceId: string): Promise<void> {
