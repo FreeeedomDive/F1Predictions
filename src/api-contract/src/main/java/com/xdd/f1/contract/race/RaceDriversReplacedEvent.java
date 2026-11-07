@@ -1,12 +1,13 @@
 package com.xdd.f1.contract.race;
 
+import java.util.List;
 import java.util.UUID;
 
-public record RaceDriverReplacedEvent(
+public record RaceDriversReplacedEvent(
         UUID raceId,
         String raceName,
         String raceType,
-        String previousDriverName,
-        String newDriverName
+        String teamName,
+        List<DriverReplacementDto> replacements
 ) {
 }

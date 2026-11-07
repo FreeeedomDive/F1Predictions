@@ -23,7 +23,6 @@ import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
 import com.xdd.f1.domain.race.RaceType;
 import com.xdd.f1.domain.race.lineup.Driver;
-import com.xdd.f1.domain.race.lineup.RaceLineup;
 import com.xdd.f1.domain.race.lineup.Team;
 import com.xdd.f1.domain.race.lineup.TeamBranding;
 import com.xdd.f1.domain.user.User;
@@ -412,10 +411,10 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void prepareLineup(Race race) {
-        lineupService.save(new RaceLineup(race.id(), List.of(new Team(
+        lineupService.addTeam(race.id(), new Team(
                 new TeamBranding("McLaren", "MCL", "#FF8000", "#000000"),
                 List.of(new Driver("Lando Norris"))
-        ))));
+        ));
     }
 
     private RaceCalendarEntry calendarEntry(RaceType type, String name, Instant openAt, Instant closeAt) {

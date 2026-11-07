@@ -3,8 +3,10 @@ package com.xdd.f1.domain.race.lineup;
 import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.race.RaceId;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 public record RaceLineup(RaceId raceId, List<Team> teams) {
     public RaceLineup {
@@ -29,27 +31,25 @@ public record RaceLineup(RaceId raceId, List<Team> teams) {
         }
     }
 
-    public RaceLineup replaceDriver(Driver previousDriver, Driver newDriver) {
-        Objects.requireNonNull(previousDriver, "Previous driver must not be null");
-        Objects.requireNonNull(newDriver, "New driver must not be null");
-        var drivers = teams.stream().flatMap(team -> team.drivers().stream()).toList();
-        if (!drivers.contains(previousDriver)) {
-            if (drivers.contains(newDriver)) {
+    public Optional<Team> findTeam(String name) {
+        return teams.stream().filter(team -> team.branding().name().equals(name)).findFirst();
+    }
+
+    public RaceLineup addTeam(Team team) {
+        var updatedTeams = new ArrayList<>(teams);
+        updatedTeams.add(team);
+        return new RaceLineup(raceId, updatedTeams);
+    }
+
+    public RaceLineup updateTeam(String previousName, Team updatedTeam) {
+        if (findTeam(previousName).isEmpty()) {
+            if (teams.contains(updatedTeam)) {
                 return this;
             }
-            throw new DomainValidationException("Driver not found in race lineup: " + previousDriver.name());
+            throw new DomainValidationException("Team not found in race lineup: " + previousName);
         }
-        if (previousDriver.equals(newDriver)) {
-            return this;
-        }
-
         var updatedTeams = teams.stream()
-                .map(team -> new Team(
-                        team.branding(),
-                        team.drivers().stream()
-                                .map(driver -> driver.equals(previousDriver) ? newDriver : driver)
-                                .toList()
-                ))
+                .map(team -> team.branding().name().equals(previousName) ? updatedTeam : team)
                 .toList();
         return new RaceLineup(raceId, updatedTeams);
     }
