@@ -11,6 +11,7 @@ import jakarta.persistence.EntityManager;
 import org.hibernate.query.TypedParameterValue;
 import org.springframework.stereotype.Repository;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,6 +28,11 @@ public class RaceLineupRepositoryAdapter implements RaceLineupRepository {
     @Override
     public Optional<RaceLineup> findByRaceId(RaceId raceId) {
         return repository.findById(raceId.value()).map(this::toDomain);
+    }
+
+    @Override
+    public Optional<RaceLineup> findLatestBefore(Instant closeAt) {
+        return repository.findLatestBefore(closeAt).map(this::toDomain);
     }
 
     @Override

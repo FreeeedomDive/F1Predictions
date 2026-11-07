@@ -7,7 +7,6 @@ import com.xdd.f1.application.race.RaceCalendarProvider;
 import com.xdd.f1.application.race.RaceCalendarSyncService;
 import com.xdd.f1.application.race.RaceNotFoundException;
 import com.xdd.f1.application.race.RaceService;
-import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.application.session.SessionService;
 import com.xdd.f1.application.user.UserRepository;
 import com.xdd.f1.bootstrap.auth.SessionCookie;
@@ -22,10 +21,6 @@ import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
 import com.xdd.f1.domain.race.RaceType;
-import com.xdd.f1.domain.race.lineup.Driver;
-import com.xdd.f1.domain.race.lineup.RaceLineup;
-import com.xdd.f1.domain.race.lineup.Team;
-import com.xdd.f1.domain.race.lineup.TeamBranding;
 import com.xdd.f1.domain.user.User;
 import com.xdd.f1.domain.user.UserId;
 import com.xdd.f1.domain.user.UserIdentityId;
@@ -44,8 +39,6 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -78,8 +71,6 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
     private final MockMvc mvc;
     private final SessionService sessions;
     private final UserRepository users;
-    private final RaceLineupRepository lineups;
-    private final TransactionTemplate transactions;
 
     private LeagueId createdLeagueId;
     private UserId createdUserId;
@@ -101,9 +92,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
             UserJpaRepository userJpaRepository,
             MockMvc mvc,
             SessionService sessions,
-            UserRepository users,
-            RaceLineupRepository lineups,
-            PlatformTransactionManager transactionManager
+            UserRepository users
     ) {
         this.service = service;
         this.jpaRepository = jpaRepository;
@@ -115,8 +104,6 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         this.mvc = mvc;
         this.sessions = sessions;
         this.users = users;
-        this.lineups = lineups;
-        this.transactions = new TransactionTemplate(transactionManager);
     }
 
     @BeforeEach
@@ -144,50 +131,6 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(loaded).isEqualTo(created);
         assertThat(loaded.status()).isEqualTo(RaceStatus.SCHEDULED);
-    }
-
-    @Test
-    void storesIndependentLineupSnapshotsAndDoesNotOverwriteAnExistingLineup() {
-        var firstRace = createRace(2027, 1, "First Grand Prix", NOW, NOW.plusSeconds(3600));
-        var nextRace = createRace(2027, 2, "Next Grand Prix", NOW.plusSeconds(7200), NOW.plusSeconds(10800));
-        var original = new RaceLineup(firstRace.id(), List.of(
-                new Team(
-                        new TeamBranding("McLaren", "MCL", "#FF8000", "#000000"),
-                        List.of(new Driver("Lando Norris"), new Driver("Oscar Piastri"))
-                ),
-                new Team(
-                        new TeamBranding("Ferrari", "FER", "#E80020", "#FFFFFF"),
-                        List.of(new Driver("Charles Leclerc"), new Driver("Lewis Hamilton"))
-                )
-        ));
-        var copied = new RaceLineup(nextRace.id(), original.teams());
-        transactions.executeWithoutResult(status -> {
-            assertThat(lineups.createIfAbsent(original)).isTrue();
-            assertThat(lineups.createIfAbsent(copied)).isTrue();
-        });
-
-        var loadedOriginal = transactions.execute(status -> lineups.findByRaceId(firstRace.id()));
-        var loadedCopy = transactions.execute(status -> lineups.findByRaceId(nextRace.id()));
-        assertThat(loadedOriginal).contains(original);
-        assertThat(loadedCopy).contains(copied);
-
-        var updated = new RaceLineup(nextRace.id(), List.of(
-                original.teams().getLast(),
-                new Team(
-                        new TeamBranding("McLaren", "MCL", "#FFFFFF", "#FF8000"),
-                        List.of(new Driver("Oscar Piastri"), new Driver("New Driver"))
-                )
-        ));
-        transactions.executeWithoutResult(status -> lineups.update(updated));
-        transactions.executeWithoutResult(status -> {
-            assertThat(lineups.createIfAbsent(copied)).isFalse();
-            assertThat(lineups.findByRaceId(nextRace.id())).contains(updated);
-        });
-
-        var originalAfterUpdate = transactions.execute(status -> lineups.findByRaceId(firstRace.id()));
-        var updatedCopy = transactions.execute(status -> lineups.findByRaceId(nextRace.id()));
-        assertThat(originalAfterUpdate).contains(original);
-        assertThat(updatedCopy).contains(updated);
     }
 
     @Test

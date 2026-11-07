@@ -6,9 +6,21 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface RaceLineupJpaRepository extends JpaRepository<RaceLineupEntity, UUID> {
+    @Query("""
+        select lineup
+        from RaceLineupEntity lineup
+        join RaceEntity race on race.id = lineup.raceId
+        where race.closeAt < :closeAt
+        order by race.closeAt desc, race.id
+        limit 1
+        """)
+    Optional<RaceLineupEntity> findLatestBefore(@Param("closeAt") Instant closeAt);
+
     @Modifying
     @Query("""
         insert into RaceLineupEntity (raceId, teams, version)
