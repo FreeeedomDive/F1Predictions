@@ -1,5 +1,6 @@
 import CloseRounded from '@mui/icons-material/CloseRounded'
 import CalendarMonthRounded from '@mui/icons-material/CalendarMonthRounded'
+import EditCalendarRounded from '@mui/icons-material/EditCalendarRounded'
 import {
   Avatar,
   Box,
@@ -58,6 +59,27 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         >
           <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
             <CalendarMonthRounded fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="Calendar"
+            slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
+          />
+        </ListItemButton>
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="overline" color="text.secondary" sx={{ px: 2 }}>
+          Administration
+        </Typography>
+        <ListItemButton
+          component={NavLink}
+          to="/admin/races"
+          onClick={onClose}
+          sx={{
+            borderRadius: 1,
+            '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+            <EditCalendarRounded fontSize="small" />
           </ListItemIcon>
           <ListItemText
             primary="Calendar"

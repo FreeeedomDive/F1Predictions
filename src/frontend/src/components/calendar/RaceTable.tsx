@@ -10,6 +10,7 @@ import {
   Typography,
 } from '@mui/material'
 import type { ChipProps } from '@mui/material'
+import type { ReactNode } from 'react'
 import type { RaceDto, RaceStatusDto } from '../../dto/race'
 
 const statuses: Record<RaceStatusDto, { label: string; color: ChipProps['color'] }> = {
@@ -37,14 +38,20 @@ function RaceTime({ value }: { value: string }) {
   )
 }
 
-export default function RaceTable({ races }: { races: RaceDto[] }) {
+export default function RaceTable({
+  races,
+  renderActions,
+}: {
+  races: RaceDto[]
+  renderActions?: (race: RaceDto) => ReactNode
+}) {
   return (
     <TableContainer component={Paper} variant="outlined" tabIndex={0}>
       <Table
         aria-label="Race calendar"
         size="small"
         sx={{
-          minWidth: 800,
+          minWidth: renderActions ? 960 : 800,
           '& th, & td': { px: 2, py: 1.5 },
           '& thead th': { fontWeight: 650, whiteSpace: 'nowrap' },
           '& tbody tr:last-child > *': { borderBottom: 0 },
@@ -57,6 +64,11 @@ export default function RaceTable({ races }: { races: RaceDto[] }) {
             <TableCell scope="col">Status</TableCell>
             <TableCell scope="col">Predictions open</TableCell>
             <TableCell scope="col">Predictions close</TableCell>
+            {renderActions && (
+              <TableCell scope="col" align="right">
+                Actions
+              </TableCell>
+            )}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -82,6 +94,7 @@ export default function RaceTable({ races }: { races: RaceDto[] }) {
               <TableCell>
                 <RaceTime value={race.closeAt} />
               </TableCell>
+              {renderActions && <TableCell align="right">{renderActions(race)}</TableCell>}
             </TableRow>
           ))}
         </TableBody>
