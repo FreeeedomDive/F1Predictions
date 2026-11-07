@@ -1,8 +1,23 @@
 import CloseRounded from '@mui/icons-material/CloseRounded'
-import { Avatar, Box, Divider, IconButton, Stack, Tooltip, Typography } from '@mui/material'
+import CalendarMonthRounded from '@mui/icons-material/CalendarMonthRounded'
+import {
+  Avatar,
+  Box,
+  Divider,
+  IconButton,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Stack,
+  Tooltip,
+  Typography,
+} from '@mui/material'
+import { NavLink } from 'react-router'
 import Brand from '../components/Brand'
 import { useLeague } from '../context/league'
 import LeagueSelector from './LeagueSelector'
+import SeasonSelector from './SeasonSelector'
 import SignOutButton from './SignOutButton'
 
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
@@ -27,7 +42,29 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         )}
       </Stack>
       <Divider />
-      <LeagueSelector />
+      <Stack spacing={2}>
+        <LeagueSelector />
+        <SeasonSelector />
+      </Stack>
+      <List component="nav" disablePadding aria-label="Navigation">
+        <ListItemButton
+          component={NavLink}
+          to="/calendar"
+          onClick={onClose}
+          sx={{
+            borderRadius: 1,
+            '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+            <CalendarMonthRounded fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="Calendar"
+            slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
+          />
+        </ListItemButton>
+      </List>
       <Stack
         direction="row"
         spacing={1.5}
