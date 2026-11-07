@@ -35,10 +35,11 @@ public class DiscordConfiguration {
     }
 
     @Bean(destroyMethod = "shutdown")
-    public JDA jda(LeagueGuildListener listener, CommandListener commandListener) {
+    public JDA jda(LeagueGuildListener listener, CommandListener commandListener) throws InterruptedException {
         return JDABuilder.createDefault(properties.token())
                 .addEventListeners(listener, commandListener)
-                .build();
+                .build()
+                .awaitReady();
     }
 
     @Bean(destroyMethod = "close")

@@ -1,7 +1,7 @@
 package com.xdd.f1.bootstrap.user;
 
 import com.xdd.f1.application.league.LeagueParticipantService;
-import com.xdd.f1.application.league.LeagueService;
+import com.xdd.f1.application.league.LeagueRepository;
 import com.xdd.f1.application.session.SessionService;
 import com.xdd.f1.application.user.UserRepository;
 import com.xdd.f1.bootstrap.auth.SessionCookie;
@@ -10,6 +10,8 @@ import com.xdd.f1.contract.user.MeResponseDto;
 import com.xdd.f1.contract.user.UserLeagueDto;
 import com.xdd.f1.domain.league.League;
 import com.xdd.f1.domain.league.LeagueId;
+import com.xdd.f1.domain.league.LeagueSettings;
+import com.xdd.f1.domain.league.LeagueSource;
 import com.xdd.f1.domain.user.User;
 import com.xdd.f1.domain.user.UserId;
 import com.xdd.f1.domain.user.UserIdentityId;
@@ -47,7 +49,7 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
     private final SessionService sessions;
     private final UserRepository users;
     private final UserJpaRepository userJpaRepository;
-    private final LeagueService leagues;
+    private final LeagueRepository leagues;
     private final LeagueParticipantService participants;
     private final LeagueJpaRepository leagueJpaRepository;
     private final JsonMapper jsonMapper;
@@ -66,7 +68,7 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
             SessionService sessions,
             UserRepository users,
             UserJpaRepository userJpaRepository,
-            LeagueService leagues,
+            LeagueRepository leagues,
             LeagueParticipantService participants,
             LeagueJpaRepository leagueJpaRepository,
             JsonMapper jsonMapper
@@ -104,7 +106,7 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
 
     @Test
     void returnsAllOwnLeaguesWithMatchingParticipantData() throws Exception {
-        var firstLeague = createLeague("First profile league");
+        var firstLeague = createLeague("First profile league", 2023);
         var secondLeague = createLeague("Second profile league");
         var firstParticipant = participants.ensureParticipant(firstLeague.id(), identityId, "First server name");
         var secondParticipant = participants.ensureParticipant(secondLeague.id(), identityId, "Second server name");
@@ -121,13 +123,15 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
                         firstLeague.id().value(),
                         firstParticipant.id().value(),
                         firstLeague.name(),
-                        "First server name"
+                        "First server name",
+                        2023
                 ),
                 new UserLeagueDto(
                         secondLeague.id().value(),
                         secondParticipant.id().value(),
                         secondLeague.name(),
-                        "Second server name"
+                        "Second server name",
+                        2026
                 )
         );
     }
@@ -155,7 +159,8 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
                 sharedLeague.id().value(),
                 ownParticipant.id().value(),
                 sharedLeague.name(),
-                "Own participant name"
+                "Own participant name",
+                2026
         ));
     }
 
@@ -171,7 +176,18 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
     }
 
     private League createLeague(String name) {
-        var league = leagues.createManual(name);
+        return createLeague(name, 2026);
+    }
+
+    private League createLeague(String name, int firstSeason) {
+        var league = new League(
+                new LeagueId(UUID.randomUUID()),
+                name,
+                new LeagueSource.Manual(),
+                new LeagueSettings(null, false, firstSeason),
+                NOW
+        );
+        leagues.create(league);
         createdLeagues.add(league.id());
         return league;
     }

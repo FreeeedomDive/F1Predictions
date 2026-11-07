@@ -3,6 +3,7 @@ export interface UserLeagueDto {
   participantId: string
   leagueName: string
   participantName: string
+  firstSeason: number
 }
 
 export interface MeResponseDto {

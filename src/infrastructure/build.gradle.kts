@@ -12,6 +12,7 @@ dependencies {
     // Declarative clients for Jolpica and OpenF1 are @HttpExchange interfaces; only the
     // annotations are needed here, the proxies are built where the clients get wired.
     implementation(libs.spring.web)
+    implementation(libs.jackson.annotations)
 
     runtimeOnly(libs.postgresql)
 }

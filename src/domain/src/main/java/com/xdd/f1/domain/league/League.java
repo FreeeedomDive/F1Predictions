@@ -1,5 +1,7 @@
 package com.xdd.f1.domain.league;
 
+import com.xdd.f1.domain.error.DomainValidationException;
+
 import java.time.Instant;
 import java.util.Objects;
 
@@ -12,7 +14,7 @@ public record League(LeagueId id, String name, LeagueSource source, LeagueSettin
         Objects.requireNonNull(createdAt, "Creation time must not be null");
 
         if (name.isBlank()) {
-            throw new IllegalArgumentException("League name must not be blank");
+            throw new DomainValidationException("League name must not be blank");
         }
     }
 }

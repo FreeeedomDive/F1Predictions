@@ -17,10 +17,6 @@ public class UserEntity {
     @Column(name = "created_at", nullable = false)
     Instant createdAt;
 
-    @Version
-    @Column(name = "version", nullable = false)
-    Long version;
-
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     List<UserIdentityEntity> userIdentities;
 

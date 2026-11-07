@@ -9,6 +9,12 @@ discord:
 sessions:
   hash-secret: integration-test-session-hash-key
 
+races:
+  transition-scheduler:
+    enabled: false
+  calendar-sync:
+    enabled: false
+
 management:
   otlp:
     metrics:

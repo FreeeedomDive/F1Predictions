@@ -2,8 +2,10 @@ import { Button } from '@mui/material'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 import StatusScreen from './components/StatusScreen'
 import AppLayout from './layout/AppLayout'
+import AdminRacesPage from './routes/AdminRacesPage'
 import AuthPage, { AuthLoadingScreen } from './routes/AuthPage'
 import { authLoader } from './routes/authLoader'
+import CalendarPage from './routes/CalendarPage'
 import RequireAuth from './routes/RequireAuth'
 
 const errorScreen = (
@@ -26,8 +28,16 @@ const router = createBrowserRouter([
     element: <RequireAuth />,
     errorElement: errorScreen,
     children: [
-      { path: '/', element: <AppLayout /> },
-      { path: '*', element: <Navigate to="/" replace /> },
+      {
+        path: '/',
+        element: <AppLayout />,
+        children: [
+          { index: true, element: <Navigate to="/calendar" replace /> },
+          { path: 'calendar', element: <CalendarPage /> },
+          { path: 'admin/races', element: <AdminRacesPage /> },
+          { path: '*', element: <Navigate to="/calendar" replace /> },
+        ],
+      },
     ],
   },
 ])

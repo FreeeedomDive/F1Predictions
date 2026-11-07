@@ -14,6 +14,12 @@ public class LeagueSettingsEntity {
     @Column(name = "notifications_channel_id")
     String notificationsChannelId;
 
+    @Column(name = "sprints_enabled", nullable = false)
+    boolean sprintsEnabled;
+
+    @Column(name = "first_season", nullable = false)
+    int firstSeason;
+
     @Version
     @Column(name = "version", nullable = false)
     Long version;

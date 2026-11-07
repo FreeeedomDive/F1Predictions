@@ -10,6 +10,9 @@ spring:
     open-in-view: false
   flyway:
     enabled: false
+  modulith:
+    events:
+      republish-outstanding-events-on-restart: true
 
 server:
   port: 8080
@@ -21,6 +24,20 @@ discord:
 sessions:
   hash-secret: ${SESSION_HASH_SECRET}
   cleanup-interval: PT1H
+
+races:
+  transition-scheduler:
+    enabled: true
+    interval: PT1M
+  calendar-sync:
+    enabled: true
+    season: 2026
+    interval: P1D
+
+jolpica:
+  base-url: https://api.jolpi.ca/ergast/f1
+  connect-timeout: PT3S
+  read-timeout: PT10S
 
 management:
   endpoints:
