@@ -1,37 +1,46 @@
 package com.xdd.f1.application.race;
 
+import com.xdd.f1.application.league.LeagueAccessGuard;
+import com.xdd.f1.application.league.LeagueNotFoundException;
+import com.xdd.f1.application.league.LeagueRepository;
 import com.xdd.f1.contract.race.RaceClosedEvent;
 import com.xdd.f1.contract.race.RaceOpenedEvent;
+import com.xdd.f1.domain.league.LeagueId;
 import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
 import com.xdd.f1.domain.race.RaceType;
+import com.xdd.f1.domain.user.UserId;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.time.Year;
+import java.util.*;
 
 @Service
 public class RaceService {
     private final RaceRepository raceRepository;
     private final RaceCalendarProvider raceCalendarProvider;
+    private final LeagueAccessGuard leagueAccessGuard;
+    private final LeagueRepository leagueRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final Clock clock;
 
     public RaceService(
             RaceRepository raceRepository,
             RaceCalendarProvider raceCalendarProvider,
+            LeagueAccessGuard leagueAccessGuard,
+            LeagueRepository leagueRepository,
             ApplicationEventPublisher eventPublisher,
             Clock clock
     ) {
         this.raceRepository = raceRepository;
         this.raceCalendarProvider = raceCalendarProvider;
+        this.leagueAccessGuard = leagueAccessGuard;
+        this.leagueRepository = leagueRepository;
         this.eventPublisher = eventPublisher;
         this.clock = clock;
     }
@@ -49,6 +58,16 @@ public class RaceService {
     @Transactional(readOnly = true)
     public List<Race> findFinishedBySeason(int season) {
         return raceRepository.findFinishedBySeason(season);
+    }
+
+    public List<Race> findSeasonCalendarForLeague(UserId userId, LeagueId leagueId, Optional<Integer> season){
+        var requestedSeason = season.orElse(Year.now(clock).getValue());
+        leagueAccessGuard.checkAccess(userId, leagueId);
+        var league = leagueRepository.findById(leagueId).orElseThrow(() -> new LeagueNotFoundException(leagueId));
+        var calendar = raceRepository.findAllBySeason(requestedSeason);
+        return calendar.stream()
+                .filter(race -> league.settings().sprintsEnabled() || race.type() != RaceType.SPRINT)
+                .toList();
     }
 
     @Transactional
