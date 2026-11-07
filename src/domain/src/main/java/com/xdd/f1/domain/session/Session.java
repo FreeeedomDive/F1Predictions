@@ -1,5 +1,6 @@
 package com.xdd.f1.domain.session;
 
+import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.user.UserId;
 
 import java.time.Instant;
@@ -16,13 +17,13 @@ public record Session(
     public Session {
         Objects.requireNonNull(hash);
         if (hash.isBlank()){
-            throw new IllegalArgumentException("Hash cannot be blank");
+            throw new DomainValidationException("Hash cannot be blank");
         }
         Objects.requireNonNull(userId);
         Objects.requireNonNull(createdAt);
         Objects.requireNonNull(expiresAt);
         if (!expiresAt.isAfter(createdAt)) {
-            throw new IllegalArgumentException(
+            throw new DomainValidationException(
                     "Expiration time must be after creation time"
             );
         }

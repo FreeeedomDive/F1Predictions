@@ -1,5 +1,7 @@
 package com.xdd.f1.domain.race;
 
+import com.xdd.f1.domain.error.DomainValidationException;
+
 import java.time.Instant;
 import java.util.Objects;
 
@@ -8,10 +10,10 @@ public record Race(RaceId id, int season, int round, RaceType type, String name,
     public Race {
         Objects.requireNonNull(id, "Race ID must not be null");
         if (season <= 0) {
-            throw new IllegalArgumentException("Season must be greater than zero");
+            throw new DomainValidationException("Season must be greater than zero");
         }
         if (round <= 0) {
-            throw new IllegalArgumentException("Round must be greater than zero");
+            throw new DomainValidationException("Round must be greater than zero");
         }
         Objects.requireNonNull(type, "Race type must not be null");
         Objects.requireNonNull(name, "Race name must not be null");
@@ -20,7 +22,7 @@ public record Race(RaceId id, int season, int round, RaceType type, String name,
         Objects.requireNonNull(closeAt, "Race close time must not be null");
 
         if (!openAt.isBefore(closeAt)) {
-            throw new IllegalArgumentException("Open time must be before close time");
+            throw new DomainValidationException("Open time must be before close time");
         }
     }
 
@@ -50,7 +52,7 @@ public record Race(RaceId id, int season, int round, RaceType type, String name,
         }
 
         if (status != requiredOldStatus) {
-            throw new IllegalStateException("Race must be in status " + requiredOldStatus + " to be changed to " + newStatus);
+            throw new InvalidRaceStatusException(status, requiredOldStatus, newStatus);
         }
 
         return new Race(id, season, round, type, name, newStatus, openAt, closeAt);

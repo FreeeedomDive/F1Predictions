@@ -7,28 +7,38 @@ import com.xdd.f1.application.race.RaceCalendarProvider;
 import com.xdd.f1.application.race.RaceCalendarSyncService;
 import com.xdd.f1.application.race.RaceNotFoundException;
 import com.xdd.f1.application.race.RaceService;
+import com.xdd.f1.application.session.SessionService;
+import com.xdd.f1.application.user.UserRepository;
+import com.xdd.f1.bootstrap.auth.SessionCookie;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
+import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.league.League;
 import com.xdd.f1.domain.league.LeagueId;
 import com.xdd.f1.domain.league.LeagueSettings;
 import com.xdd.f1.domain.league.LeagueSource;
+import com.xdd.f1.domain.race.InvalidRaceStatusException;
 import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
 import com.xdd.f1.domain.race.RaceType;
+import com.xdd.f1.domain.user.User;
 import com.xdd.f1.domain.user.UserId;
 import com.xdd.f1.domain.user.UserIdentityId;
 import com.xdd.f1.domain.user.UserIdentitySource;
 import com.xdd.f1.infrastructure.persistence.league.LeagueJpaRepository;
 import com.xdd.f1.infrastructure.persistence.race.RaceJpaRepository;
 import com.xdd.f1.infrastructure.persistence.user.UserJpaRepository;
+import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -39,8 +49,15 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+@AutoConfigureMockMvc
 class RaceServiceIntegrationTest extends AbstractIntegrationTest {
 
     private static final Instant NOW = Instant.parse("2026-02-03T04:05:06Z");
@@ -52,6 +69,9 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
     private final LeagueParticipantService participants;
     private final LeagueJpaRepository leagueJpaRepository;
     private final UserJpaRepository userJpaRepository;
+    private final MockMvc mvc;
+    private final SessionService sessions;
+    private final UserRepository users;
 
     private LeagueId createdLeagueId;
     private UserId createdUserId;
@@ -70,7 +90,10 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
             LeagueRepository leagues,
             LeagueParticipantService participants,
             LeagueJpaRepository leagueJpaRepository,
-            UserJpaRepository userJpaRepository
+            UserJpaRepository userJpaRepository,
+            MockMvc mvc,
+            SessionService sessions,
+            UserRepository users
     ) {
         this.service = service;
         this.jpaRepository = jpaRepository;
@@ -79,6 +102,9 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         this.participants = participants;
         this.leagueJpaRepository = leagueJpaRepository;
         this.userJpaRepository = userJpaRepository;
+        this.mvc = mvc;
+        this.sessions = sessions;
+        this.users = users;
     }
 
     @BeforeEach
@@ -140,7 +166,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         var race = createRace(2027, 1, "Bahrain Grand Prix", NOW, NOW.plusSeconds(3600));
 
         assertThatThrownBy(() -> service.closeRacePredictions(race.id()))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(InvalidRaceStatusException.class)
                 .hasMessageContaining(RaceStatus.OPEN.name());
 
         assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.SCHEDULED);
@@ -162,11 +188,17 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void throwsWhenRaceDoesNotExist() {
+    void throwsWhenRaceDoesNotExist() throws Exception {
         var id = new RaceId(UUID.randomUUID());
 
         assertThatThrownBy(() -> service.getById(id))
                 .isInstanceOf(RaceNotFoundException.class);
+
+        mvc.perform(patch("/adminApi/v1/races/{raceId}/open", id.value()).cookie(createSessionWithoutLeague()))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.title").value("Not Found"));
     }
 
     @Test
@@ -249,7 +281,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         when(calendarProvider.loadSeason(2027)).thenReturn(List.of(valid, invalid));
 
         assertThatThrownBy(() -> calendarSync.syncCalendar(2027))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(DomainValidationException.class);
 
         assertThat(service.findAllBySeason(2027)).isEmpty();
     }
@@ -278,6 +310,68 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         } else {
             assertThat(calendar).containsExactly(race);
         }
+    }
+
+    @Test
+    void adminCalendarIncludesSprintsWithoutLeagueMembership() throws Exception {
+        var race = createRace(2027, 1, "Grand Prix", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
+        var sprint = service.create(2027, 1, RaceType.SPRINT, "Grand Prix", NOW, NOW.plusSeconds(1800));
+        createRace(2026, 1, "Previous season", NOW, NOW.plusSeconds(3600));
+        var cookie = createSessionWithoutLeague();
+
+        mvc.perform(get("/adminApi/v1/races").param("season", "2027"))
+                .andExpect(status().isUnauthorized());
+
+        mvc.perform(get("/adminApi/v1/races").param("season", "2027").cookie(cookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(sprint.id().value().toString()))
+                .andExpect(jsonPath("$[0].type").value("SPRINT"))
+                .andExpect(jsonPath("$[1].id").value(race.id().value().toString()))
+                .andExpect(jsonPath("$[1].type").value("RACE"));
+    }
+
+    @Test
+    void adminCanOnlyOpenScheduledRaceAndCloseOpenRace() throws Exception {
+        var race = createRace(2027, 1, "Grand Prix", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
+        var cookie = createSessionWithoutLeague();
+
+        mvc.perform(patch("/adminApi/v1/races/{raceId}/open", race.id().value()))
+                .andExpect(status().isUnauthorized());
+
+        mvc.perform(patch("/adminApi/v1/races/{raceId}/close", race.id().value()).cookie(cookie))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.title").value("Conflict"))
+                .andExpect(jsonPath("$.detail").value(containsString("current status: SCHEDULED")));
+        assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.SCHEDULED);
+
+        mvc.perform(patch("/adminApi/v1/races/{raceId}/open", race.id().value()).cookie(cookie))
+                .andExpect(status().isOk());
+        assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.OPEN);
+
+        mvc.perform(patch("/adminApi/v1/races/{raceId}/close", race.id().value()))
+                .andExpect(status().isUnauthorized());
+        assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.OPEN);
+
+        mvc.perform(patch("/adminApi/v1/races/{raceId}/close", race.id().value()).cookie(cookie))
+                .andExpect(status().isOk());
+        assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.CLOSED);
+
+        mvc.perform(patch("/adminApi/v1/races/{raceId}/close", race.id().value()).cookie(cookie))
+                .andExpect(status().isOk());
+
+        mvc.perform(patch("/adminApi/v1/races/{raceId}/open", race.id().value()).cookie(cookie))
+                .andExpect(status().isConflict());
+        assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.CLOSED);
+    }
+
+    private Cookie createSessionWithoutLeague() {
+        createdUserId = new UserId(UUID.randomUUID());
+        var identity = new UserIdentityId(UserIdentitySource.MANUAL, UUID.randomUUID().toString());
+        users.create(new User(createdUserId, NOW), identity);
+        return new Cookie(SessionCookie.NAME, sessions.create(createdUserId));
     }
 
     private Race createRace(int season, int round, String name, Instant openAt, Instant closeAt) {
