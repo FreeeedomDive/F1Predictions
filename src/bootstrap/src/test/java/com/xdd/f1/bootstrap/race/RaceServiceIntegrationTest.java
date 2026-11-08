@@ -7,6 +7,7 @@ import com.xdd.f1.application.race.RaceCalendarProvider;
 import com.xdd.f1.application.race.RaceCalendarSyncService;
 import com.xdd.f1.application.race.RaceNotFoundException;
 import com.xdd.f1.application.race.RaceService;
+import com.xdd.f1.application.race.lineup.RaceLineupService;
 import com.xdd.f1.application.session.SessionService;
 import com.xdd.f1.application.user.UserRepository;
 import com.xdd.f1.bootstrap.auth.SessionCookie;
@@ -21,6 +22,9 @@ import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
 import com.xdd.f1.domain.race.RaceType;
+import com.xdd.f1.domain.race.lineup.Driver;
+import com.xdd.f1.domain.race.lineup.Team;
+import com.xdd.f1.domain.race.lineup.TeamBranding;
 import com.xdd.f1.domain.user.User;
 import com.xdd.f1.domain.user.UserId;
 import com.xdd.f1.domain.user.UserIdentityId;
@@ -71,6 +75,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
     private final MockMvc mvc;
     private final SessionService sessions;
     private final UserRepository users;
+    private final RaceLineupService lineupService;
 
     private LeagueId createdLeagueId;
     private UserId createdUserId;
@@ -92,7 +97,8 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
             UserJpaRepository userJpaRepository,
             MockMvc mvc,
             SessionService sessions,
-            UserRepository users
+            UserRepository users,
+            RaceLineupService lineupService
     ) {
         this.service = service;
         this.jpaRepository = jpaRepository;
@@ -104,6 +110,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         this.mvc = mvc;
         this.sessions = sessions;
         this.users = users;
+        this.lineupService = lineupService;
     }
 
     @BeforeEach
@@ -147,6 +154,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
     @Test
     void opensClosesAndFinishesRace() {
         var race = createRace(2027, 1, "Bahrain Grand Prix", NOW, NOW.plusSeconds(3600));
+        prepareLineup(race);
 
         service.openRacePredictions(race.id());
         assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.OPEN);
@@ -176,6 +184,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         var toOpen = createRace(2027, 1, "Opening Grand Prix", NOW, NOW.plusSeconds(3600));
         var toClose = createRace(2027, 2, "Closing Grand Prix", NOW.minusSeconds(7200), NOW);
         var future = createRace(2027, 3, "Future Grand Prix", NOW.plusSeconds(1), NOW.plusSeconds(3600));
+        prepareLineup(toClose);
         service.openRacePredictions(toClose.id());
 
         service.processScheduledTransitions();
@@ -203,6 +212,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
     @Test
     void doesNothingIfRaceIsAlreadyOpened() {
         var toOpen = createRace(2027, 1, "Bahrain Grand Prix", NOW, NOW.plusSeconds(3600));
+        prepareLineup(toOpen);
         service.openRacePredictions(toOpen.id());
 
         service.openRacePredictions(toOpen.id());
@@ -213,6 +223,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
     @Test
     void doesNothingIfRaceIsAlreadyClosed() {
         var toClose = createRace(2027, 1, "Bahrain Grand Prix", NOW, NOW.plusSeconds(3600));
+        prepareLineup(toClose);
         service.openRacePredictions(toClose.id());
         service.closeRacePredictions(toClose.id());
 
@@ -253,6 +264,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         when(calendarProvider.loadSeason(2027)).thenReturn(List.of(initial));
         calendarSync.syncCalendar(2027);
         var created = service.findAllBySeason(2027).getFirst();
+        prepareLineup(created);
         service.openRacePredictions(created.id());
         var updated = calendarEntry(RaceType.RACE, "Updated Grand Prix", NOW.plusSeconds(14400), NOW.plusSeconds(18000));
         when(calendarProvider.loadSeason(2027)).thenReturn(List.of(updated));
@@ -361,6 +373,13 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.SCHEDULED);
 
         mvc.perform(patch("/adminApi/v1/races/{raceId}/open", race.id().value()).cookie(cookie))
+                .andExpect(status().isConflict())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.detail").value(containsString("Prepare a lineup")));
+        assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.SCHEDULED);
+
+        prepareLineup(race);
+        mvc.perform(patch("/adminApi/v1/races/{raceId}/open", race.id().value()).cookie(cookie))
                 .andExpect(status().isOk());
         assertThat(service.getById(race.id()).status()).isEqualTo(RaceStatus.OPEN);
 
@@ -389,6 +408,13 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
 
     private Race createRace(int season, int round, String name, Instant openAt, Instant closeAt) {
         return service.create(season, round, RaceType.RACE, name, openAt, closeAt);
+    }
+
+    private void prepareLineup(Race race) {
+        lineupService.addTeam(race.id(), new Team(
+                new TeamBranding("McLaren", "MCL", "#FF8000", "#000000"),
+                List.of(new Driver("Lando Norris"))
+        ));
     }
 
     private RaceCalendarEntry calendarEntry(RaceType type, String name, Instant openAt, Instant closeAt) {

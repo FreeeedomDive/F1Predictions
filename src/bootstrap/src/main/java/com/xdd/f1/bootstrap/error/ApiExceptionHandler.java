@@ -3,6 +3,9 @@ package com.xdd.f1.bootstrap.error;
 import com.xdd.f1.application.league.LeagueNotFoundException;
 import com.xdd.f1.application.league.LeagueParticipantNotFoundException;
 import com.xdd.f1.application.race.RaceNotFoundException;
+import com.xdd.f1.application.race.lineup.RaceLineupNotEditableException;
+import com.xdd.f1.application.race.lineup.RaceLineupNotFoundException;
+import com.xdd.f1.application.race.lineup.RaceLineupNotPreparedException;
 import com.xdd.f1.application.session.SessionNotFoundException;
 import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.race.InvalidRaceStatusException;
@@ -27,14 +30,19 @@ public class ApiExceptionHandler {
     @ExceptionHandler({
             LeagueNotFoundException.class,
             LeagueParticipantNotFoundException.class,
-            RaceNotFoundException.class
+            RaceNotFoundException.class,
+            RaceLineupNotFoundException.class
     })
     public ProblemDetail notFound(RuntimeException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
     }
 
-    @ExceptionHandler(InvalidRaceStatusException.class)
-    public ProblemDetail invalidRaceStatus(InvalidRaceStatusException exception) {
+    @ExceptionHandler({
+            InvalidRaceStatusException.class,
+            RaceLineupNotPreparedException.class,
+            RaceLineupNotEditableException.class
+    })
+    public ProblemDetail conflict(RuntimeException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
     }
 }
