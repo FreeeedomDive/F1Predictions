@@ -14,7 +14,6 @@ export function AuthLoadingScreen() {
 export default function AuthPage() {
   return (
     <>
-      <title>Not authorized · F1 Predictions</title>
       <Container
         component="main"
         maxWidth="xs"
