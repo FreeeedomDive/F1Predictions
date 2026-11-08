@@ -14,7 +14,6 @@ export default function AppLayout() {
 
   return (
     <>
-      <title>F1 Predictions</title>
       <Box sx={{ display: 'flex', minHeight: '100dvh' }}>
         {!desktop && (
           <AppBar

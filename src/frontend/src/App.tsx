@@ -9,6 +9,8 @@ import { authLoader } from './routes/authLoader'
 import CalendarPage from './routes/CalendarPage'
 import RequireAuth from './routes/RequireAuth'
 
+const withDevPrefix = (title: string) => (import.meta.env.DEV ? `[dev] ${title}` : title)
+
 const errorScreen = (
   <StatusScreen
     title="Something went wrong"
@@ -21,7 +23,12 @@ const router = createBrowserRouter([
   {
     path: '/auth',
     loader: authLoader,
-    element: <AuthPage />,
+    element: (
+      <>
+        <title>{withDevPrefix('Not authorized')}</title>
+        <AuthPage />
+      </>
+    ),
     hydrateFallbackElement: <AuthLoadingScreen />,
     errorElement: errorScreen,
   },
@@ -34,9 +41,33 @@ const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { index: true, element: <Navigate to="/calendar" replace /> },
-          { path: 'calendar', element: <CalendarPage /> },
-          { path: 'admin/races', element: <AdminRacesPage /> },
-          { path: 'admin/teams', element: <AdminTeamsPage /> },
+          {
+            path: 'calendar',
+            element: (
+              <>
+                <title>{withDevPrefix('Calendar')}</title>
+                <CalendarPage />
+              </>
+            ),
+          },
+          {
+            path: 'admin/races',
+            element: (
+              <>
+                <title>{withDevPrefix('[Admin] Races')}</title>
+                <AdminRacesPage />
+              </>
+            ),
+          },
+          {
+            path: 'admin/teams',
+            element: (
+              <>
+                <title>{withDevPrefix('[Admin] Teams')}</title>
+                <AdminTeamsPage />
+              </>
+            ),
+          },
           { path: '*', element: <Navigate to="/calendar" replace /> },
         ],
       },
