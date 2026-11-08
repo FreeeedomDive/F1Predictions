@@ -13,3 +13,8 @@ export interface RaceLineupDto {
   teams: RaceLineupTeamDto[]
   prepared: boolean
 }
+
+export interface SwapRaceDriversRequestDto {
+  firstDriverName: string
+  secondDriverName: string
+}

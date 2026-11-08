@@ -5,6 +5,7 @@ import com.xdd.f1.bootstrap.auth.AuthenticatedUser;
 import com.xdd.f1.bootstrap.auth.CurrentUser;
 import com.xdd.f1.contract.race.lineup.RaceLineupDto;
 import com.xdd.f1.contract.race.lineup.RaceLineupTeamDto;
+import com.xdd.f1.contract.race.lineup.SwapRaceDriversRequestDto;
 import com.xdd.f1.domain.race.RaceId;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -57,5 +58,20 @@ public class AdminRaceLineupController {
                 teamName,
                 RaceLineupDtoMapper.toDomain(request)
         );
+    }
+
+    @PostMapping("races/{raceId}/lineup/swapDrivers")
+    public RaceLineupDto swapDrivers(
+            @CurrentUser AuthenticatedUser user,
+            @PathVariable UUID raceId,
+            @RequestBody SwapRaceDriversRequestDto request
+    ) {
+        var id = new RaceId(raceId);
+        lineupService.swapDrivers(
+                id,
+                RaceLineupDtoMapper.toDriver(request.firstDriverName()),
+                RaceLineupDtoMapper.toDriver(request.secondDriverName())
+        );
+        return RaceLineupDtoMapper.toDto(lineupService.getForEditing(id));
     }
 }

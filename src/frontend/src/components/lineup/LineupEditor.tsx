@@ -1,4 +1,5 @@
 import AddRounded from '@mui/icons-material/AddRounded'
+import SwapHorizRounded from '@mui/icons-material/SwapHorizRounded'
 import {
   Button,
   Paper,
@@ -29,12 +30,14 @@ export default function LineupEditor({
   saving,
   savingTeam,
   onSave,
+  onSwapDrivers,
 }: {
   lineup: RaceLineupDto
   busy: boolean
   saving: boolean
   savingTeam: string | undefined
   onSave: (team: RaceLineupTeamDto, previousName: string | undefined, onSaved: () => void) => void
+  onSwapDrivers: () => void
 }) {
   const [newTeamIds, setNewTeamIds] = useState<number[]>([])
   const [savingNewTeamId, setSavingNewTeamId] = useState<number | null>(null)
@@ -51,14 +54,27 @@ export default function LineupEditor({
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+      <Stack
+        direction="row"
+        sx={{ alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}
+      >
         <Typography variant="body2" color="text.secondary">
           {lineup.teams.length} {lineup.teams.length === 1 ? 'team' : 'teams'} · Save each row
           separately
         </Typography>
-        <Button variant="outlined" startIcon={<AddRounded />} onClick={addDraft}>
-          Add team
-        </Button>
+        <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<SwapHorizRounded />}
+            disabled={busy || lineup.teams.flatMap((team) => team.drivers).length < 2}
+            onClick={onSwapDrivers}
+          >
+            Swap drivers
+          </Button>
+          <Button variant="outlined" startIcon={<AddRounded />} onClick={addDraft}>
+            Add team
+          </Button>
+        </Stack>
       </Stack>
       <TableContainer component={Paper} variant="outlined" tabIndex={0}>
         <Table

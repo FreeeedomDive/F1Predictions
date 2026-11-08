@@ -1,13 +1,23 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
-import { addRaceLineupTeam, getRaceLineupTarget, updateRaceLineupTeam } from '../api/raceLineups'
-import type { RaceLineupDto, RaceLineupTeamDto } from '../dto/raceLineup'
+import {
+  addRaceLineupTeam,
+  getRaceLineupTarget,
+  swapRaceLineupDrivers,
+  updateRaceLineupTeam,
+} from '../api/raceLineups'
+import type { RaceLineupDto, RaceLineupTeamDto, SwapRaceDriversRequestDto } from '../dto/raceLineup'
 
 interface SaveTeamVariables {
   season: number
   raceId: string
   previousName?: string
   team: RaceLineupTeamDto
+}
+
+interface SwapDriversVariables extends SwapRaceDriversRequestDto {
+  season: number
+  raceId: string
 }
 
 export function useRaceLineupTarget(season: number | null) {
@@ -47,6 +57,26 @@ export function useSaveRaceLineupTeam() {
               )
         return { ...current, teams, prepared: true }
       })
+    },
+    onSettled: (_, _error, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'raceLineups', variables.season] })
+    },
+  })
+}
+
+export function useSwapRaceLineupDrivers() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ raceId, firstDriverName, secondDriverName }: SwapDriversVariables) =>
+      swapRaceLineupDrivers(raceId, { firstDriverName, secondDriverName }),
+    retry: false,
+    onSuccess: async (lineup, variables) => {
+      const queryKey = ['admin', 'raceLineups', variables.season]
+      await queryClient.cancelQueries({ queryKey })
+      queryClient.setQueryData<RaceLineupDto | null>(queryKey, (current) =>
+        current?.race.id === variables.raceId ? lineup : current,
+      )
     },
     onSettled: (_, _error, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['admin', 'raceLineups', variables.season] })

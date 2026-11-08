@@ -490,6 +490,90 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(updated.driverReplacementsTo(updated)).isEmpty();
     }
 
+    @ParameterizedTest(name = "predictionsOpen={0}")
+    @ValueSource(booleans = {false, true})
+    void swapsExistingDriversOnlyInTargetRaceAndCanSwapThemBack(boolean predictionsOpen) {
+        var previous = createRace(2027, 1, "Previous Grand Prix", NOW, NOW.plusSeconds(3600));
+        var race = createRace(2027, 2, "Grand Prix", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
+        var future = createRace(2027, 3, "Future Grand Prix", NOW.plusSeconds(7200), NOW.plusSeconds(10800));
+        var original = redBullLineup(previous);
+        prepareLineup(original);
+        prepareLineup(new RaceLineup(future.id(), original.teams()));
+        if (predictionsOpen) {
+            service.openRacePredictions(race.id());
+        }
+        var lawson = new Driver("Lawson");
+        var hadjar = new Driver("Hadjar");
+
+        var swapped = lineupService.swapDrivers(race.id(), lawson, hadjar);
+
+        var expected = new RaceLineup(race.id(), List.of(
+                new Team(original.teams().getFirst().branding(), List.of(new Driver("Verstappen"), hadjar)),
+                new Team(original.teams().getLast().branding(), List.of(new Driver("Tsunoda"), lawson))
+        ));
+        assertThat(swapped).isEqualTo(expected);
+        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(expected.teams());
+        assertThat(lineupService.getForEditing(race.id()).prepared()).isTrue();
+        assertThat(lineupService.swapDrivers(race.id(), hadjar, hadjar)).isEqualTo(expected);
+        assertThat(lineupService.getForEditing(previous.id()).teams()).isEqualTo(original.teams());
+        assertThat(lineupService.getForEditing(future.id()).teams()).isEqualTo(original.teams());
+
+        var restored = lineupService.swapDrivers(race.id(), lawson, hadjar);
+        assertThat(restored).isEqualTo(new RaceLineup(race.id(), original.teams()));
+        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(original.teams());
+    }
+
+    @Test
+    void rejectsSwapWithUnknownDriverOrClosedRaceWithoutChangingLineup() {
+        var race = createRace(2027, 1, "Grand Prix", NOW, NOW.plusSeconds(3600));
+        var original = redBullLineup(race);
+        prepareLineup(original);
+
+        assertThatThrownBy(() -> lineupService.swapDrivers(race.id(), new Driver("Lawson"), new Driver("Unknown driver")))
+                .isInstanceOf(DomainValidationException.class);
+        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(original.teams());
+
+        service.openRacePredictions(race.id());
+        service.closeRacePredictions(race.id());
+        assertThatThrownBy(() -> lineupService.swapDrivers(race.id(), new Driver("Lawson"), new Driver("Hadjar")))
+                .isInstanceOf(RaceLineupNotEditableException.class);
+        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(original.teams());
+    }
+
+    @Test
+    void rollsBackBothSidesOfSwapTogetherWithInheritedLineup() {
+        var previous = createRace(2027, 1, "Previous Grand Prix", NOW, NOW.plusSeconds(3600));
+        var race = createRace(2027, 2, "Grand Prix", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
+        var original = redBullLineup(previous);
+        prepareLineup(original);
+
+        assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
+            lineupService.swapDrivers(race.id(), new Driver("Lawson"), new Driver("Hadjar"));
+            var current = lineupService.getForEditing(race.id());
+            assertThat(current.prepared()).isTrue();
+            assertThat(current.teams().getFirst().drivers()).containsExactly(new Driver("Verstappen"), new Driver("Hadjar"));
+            assertThat(current.teams().getLast().drivers()).containsExactly(new Driver("Tsunoda"), new Driver("Lawson"));
+            throw new IllegalStateException("Swap rolled back");
+        })).isInstanceOf(IllegalStateException.class).hasMessage("Swap rolled back");
+
+        assertThat(lineupService.getForEditing(race.id()).prepared()).isFalse();
+        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(original.teams());
+        assertThat(lineupService.getForEditing(previous.id()).teams()).isEqualTo(original.teams());
+    }
+
+    private RaceLineup redBullLineup(Race race) {
+        return new RaceLineup(race.id(), List.of(
+                new Team(
+                        new TeamBranding("Red Bull", "RBR", "#1F00B8", "#FFFFFF"),
+                        List.of(new Driver("Verstappen"), new Driver("Lawson"))
+                ),
+                new Team(
+                        new TeamBranding("Racing Bulls", "RCB", "#6692FF", "#111111"),
+                        List.of(new Driver("Tsunoda"), new Driver("Hadjar"))
+                )
+        ));
+    }
+
     private void prepareLineup(RaceLineup lineup) {
         transactions.executeWithoutResult(status -> lineups.createIfAbsent(lineup));
     }

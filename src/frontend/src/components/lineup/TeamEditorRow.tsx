@@ -18,6 +18,9 @@ import type { RaceLineupTeamDto } from '../../dto/raceLineup'
 
 const hexColor = /^#[0-9a-f]{6}$/i
 
+type TeamFields = Omit<RaceLineupTeamDto, 'drivers'>
+type TeamDraft = Partial<TeamFields> & { drivers?: Record<number, string> }
+
 function normalizeTeam(team: RaceLineupTeamDto): RaceLineupTeamDto {
   return {
     name: team.name.trim(),
@@ -106,15 +109,25 @@ export default function TeamEditorRow({
   onSave: (team: RaceLineupTeamDto, onSaved: () => void) => void
   onCancel?: () => void
 }) {
-  const [draft, setDraft] = useState<RaceLineupTeamDto | null>(null)
+  const [draft, setDraft] = useState<TeamDraft>({})
   const [showErrors, setShowErrors] = useState(false)
-  const value = draft ?? team
+  const { drivers: driverDrafts = {}, ...fields } = draft
+  const driverCount = Math.max(
+    2,
+    team.drivers.length,
+    ...Object.keys(driverDrafts).map((index) => Number(index) + 1),
+  )
+  const value: RaceLineupTeamDto = {
+    ...team,
+    ...fields,
+    drivers: Array.from(
+      { length: driverCount },
+      (_, index) => driverDrafts[index] ?? team.drivers[index] ?? '',
+    ),
+  }
   const normalized = normalizeTeam(value)
   const dirty = isNew || !sameTeam(normalized, team)
-  const drivers = Array.from(
-    { length: Math.max(2, value.drivers.length) },
-    (_, index) => value.drivers[index] ?? '',
-  )
+  const drivers = value.drivers
   const driverErrors = drivers.map((driver, index) => {
     const name = driver.trim()
     if (!name && (isNew || index < team.drivers.length)) return 'Driver name is required.'
@@ -129,13 +142,26 @@ export default function TeamEditorRow({
     hexColor.test(normalized.textColor) &&
     driverErrors.every((error) => !error)
 
-  function change(patch: Partial<RaceLineupTeamDto>) {
-    const next = { ...value, ...patch }
-    setDraft(sameTeam(next, team) ? null : next)
+  function change(field: keyof TeamFields, nextValue: string) {
+    setDraft((current) => {
+      const next = { ...current }
+      if (nextValue === team[field]) delete next[field]
+      else next[field] = nextValue
+      return next
+    })
+  }
+
+  function changeDriver(index: number, nextValue: string) {
+    setDraft((current) => {
+      const drivers = { ...current.drivers }
+      if (nextValue === (team.drivers[index] ?? '')) delete drivers[index]
+      else drivers[index] = nextValue
+      return { ...current, drivers }
+    })
   }
 
   function reset() {
-    setDraft(null)
+    setDraft({})
     setShowErrors(false)
   }
 
@@ -155,7 +181,7 @@ export default function TeamEditorRow({
           disabled={saving}
           error={showErrors && !normalized.name}
           helperText={showErrors && !normalized.name ? 'Team name is required.' : undefined}
-          onChange={(event) => change({ name: event.target.value })}
+          onChange={(event) => change('name', event.target.value)}
           slotProps={{ htmlInput: { 'aria-label': 'Team name' } }}
         />
       </TableCell>
@@ -168,7 +194,7 @@ export default function TeamEditorRow({
           disabled={saving}
           error={showErrors && !normalized.badge}
           helperText={showErrors && !normalized.badge ? 'Badge is required.' : undefined}
-          onChange={(event) => change({ badge: event.target.value })}
+          onChange={(event) => change('badge', event.target.value)}
           slotProps={{
             htmlInput: { 'aria-label': 'Team badge' },
             input: {
@@ -199,7 +225,7 @@ export default function TeamEditorRow({
           value={value.backgroundColor}
           disabled={saving}
           showErrors={showErrors}
-          onChange={(backgroundColor) => change({ backgroundColor })}
+          onChange={(backgroundColor) => change('backgroundColor', backgroundColor)}
         />
       </TableCell>
       <TableCell>
@@ -208,7 +234,7 @@ export default function TeamEditorRow({
           value={value.textColor}
           disabled={saving}
           showErrors={showErrors}
-          onChange={(textColor) => change({ textColor })}
+          onChange={(textColor) => change('textColor', textColor)}
         />
       </TableCell>
       <TableCell sx={{ minWidth: 380 }}>
@@ -222,11 +248,7 @@ export default function TeamEditorRow({
               disabled={saving}
               error={showErrors && !!driverErrors[index]}
               helperText={showErrors ? driverErrors[index] || undefined : undefined}
-              onChange={(event) => {
-                const updated = [...value.drivers]
-                updated[index] = event.target.value
-                change({ drivers: updated })
-              }}
+              onChange={(event) => changeDriver(index, event.target.value)}
             />
           ))}
         </Box>

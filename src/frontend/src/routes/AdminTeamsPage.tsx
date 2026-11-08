@@ -14,12 +14,18 @@ import {
   Typography,
 } from '@mui/material'
 import { isAxiosError } from 'axios'
+import { useState } from 'react'
 import { Navigate } from 'react-router'
 import { isUnauthorized } from '../api/session'
 import LineupEditor from '../components/lineup/LineupEditor'
+import SwapDriversDialog from '../components/lineup/SwapDriversDialog'
 import { useLeague } from '../context/league'
 import type { RaceLineupTeamDto } from '../dto/raceLineup'
-import { useRaceLineupTarget, useSaveRaceLineupTeam } from '../queries/raceLineups'
+import {
+  useRaceLineupTarget,
+  useSaveRaceLineupTeam,
+  useSwapRaceLineupDrivers,
+} from '../queries/raceLineups'
 
 const dateTime = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -39,11 +45,16 @@ export default function AdminTeamsPage() {
   const { selectedSeason } = useLeague()
   const target = useRaceLineupTarget(selectedSeason)
   const save = useSaveRaceLineupTeam()
+  const swap = useSwapRaceLineupDrivers()
+  const [swapRaceId, setSwapRaceId] = useState<string | null>(null)
   const lineup = target.data
+  const latestIsSwap = swap.submittedAt > save.submittedAt
+  const action = latestIsSwap ? swap : save
 
   if (
     (target.isError && isUnauthorized(target.error)) ||
-    (save.isError && isUnauthorized(save.error))
+    (save.isError && isUnauthorized(save.error)) ||
+    (swap.isError && isUnauthorized(swap.error))
   ) {
     return <Navigate to="/auth" replace />
   }
@@ -54,9 +65,18 @@ export default function AdminTeamsPage() {
     onSaved: () => void,
   ) {
     if (!lineup || selectedSeason === null) return
+    swap.reset()
     save.mutate(
       { season: selectedSeason, raceId: lineup.race.id, previousName, team },
       { onSuccess: onSaved },
+    )
+  }
+
+  function swapDrivers(firstDriverName: string, secondDriverName: string) {
+    if (!lineup || selectedSeason === null || swapRaceId !== lineup.race.id) return
+    swap.mutate(
+      { season: selectedSeason, raceId: lineup.race.id, firstDriverName, secondDriverName },
+      { onSuccess: () => setSwapRaceId(null) },
     )
   }
 
@@ -84,7 +104,9 @@ export default function AdminTeamsPage() {
             <span>
               <IconButton
                 aria-label="Refresh lineup"
-                disabled={selectedSeason === null || target.isFetching || save.isPending}
+                disabled={
+                  selectedSeason === null || target.isFetching || save.isPending || swap.isPending
+                }
                 onClick={() => void target.refetch()}
               >
                 <RefreshRounded />
@@ -151,7 +173,14 @@ export default function AdminTeamsPage() {
                   <Chip
                     size="small"
                     color={lineup.race.status === 'OPEN' ? 'success' : 'default'}
-                    label={lineup.race.status === 'OPEN' ? 'Predictions open' : 'Scheduled'}
+                    label={
+                      {
+                        SCHEDULED: 'Scheduled',
+                        OPEN: 'Predictions open',
+                        CLOSED: 'Predictions closed',
+                        FINISHED: 'Finished',
+                      }[lineup.race.status]
+                    }
                   />
                 </Stack>
                 <Typography variant="body2" color="text.secondary">
@@ -169,23 +198,43 @@ export default function AdminTeamsPage() {
             <LineupEditor
               key={lineup.race.id}
               lineup={lineup}
-              busy={save.isPending || target.isFetching}
+              busy={save.isPending || swap.isPending || target.isFetching}
               saving={save.isPending && save.variables?.raceId === lineup.race.id}
               savingTeam={save.variables?.previousName}
               onSave={saveTeam}
+              onSwapDrivers={() => {
+                save.reset()
+                swap.reset()
+                setSwapRaceId(lineup.race.id)
+              }}
             />
+            {swapRaceId === lineup.race.id && (
+              <SwapDriversDialog
+                lineup={lineup}
+                busy={swap.isPending}
+                onSwap={swapDrivers}
+                onClose={() => setSwapRaceId(null)}
+              />
+            )}
           </>
         )}
       </Stack>
       <Snackbar
-        open={save.isSuccess || save.isError}
+        open={action.isSuccess || action.isError}
         autoHideDuration={6000}
-        onClose={() => save.reset()}
+        onClose={() => action.reset()}
       >
-        <Alert severity={save.isError ? 'error' : 'success'} onClose={() => save.reset()}>
-          {save.isError
-            ? errorMessage(save.error, 'Could not save the team. Please try again.')
-            : `${save.variables?.team.name ?? 'Team'} saved.`}
+        <Alert severity={action.isError ? 'error' : 'success'} onClose={() => action.reset()}>
+          {action.isError
+            ? errorMessage(
+                action.error,
+                latestIsSwap
+                  ? 'Could not swap the drivers. Please try again.'
+                  : 'Could not save the team. Please try again.',
+              )
+            : latestIsSwap
+              ? 'Drivers swapped.'
+              : `${save.variables?.team.name ?? 'Team'} saved.`}
         </Alert>
       </Snackbar>
     </Container>

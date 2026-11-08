@@ -7,6 +7,7 @@ import com.xdd.f1.contract.race.RaceDriversReplacedEvent;
 import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
+import com.xdd.f1.domain.race.lineup.Driver;
 import com.xdd.f1.domain.race.lineup.RaceLineup;
 import com.xdd.f1.domain.race.lineup.Team;
 import org.springframework.context.ApplicationEventPublisher;
@@ -65,6 +66,22 @@ public class RaceLineupService {
     @Transactional
     public RaceLineup updateTeam(RaceId raceId, String previousName, Team team) {
         return saveTeam(getEditableRace(raceId), Optional.of(previousName), team);
+    }
+
+    @Transactional
+    public RaceLineup swapDrivers(RaceId raceId, Driver firstDriver, Driver secondDriver) {
+        var race = getEditableRace(raceId);
+        ensureForRace(race);
+        var current = lineupRepository.findByRaceId(raceId)
+                .orElseThrow(() -> new RaceLineupNotFoundException(raceId));
+        var updated = current.swapDrivers(firstDriver, secondDriver);
+        if (!current.equals(updated)) {
+            lineupRepository.update(updated);
+            for (var team : updated.teams()) {
+                publishReplacements(race, Optional.of(current), Optional.of(team.branding().name()), team);
+            }
+        }
+        return updated;
     }
 
     @Transactional

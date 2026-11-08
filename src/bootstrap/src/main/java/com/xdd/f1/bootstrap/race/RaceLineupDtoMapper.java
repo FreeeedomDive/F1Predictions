@@ -21,7 +21,7 @@ final class RaceLineupDtoMapper {
         );
     }
 
-    private static Driver toDriver(String name) {
+    static Driver toDriver(String name) {
         if (name == null) {
             throw new DomainValidationException("Driver name is required");
         }

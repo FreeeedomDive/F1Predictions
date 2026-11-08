@@ -53,4 +53,27 @@ public record RaceLineup(RaceId raceId, List<Team> teams) {
                 .toList();
         return new RaceLineup(raceId, updatedTeams);
     }
+
+    public RaceLineup swapDrivers(Driver firstDriver, Driver secondDriver) {
+        Objects.requireNonNull(firstDriver, "First driver must not be null");
+        Objects.requireNonNull(secondDriver, "Second driver must not be null");
+        var drivers = teams.stream().flatMap(team -> team.drivers().stream()).toList();
+        if (!drivers.contains(firstDriver) || !drivers.contains(secondDriver)) {
+            throw new DomainValidationException("Both drivers must belong to the race lineup to be swapped");
+        }
+        if (firstDriver.equals(secondDriver)) {
+            return this;
+        }
+
+        var updatedTeams = teams.stream()
+                .map(team -> new Team(
+                        team.branding(),
+                        team.drivers().stream()
+                                .map(driver -> driver.equals(firstDriver) ? secondDriver
+                                        : driver.equals(secondDriver) ? firstDriver : driver)
+                                .toList()
+                ))
+                .toList();
+        return new RaceLineup(raceId, updatedTeams);
+    }
 }
