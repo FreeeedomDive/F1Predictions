@@ -1,5 +1,7 @@
 import CalendarMonthRounded from '@mui/icons-material/CalendarMonthRounded'
+import EditNoteRounded from '@mui/icons-material/EditNoteRounded'
 import RefreshRounded from '@mui/icons-material/RefreshRounded'
+import VisibilityRounded from '@mui/icons-material/VisibilityRounded'
 import {
   Alert,
   Button,
@@ -12,7 +14,7 @@ import {
   Typography,
 } from '@mui/material'
 import { isAxiosError } from 'axios'
-import { Navigate } from 'react-router'
+import { Link, Navigate } from 'react-router'
 import { isUnauthorized } from '../api/session'
 import RaceTable from '../components/calendar/RaceTable'
 import { useLeague } from '../context/league'
@@ -119,7 +121,23 @@ export default function CalendarPage() {
             <Typography variant="caption" color="text.secondary">
               Times in {timeZone}
             </Typography>
-            <RaceTable races={calendar.data} />
+            <RaceTable
+              races={calendar.data}
+              raceLink={(race) => `/races/${encodeURIComponent(race.id)}`}
+              renderActions={(race) => (
+                <Button
+                  component={Link}
+                  to={`/races/${encodeURIComponent(race.id)}`}
+                  size="small"
+                  variant={race.status === 'OPEN' ? 'contained' : 'outlined'}
+                  startIcon={race.status === 'OPEN' ? <EditNoteRounded /> : <VisibilityRounded />}
+                  aria-label={`${race.status === 'OPEN' ? 'Predict' : 'View prediction'} · ${race.name}`}
+                  sx={{ whiteSpace: 'nowrap' }}
+                >
+                  {race.status === 'OPEN' ? 'Predict' : 'View prediction'}
+                </Button>
+              )}
+            />
           </Stack>
         )}
       </Stack>

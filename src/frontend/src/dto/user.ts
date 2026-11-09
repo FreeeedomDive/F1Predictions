@@ -4,6 +4,7 @@ export interface UserLeagueDto {
   leagueName: string
   participantName: string
   firstSeason: number
+  sprintsEnabled: boolean
 }
 
 export interface MeResponseDto {

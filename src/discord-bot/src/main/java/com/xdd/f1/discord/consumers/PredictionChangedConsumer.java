@@ -21,10 +21,10 @@ public class PredictionChangedConsumer {
     @ApplicationModuleListener
     public void onPredictionChanged(PredictionChangedEvent event) {
         var raceName = event.raceName() + (event.raceType().equals("SPRINT") ? " (Sprint)" : "");
+        var action = event.created() ? "submitted a prediction" : "updated their prediction";
         var embed = new EmbedBuilder()
                 .setColor(new Color(0x5865F2))
-                .setTitle(event.created() ? "Prediction added" : "Prediction updated")
-                .addField(raceName, event.participantName(), false)
+                .setDescription(event.participantName() + " has " + action + " for " + raceName)
                 .build();
         sender.sendToLeague(event.leagueId(), event.raceType(), embed);
     }
