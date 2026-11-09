@@ -9,7 +9,6 @@ import com.xdd.f1.domain.race.result.*;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Repository
 public class RaceResultRepositoryAdapter implements RaceResultRepository {
@@ -47,10 +46,9 @@ public class RaceResultRepositoryAdapter implements RaceResultRepository {
             return null;
         }
         var classification = values.classification() == null ? null : values.classification().stream()
-                .map(Driver::new).toList();
-        var statuses = values.driverStatuses() == null ? null : values.driverStatuses().entrySet().stream()
-                .collect(Collectors.toMap(entry -> new Driver(entry.getKey()), entry -> RaceDriverStatus.valueOf(entry.getValue())));
-        return new RaceResultValues(classification, statuses, values.safetyCars(), values.firstPlaceLead());
+                .map(entry -> new RaceClassificationEntry(new Driver(entry.driverName()),
+                        RaceDriverStatus.valueOf(entry.status()))).toList();
+        return new RaceResultValues(classification, values.safetyCars(), values.firstPlaceLead());
     }
 
     private RaceResultValuesData toData(RaceResultValues values) {
@@ -58,10 +56,9 @@ public class RaceResultRepositoryAdapter implements RaceResultRepository {
             return null;
         }
         var classification = values.classification() == null ? null : values.classification().stream()
-                .map(Driver::name).toList();
-        var statuses = values.driverStatuses() == null ? null : values.driverStatuses().entrySet().stream()
-                .collect(Collectors.toMap(entry -> entry.getKey().name(), entry -> entry.getValue().name()));
-        return new RaceResultValuesData(classification, statuses, values.safetyCars(), values.firstPlaceLead());
+                .map(entry -> new RaceResultValuesData.ClassificationEntry(entry.driver().name(),
+                        entry.status().name())).toList();
+        return new RaceResultValuesData(classification, values.safetyCars(), values.firstPlaceLead());
     }
 
     private void updateEntity(RaceResultEntity entity, RaceResult result) {

@@ -25,7 +25,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -108,25 +107,25 @@ class RaceResultRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void preservesAbsentValuesUnknownStatusAndActualZerosAndCanClearBothSnapshots() {
+    void preservesAbsentValuesAndActualZerosAndCanClearBothSnapshots() {
         var race = createRace(2026, 1);
         var rules = new RulesVersion("2026");
-        var absent = new RaceResultValues(null, null, null, null);
-        var unknown = new RaceResultValues(List.of(new Driver("Norris")), null, null, null);
-        var initial = new RaceResult(race.id(), rules, absent, unknown);
+        var absent = new RaceResultValues(null, null, null);
+        var draft = new RaceResultValues(List.of(new RaceClassificationEntry(new Driver("Norris"), RaceDriverStatus.FINISHED)), null, null);
+        var initial = new RaceResult(race.id(), rules, absent, draft);
         transactions.executeWithoutResult(status -> results.create(initial));
         transactions.executeWithoutResult(status -> assertThat(results.findByRaceId(race.id())).contains(initial));
 
-        var zeros = new RaceResultValues(List.of(new Driver("Norris")), Map.of(new Driver("Norris"), RaceDriverStatus.FINISHED),
+        var zeros = new RaceResultValues(List.of(new RaceClassificationEntry(new Driver("Norris"), RaceDriverStatus.FINISHED)),
                 0, BigDecimal.ZERO);
         var updated = new RaceResult(race.id(), rules, zeros, absent);
         transactions.executeWithoutResult(status -> results.update(updated));
         transactions.executeWithoutResult(status -> assertThat(results.findByRaceId(race.id())).contains(updated));
 
-        var statusesOnly = new RaceResultValues(null, Map.of(new Driver("Norris"), RaceDriverStatus.DNF), null, null);
-        var independentCategories = new RaceResult(race.id(), rules, statusesOnly, new RaceResultValues(List.of(), Map.of(), null, null));
-        transactions.executeWithoutResult(status -> results.update(independentCategories));
-        transactions.executeWithoutResult(status -> assertThat(results.findByRaceId(race.id())).contains(independentCategories));
+        var classificationOnly = new RaceResultValues(List.of(new RaceClassificationEntry(new Driver("Norris"), RaceDriverStatus.DNF)), null, null);
+        var partialResult = new RaceResult(race.id(), rules, classificationOnly, new RaceResultValues(List.of(), null, null));
+        transactions.executeWithoutResult(status -> results.update(partialResult));
+        transactions.executeWithoutResult(status -> assertThat(results.findByRaceId(race.id())).contains(partialResult));
 
         var cleared = new RaceResult(race.id(), rules, null, null);
         transactions.executeWithoutResult(status -> results.update(cleared));
@@ -228,11 +227,11 @@ class RaceResultRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     private RaceResultValues values(String lead) {
-        return new RaceResultValues(
-                List.of(new Driver("Norris"), new Driver("Stroll"), new Driver("Bottas"), new Driver("Hamilton")),
-                Map.of(new Driver("Norris"), RaceDriverStatus.FINISHED, new Driver("Stroll"), RaceDriverStatus.DNF,
-                        new Driver("Bottas"), RaceDriverStatus.DNS, new Driver("Hamilton"), RaceDriverStatus.DQ),
-                2, new BigDecimal(lead)
-        );
+        return new RaceResultValues(List.of(
+                new RaceClassificationEntry(new Driver("Norris"), RaceDriverStatus.FINISHED),
+                new RaceClassificationEntry(new Driver("Stroll"), RaceDriverStatus.DNF),
+                new RaceClassificationEntry(new Driver("Bottas"), RaceDriverStatus.DNS),
+                new RaceClassificationEntry(new Driver("Hamilton"), RaceDriverStatus.DQ)
+        ), 2, new BigDecimal(lead));
     }
 }
