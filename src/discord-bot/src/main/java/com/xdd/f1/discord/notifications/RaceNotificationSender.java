@@ -1,6 +1,7 @@
 package com.xdd.f1.discord.notifications;
 
 import com.xdd.f1.contract.league.LeagueApi;
+import com.xdd.f1.contract.league.LeagueDto;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
@@ -8,6 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+
+import java.util.UUID;
 
 @Component
 @ConditionalOnProperty(prefix = "discord", name = "enabled", havingValue = "true")
@@ -26,22 +29,28 @@ public class RaceNotificationSender {
     public void sendToLeagues(String raceType, MessageEmbed embed) {
         var discordLeagues = leagueApi.findDiscordLeagues();
         for (var league : discordLeagues) {
-            if (raceType.equals("SPRINT") && !league.settings().sprintsEnabled()) {
-                continue;
-            }
-
-            var channelId = league.settings().notificationsChannelId();
-            if (channelId == null || channelId.isBlank()) {
-                continue;
-            }
-
-            var channel = jda.getChannelById(GuildMessageChannel.class, channelId);
-            if (channel == null) {
-                log.warn("Discord notification channel {} for league {} was not found", channelId, league.id());
-                continue;
-            }
-
-            channel.sendMessageEmbeds(embed).complete();
+            send(league, raceType, embed);
         }
+    }
+
+    public void sendToLeague(UUID leagueId, String raceType, MessageEmbed embed) {
+        leagueApi.findDiscordLeagues().stream().filter(league -> league.id().equals(leagueId))
+                .findFirst().ifPresent(league -> send(league, raceType, embed));
+    }
+
+    private void send(LeagueDto league, String raceType, MessageEmbed embed) {
+        if (raceType.equals("SPRINT") && !league.settings().sprintsEnabled()) {
+            return;
+        }
+        var channelId = league.settings().notificationsChannelId();
+        if (channelId == null || channelId.isBlank()) {
+            return;
+        }
+        var channel = jda.getChannelById(GuildMessageChannel.class, channelId);
+        if (channel == null) {
+            log.warn("Discord notification channel {} for league {} was not found", channelId, league.id());
+            return;
+        }
+        channel.sendMessageEmbeds(embed).complete();
     }
 }

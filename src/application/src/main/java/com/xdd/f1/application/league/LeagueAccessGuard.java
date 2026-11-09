@@ -1,6 +1,7 @@
 package com.xdd.f1.application.league;
 
 import com.xdd.f1.domain.league.LeagueId;
+import com.xdd.f1.domain.league.LeagueParticipant;
 import com.xdd.f1.domain.user.UserId;
 import org.springframework.stereotype.Service;
 
@@ -13,10 +14,8 @@ public class LeagueAccessGuard {
         this.repository = repository;
     }
 
-    public void checkAccess(UserId userId, LeagueId leagueId) {
-        var leagueParticipant = repository.findByLeagueAndUser(leagueId, userId);
-        if (leagueParticipant.isEmpty()){
-            throw new LeagueParticipantNotFoundException(userId, leagueId);
-        }
+    public LeagueParticipant checkAccess(UserId userId, LeagueId leagueId) {
+        return repository.findByLeagueAndUser(leagueId, userId)
+                .orElseThrow(() -> new LeagueParticipantNotFoundException(userId, leagueId));
     }
 }

@@ -7,6 +7,9 @@ import com.xdd.f1.application.race.lineup.RaceLineupNotEditableException;
 import com.xdd.f1.application.race.lineup.RaceLineupNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupNotPreparedException;
 import com.xdd.f1.application.session.SessionNotFoundException;
+import com.xdd.f1.application.prediction.PredictionNotFoundException;
+import com.xdd.f1.application.prediction.PredictionConditionsNotFoundException;
+import com.xdd.f1.application.prediction.PredictionsClosedException;
 import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.race.InvalidRaceStatusException;
 import org.springframework.http.HttpStatus;
@@ -31,7 +34,9 @@ public class ApiExceptionHandler {
             LeagueNotFoundException.class,
             LeagueParticipantNotFoundException.class,
             RaceNotFoundException.class,
-            RaceLineupNotFoundException.class
+            RaceLineupNotFoundException.class,
+            PredictionNotFoundException.class,
+            PredictionConditionsNotFoundException.class
     })
     public ProblemDetail notFound(RuntimeException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
@@ -40,7 +45,8 @@ public class ApiExceptionHandler {
     @ExceptionHandler({
             InvalidRaceStatusException.class,
             RaceLineupNotPreparedException.class,
-            RaceLineupNotEditableException.class
+            RaceLineupNotEditableException.class,
+            PredictionsClosedException.class
     })
     public ProblemDetail conflict(RuntimeException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());

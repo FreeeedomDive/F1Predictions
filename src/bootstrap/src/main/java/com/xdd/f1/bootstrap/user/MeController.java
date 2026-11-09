@@ -32,7 +32,8 @@ public class MeController {
                 userLeague.participantId().value(),
                 userLeague.leagueName(),
                 userLeague.participantName(),
-                userLeague.firstSeason()
+                userLeague.firstSeason(),
+                userLeague.sprintsEnabled()
         );
     }
 }

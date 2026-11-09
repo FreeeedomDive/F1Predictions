@@ -9,5 +9,6 @@ dependencies {
 
     implementation(libs.spring.context)
     implementation(libs.spring.tx)
+    implementation(libs.slf4j.api)
     implementation(libs.spring.modulith.events.api)
 }

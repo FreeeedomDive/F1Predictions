@@ -23,6 +23,7 @@ postgresql = { module = "org.postgresql:postgresql" }
 spring-context = { module = "org.springframework:spring-context" }
 spring-tx = { module = "org.springframework:spring-tx" }
 spring-web = { module = "org.springframework:spring-web" }
+slf4j-api = { module = "org.slf4j:slf4j-api" }
 jackson-annotations = { module = "com.fasterxml.jackson.core:jackson-annotations" }
 
 # Phase 2 / later stages: messaging, auth, sessions. Not wired into any module yet.

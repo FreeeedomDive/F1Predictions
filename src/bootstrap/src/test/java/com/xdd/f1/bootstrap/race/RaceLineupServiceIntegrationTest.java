@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -292,7 +291,7 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "editorFirst={0}")
     @ValueSource(booleans = {false, true})
-    void openingAndEditorCanConcurrentlyCreateTheSameLineup(boolean editorFirst) throws Exception {
+    void serializesOpeningAndEditorWithoutOverwritingTeamChanges(boolean editorFirst) throws Exception {
         var previous = createRace(2027, 1, "Previous Grand Prix", NOW, NOW.plusSeconds(3600));
         var race = createRace(2027, 2, "Grand Prix", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
         var original = lineup(previous, "McLaren", "Lando Norris");
@@ -300,18 +299,12 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
         prepareLineup(original);
 
         var firstInserted = new CountDownLatch(1);
-        var competingInsert = new CountDownLatch(1);
-        var attempts = new AtomicInteger();
-        // Hold the first insert uncommitted until the other transaction also tries to create the lineup.
+        var competingOperationStarted = new CountDownLatch(1);
         doAnswer(invocation -> {
-            if (attempts.incrementAndGet() == 1) {
-                var created = invocation.callRealMethod();
-                firstInserted.countDown();
-                assertThat(competingInsert.await(10, TimeUnit.SECONDS)).isTrue();
-                return created;
-            }
-            competingInsert.countDown();
-            return invocation.callRealMethod();
+            var created = invocation.callRealMethod();
+            firstInserted.countDown();
+            assertThat(competingOperationStarted.await(10, TimeUnit.SECONDS)).isTrue();
+            return created;
         }).when(lineups).createIfAbsent(argThat(lineup -> lineup.raceId().equals(race.id())));
 
         try (var executor = Executors.newFixedThreadPool(2)) {
@@ -324,6 +317,7 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
             });
             assertThat(firstInserted.await(10, TimeUnit.SECONDS)).isTrue();
             var second = executor.submit(() -> {
+                competingOperationStarted.countDown();
                 if (editorFirst) {
                     service.openRacePredictions(race.id());
                 } else {
