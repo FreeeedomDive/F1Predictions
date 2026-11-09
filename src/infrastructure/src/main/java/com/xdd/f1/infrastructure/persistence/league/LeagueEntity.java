@@ -47,4 +47,24 @@ public class LeagueEntity {
     public UUID getId() {
         return id;
     }
+
+    public String getName() {
+        return name;
+    }
+
+    public LeagueSourceType getSource() {
+        return source;
+    }
+
+    public String getSourceId() {
+        return sourceId;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public LeagueSettingsEntity getSettings() {
+        return settings;
+    }
 }

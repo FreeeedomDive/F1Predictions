@@ -19,7 +19,8 @@ public interface LeagueParticipantJpaRepository extends JpaRepository<LeaguePart
                p.id as participantId,
                l.name as leagueName,
                p.displayName as participantName,
-               s.firstSeason as firstSeason
+               s.firstSeason as firstSeason,
+               s.sprintsEnabled as sprintsEnabled
         from LeagueParticipantEntity p
         join p.league l
         join l.settings s
