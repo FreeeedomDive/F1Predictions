@@ -7,6 +7,7 @@ import {
   updateRaceLineupTeam,
 } from '../api/raceLineups'
 import type { RaceLineupDto, RaceLineupTeamDto, SwapRaceDriversRequestDto } from '../dto/raceLineup'
+import { invalidateRacePredictions } from './predictions'
 
 interface SaveTeamVariables {
   season: number
@@ -58,9 +59,11 @@ export function useSaveRaceLineupTeam() {
         return { ...current, teams, prepared: true }
       })
     },
-    onSettled: (_, _error, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['admin', 'raceLineups', variables.season] })
-    },
+    onSettled: (_, _error, variables) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin', 'raceLineups', variables.season] }),
+        invalidateRacePredictions(queryClient, variables.raceId),
+      ]),
   })
 }
 
@@ -78,8 +81,10 @@ export function useSwapRaceLineupDrivers() {
         current?.race.id === variables.raceId ? lineup : current,
       )
     },
-    onSettled: (_, _error, variables) => {
-      void queryClient.invalidateQueries({ queryKey: ['admin', 'raceLineups', variables.season] })
-    },
+    onSettled: (_, _error, variables) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin', 'raceLineups', variables.season] }),
+        invalidateRacePredictions(queryClient, variables.raceId),
+      ]),
   })
 }

@@ -23,7 +23,7 @@ public class RaceRepositoryAdapter implements RaceRepository {
 
     @Override
     public Optional<Race> findById(RaceId id) {
-        return repository.findById(id.value()).map(this::toDomain);
+        return repository.findProjectedById(id.value()).map(this::toDomain);
     }
 
     @Override
@@ -67,16 +67,16 @@ public class RaceRepositoryAdapter implements RaceRepository {
         updateEntity(entity, race);
     }
 
-    private Race toDomain(RaceEntity entity) {
+    private Race toDomain(RaceProjection entity) {
         return new Race(
-                new RaceId(entity.id),
-                entity.season,
-                entity.round,
-                RaceType.valueOf(entity.type),
-                entity.name,
-                RaceStatus.valueOf(entity.status),
-                entity.openAt,
-                entity.closeAt
+                new RaceId(entity.getId()),
+                entity.getSeason(),
+                entity.getRound(),
+                RaceType.valueOf(entity.getType()),
+                entity.getName(),
+                RaceStatus.valueOf(entity.getStatus()),
+                entity.getOpenAt(),
+                entity.getCloseAt()
         );
     }
 

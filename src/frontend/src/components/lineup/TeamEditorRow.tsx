@@ -1,19 +1,23 @@
 import CloseRounded from '@mui/icons-material/CloseRounded'
+import MoreVertRounded from '@mui/icons-material/MoreVertRounded'
 import SaveRounded from '@mui/icons-material/SaveRounded'
 import UndoRounded from '@mui/icons-material/UndoRounded'
 import {
   Box,
-  Button,
   Chip,
+  CircularProgress,
   IconButton,
   InputAdornment,
-  Stack,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
   TableCell,
   TableRow,
   TextField,
   Tooltip,
 } from '@mui/material'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { RaceLineupTeamDto } from '../../dto/raceLineup'
 
 const hexColor = /^#[0-9a-f]{6}$/i
@@ -111,6 +115,9 @@ export default function TeamEditorRow({
 }) {
   const [draft, setDraft] = useState<TeamDraft>({})
   const [showErrors, setShowErrors] = useState(false)
+  const [actionsAnchor, setActionsAnchor] = useState<HTMLElement | null>(null)
+  const actionsId = useId()
+  const actionsButtonId = useId()
   const { drivers: driverDrafts = {}, ...fields } = draft
   const driverCount = Math.max(
     2,
@@ -126,6 +133,11 @@ export default function TeamEditorRow({
     ),
   }
   const normalized = normalizeTeam(value)
+  const badgeError = !normalized.badge
+    ? 'Badge is required.'
+    : normalized.badge.length > 3
+      ? 'Use up to 3 characters.'
+      : ''
   const dirty = isNew || !sameTeam(normalized, team)
   const drivers = value.drivers
   const driverErrors = drivers.map((driver, index) => {
@@ -137,7 +149,7 @@ export default function TeamEditorRow({
   })
   const valid =
     normalized.name.length > 0 &&
-    normalized.badge.length > 0 &&
+    !badgeError &&
     hexColor.test(normalized.backgroundColor) &&
     hexColor.test(normalized.textColor) &&
     driverErrors.every((error) => !error)
@@ -161,11 +173,13 @@ export default function TeamEditorRow({
   }
 
   function reset() {
+    setActionsAnchor(null)
     setDraft({})
     setShowErrors(false)
   }
 
   function save() {
+    setActionsAnchor(null)
     setShowErrors(true)
     if (valid) onSave(normalized, reset)
   }
@@ -192,11 +206,13 @@ export default function TeamEditorRow({
           placeholder="Badge"
           value={value.badge}
           disabled={saving}
-          error={showErrors && !normalized.badge}
-          helperText={showErrors && !normalized.badge ? 'Badge is required.' : undefined}
+          error={!!badgeError && (showErrors || normalized.badge.length > 3)}
+          helperText={
+            showErrors || normalized.badge.length > 3 ? badgeError || undefined : undefined
+          }
           onChange={(event) => change('badge', event.target.value)}
           slotProps={{
-            htmlInput: { 'aria-label': 'Team badge' },
+            htmlInput: { 'aria-label': 'Team badge', maxLength: 3 },
             input: {
               endAdornment: (
                 <InputAdornment position="end">
@@ -253,38 +269,55 @@ export default function TeamEditorRow({
           ))}
         </Box>
       </TableCell>
-      <TableCell align="right">
-        <Stack
-          direction="row"
-          spacing={0.5}
-          sx={{ alignItems: 'center', justifyContent: 'flex-end' }}
+      <TableCell align="right" sx={{ width: 64 }}>
+        <Tooltip title={saving ? 'Saving team…' : 'Team actions'}>
+          <span>
+            <IconButton
+              id={actionsButtonId}
+              aria-label={`Actions for ${normalized.name || 'new team'}`}
+              aria-haspopup="menu"
+              aria-controls={actionsAnchor ? actionsId : undefined}
+              aria-expanded={Boolean(actionsAnchor)}
+              aria-busy={saving}
+              disabled={saving}
+              onClick={(event) => setActionsAnchor(event.currentTarget)}
+              sx={{ width: 40, height: 40, border: 1, borderColor: 'divider', borderRadius: 1 }}
+            >
+              {saving ? (
+                <CircularProgress size={18} color="inherit" />
+              ) : (
+                <MoreVertRounded fontSize="small" />
+              )}
+            </IconButton>
+          </span>
+        </Tooltip>
+        <Menu
+          id={actionsId}
+          anchorEl={actionsAnchor}
+          open={Boolean(actionsAnchor)}
+          onClose={() => setActionsAnchor(null)}
+          slotProps={{ list: { 'aria-labelledby': actionsButtonId } }}
         >
-          <Button
-            aria-label={isNew ? 'Add new team' : `Save team ${team.name}`}
-            size="small"
-            variant="outlined"
-            startIcon={<SaveRounded />}
-            loading={saving}
-            disabled={busy || !dirty}
-            onClick={save}
+          <MenuItem disabled={busy || !dirty} onClick={save}>
+            <ListItemIcon>
+              <SaveRounded fontSize="small" />
+            </ListItemIcon>
+            <ListItemText>Save</ListItemText>
+          </MenuItem>
+          <MenuItem
+            disabled={saving || (!isNew && !dirty)}
+            onClick={() => {
+              setActionsAnchor(null)
+              if (isNew) onCancel?.()
+              else reset()
+            }}
           >
-            {isNew ? 'Add' : 'Save'}
-          </Button>
-          {(isNew || dirty) && (
-            <Tooltip title={isNew ? 'Cancel new team' : 'Discard changes'}>
-              <span>
-                <IconButton
-                  size="small"
-                  aria-label={isNew ? 'Cancel new team' : `Discard changes for ${team.name}`}
-                  disabled={saving}
-                  onClick={isNew ? onCancel : reset}
-                >
-                  {isNew ? <CloseRounded fontSize="small" /> : <UndoRounded fontSize="small" />}
-                </IconButton>
-              </span>
-            </Tooltip>
-          )}
-        </Stack>
+            <ListItemIcon>
+              {isNew ? <CloseRounded fontSize="small" /> : <UndoRounded fontSize="small" />}
+            </ListItemIcon>
+            <ListItemText>{isNew ? 'Cancel' : 'Discard changes'}</ListItemText>
+          </MenuItem>
+        </Menu>
       </TableCell>
     </TableRow>
   )

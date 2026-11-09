@@ -8,7 +8,7 @@ import com.xdd.f1.domain.race.lineup.Driver;
 import com.xdd.f1.domain.race.lineup.Team;
 import com.xdd.f1.domain.race.lineup.TeamBranding;
 
-final class RaceLineupDtoMapper {
+public final class RaceLineupDtoMapper {
 
     private RaceLineupDtoMapper() {
     }
@@ -28,7 +28,7 @@ final class RaceLineupDtoMapper {
         return new Driver(name);
     }
 
-    private static RaceLineupTeamDto toDto(Team team) {
+    public static RaceLineupTeamDto toDto(Team team) {
         return new RaceLineupTeamDto(
                 team.branding().name(),
                 team.branding().badge(),

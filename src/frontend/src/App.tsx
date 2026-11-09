@@ -8,6 +8,7 @@ import AuthPage, { AuthLoadingScreen } from './routes/AuthPage'
 import { authLoader } from './routes/authLoader'
 import CalendarPage from './routes/CalendarPage'
 import RequireAuth from './routes/RequireAuth'
+import RacePage from './routes/RacePage'
 
 const withDevPrefix = (title: string) => (import.meta.env.DEV ? `[dev] ${title}` : title)
 
@@ -49,6 +50,14 @@ const router = createBrowserRouter([
                 <CalendarPage />
               </>
             ),
+          },
+          {
+            path: 'prediction',
+            element: <RacePage current />,
+          },
+          {
+            path: 'races/:raceId',
+            element: <RacePage />,
           },
           {
             path: 'admin/races',

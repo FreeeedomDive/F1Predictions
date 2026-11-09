@@ -8,6 +8,7 @@ public record UserLeague(
         LeagueParticipantId participantId,
         String leagueName,
         String participantName,
-        int firstSeason
+        int firstSeason,
+        boolean sprintsEnabled
 ) {
 }

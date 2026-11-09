@@ -1,5 +1,6 @@
 import {
   Chip,
+  Link,
   Paper,
   Table,
   TableBody,
@@ -11,6 +12,7 @@ import {
 } from '@mui/material'
 import type { ChipProps } from '@mui/material'
 import type { ReactNode } from 'react'
+import { Link as RouterLink } from 'react-router'
 import type { RaceDto, RaceStatusDto } from '../../dto/race'
 
 const statuses: Record<RaceStatusDto, { label: string; color: ChipProps['color'] }> = {
@@ -41,9 +43,11 @@ function RaceTime({ value }: { value: string }) {
 export default function RaceTable({
   races,
   renderActions,
+  raceLink,
 }: {
   races: RaceDto[]
   renderActions?: (race: RaceDto) => ReactNode
+  raceLink?: (race: RaceDto) => string
 }) {
   return (
     <TableContainer component={Paper} variant="outlined" tabIndex={0}>
@@ -75,7 +79,18 @@ export default function RaceTable({
           {races.map((race) => (
             <TableRow key={race.id} hover>
               <TableCell component="th" scope="row" sx={{ fontWeight: 600 }}>
-                {race.name}
+                {raceLink ? (
+                  <Link
+                    component={RouterLink}
+                    to={raceLink(race)}
+                    underline="hover"
+                    color="inherit"
+                  >
+                    {race.name}
+                  </Link>
+                ) : (
+                  race.name
+                )}
               </TableCell>
               <TableCell>
                 <Chip

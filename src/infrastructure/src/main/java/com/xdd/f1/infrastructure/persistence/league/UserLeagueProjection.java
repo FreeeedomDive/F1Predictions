@@ -13,4 +13,5 @@ public interface UserLeagueProjection {
     String getParticipantName();
 
     int getFirstSeason();
+    boolean getSprintsEnabled();
 }

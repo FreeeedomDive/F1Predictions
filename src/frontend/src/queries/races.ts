@@ -1,5 +1,6 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
+import { invalidateRacePredictions } from './predictions'
 import {
   closeRacePredictions,
   getAdminRaceCalendar,
@@ -44,11 +45,12 @@ export function useChangeRacePredictionsStatus() {
     mutationFn: ({ raceId, action }: { raceId: string; action: 'open' | 'close' }) =>
       action === 'open' ? openRacePredictions(raceId) : closeRacePredictions(raceId),
     retry: false,
-    onSettled: async () => {
+    onSettled: async (_data, _error, variables) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['admin', 'races'] }),
         queryClient.invalidateQueries({ queryKey: ['races'] }),
         queryClient.invalidateQueries({ queryKey: ['admin', 'raceLineups'] }),
+        invalidateRacePredictions(queryClient, variables.raceId),
       ])
     },
   })

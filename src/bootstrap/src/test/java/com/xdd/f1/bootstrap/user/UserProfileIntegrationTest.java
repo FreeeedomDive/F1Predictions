@@ -124,14 +124,16 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
                         firstParticipant.id().value(),
                         firstLeague.name(),
                         "First server name",
-                        2023
+                        2023,
+                        firstLeague.settings().sprintsEnabled()
                 ),
                 new UserLeagueDto(
                         secondLeague.id().value(),
                         secondParticipant.id().value(),
                         secondLeague.name(),
                         "Second server name",
-                        2026
+                        2026,
+                        secondLeague.settings().sprintsEnabled()
                 )
         );
     }
@@ -160,7 +162,8 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
                 ownParticipant.id().value(),
                 sharedLeague.name(),
                 "Own participant name",
-                2026
+                2026,
+                sharedLeague.settings().sprintsEnabled()
         ));
     }
 

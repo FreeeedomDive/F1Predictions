@@ -7,6 +7,7 @@ public record UserLeagueDto(
         UUID participantId,
         String leagueName,
         String participantName,
-        int firstSeason
+        int firstSeason,
+        boolean sprintsEnabled
 ) {
 }

@@ -31,4 +31,20 @@ public class LeagueSettingsEntity {
 
     protected LeagueSettingsEntity() {
     }
+
+    public String getNotificationsChannelId() {
+        return notificationsChannelId;
+    }
+
+    public void setNotificationsChannelId(String notificationsChannelId) {
+        this.notificationsChannelId = notificationsChannelId;
+    }
+
+    public boolean isSprintsEnabled() {
+        return sprintsEnabled;
+    }
+
+    public int getFirstSeason() {
+        return firstSeason;
+    }
 }

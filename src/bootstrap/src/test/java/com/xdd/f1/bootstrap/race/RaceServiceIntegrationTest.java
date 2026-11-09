@@ -196,6 +196,43 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void closesDueRaceWhenAnEarlierScheduledRaceHasNoLineup() {
+        var missed = createRace(2027, 1, "Earlier race without lineup", NOW.minusSeconds(7200), NOW.minusSeconds(3600));
+        var brazil = createRace(2027, 2, "Brazilian Grand Prix", NOW, NOW.plusSeconds(3600));
+        prepareLineup(brazil);
+        service.openRacePredictions(brazil.id());
+        when(clock.instant()).thenReturn(brazil.closeAt());
+
+        var result = service.processScheduledTransitions();
+
+        assertThat(service.getById(brazil.id()).status()).isEqualTo(RaceStatus.CLOSED);
+        assertThat(service.getById(missed.id()).status()).isEqualTo(RaceStatus.SCHEDULED);
+        assertThat(result).containsEntry(brazil.id(), RaceStatus.CLOSED).doesNotContainKey(missed.id());
+    }
+
+    @Test
+    void commitsOtherTransitionsWhenOneOpeningFailsAndRollsBackOnlyThatRace() {
+        var due = createRace(2027, 1, "Race to close", NOW.minusSeconds(7200), NOW);
+        prepareLineup(due);
+        service.openRacePredictions(due.id());
+        var before = createRace(2027, 2, "First valid opening", NOW.minusSeconds(30), NOW.plusSeconds(3600));
+        var invalid = createRace(2028, 1, "Opening without season rules", NOW.minusSeconds(20), NOW.plusSeconds(5400));
+        var after = createRace(2027, 3, "Next valid opening", NOW.minusSeconds(10), NOW.plusSeconds(7200));
+
+        var result = service.processScheduledTransitions();
+
+        assertThat(result).containsEntry(due.id(), RaceStatus.CLOSED)
+                .containsEntry(before.id(), RaceStatus.OPEN)
+                .containsEntry(after.id(), RaceStatus.OPEN)
+                .doesNotContainKey(invalid.id());
+        assertThat(service.getById(due.id()).status()).isEqualTo(RaceStatus.CLOSED);
+        assertThat(service.getById(before.id()).status()).isEqualTo(RaceStatus.OPEN);
+        assertThat(service.getById(after.id()).status()).isEqualTo(RaceStatus.OPEN);
+        assertThat(service.getById(invalid.id()).status()).isEqualTo(RaceStatus.SCHEDULED);
+        assertThat(lineupService.getForEditing(invalid.id()).prepared()).isFalse();
+    }
+
+    @Test
     void throwsWhenRaceDoesNotExist() throws Exception {
         var id = new RaceId(UUID.randomUUID());
 
