@@ -30,6 +30,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -290,7 +291,8 @@ class PredictionServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Team team(String name, String first, String second) {
-        return new Team(new TeamBranding(name, name, "#112233", "#FFFFFF"), List.of(new Driver(first), new Driver(second)));
+        var badge = name.substring(0, Math.min(3, name.length())).toUpperCase(Locale.ROOT);
+        return new Team(new TeamBranding(name, badge, "#112233", "#FFFFFF"), List.of(new Driver(first), new Driver(second)));
     }
 
     private PredictionValues values(String tenthPlace) {

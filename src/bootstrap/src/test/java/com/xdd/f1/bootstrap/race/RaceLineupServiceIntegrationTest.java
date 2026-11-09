@@ -31,6 +31,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -381,6 +382,22 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void limitsBadgesToThreeCharactersWhenAddingOrUpdatingATeam() {
+        var race = createRace(2027, 1, "Grand Prix", NOW, NOW.plusSeconds(3600));
+        var valid = lineup(race, "McLaren", "Lando Norris").teams().getFirst();
+        var tooLong = new Team(new TeamBranding("McLaren", "LONG", "#FF8000", "#000000"), valid.drivers());
+
+        assertThatThrownBy(() -> lineupService.addTeam(race.id(), tooLong))
+                .isInstanceOf(DomainValidationException.class).hasMessageContaining("3 characters");
+        assertThat(lineupService.getForEditing(race.id()).prepared()).isFalse();
+
+        lineupService.addTeam(race.id(), valid);
+        assertThatThrownBy(() -> lineupService.updateTeam(race.id(), "McLaren", tooLong))
+                .isInstanceOf(DomainValidationException.class).hasMessageContaining("3 characters");
+        assertThat(lineupService.getForEditing(race.id()).teams()).containsExactly(valid);
+    }
+
+    @Test
     void rejectsInvalidOrClosedRaceTeamUpdateWithoutChangingLineup() {
         var race = createRace(2027, 1, "Grand Prix", NOW, NOW.plusSeconds(3600));
         var previousDriver = new Driver("Lando Norris");
@@ -577,8 +594,9 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     private RaceLineup lineup(Race race, String teamName, String driverName) {
+        var badge = teamName.substring(0, Math.min(3, teamName.length())).toUpperCase(Locale.ROOT);
         return new RaceLineup(race.id(), List.of(new Team(
-                new TeamBranding(teamName, teamName, "#FF8000", "#000000"),
+                new TeamBranding(teamName, badge, "#FF8000", "#000000"),
                 List.of(new Driver(driverName))
         )));
     }

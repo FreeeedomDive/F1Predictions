@@ -7,6 +7,7 @@ import com.xdd.f1.application.prediction.PredictionRepository;
 import com.xdd.f1.application.prediction.PredictionConditionsRepository;
 import com.xdd.f1.contract.race.DriverReplacementDto;
 import com.xdd.f1.contract.race.RaceDriversReplacedEvent;
+import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
@@ -111,6 +112,9 @@ public class RaceLineupService {
     }
 
     private RaceLineup saveTeam(Race race, Optional<String> previousName, Team team) {
+        if (team.branding().badge().length() > 3) {
+            throw new DomainValidationException("Team badge must not exceed 3 characters");
+        }
         var saved = lineupRepository.findByRaceId(race.id());
         var current = saved.or(() -> lineupRepository.findLatestBefore(race.closeAt())
                 .map(previous -> new RaceLineup(race.id(), previous.teams())));
