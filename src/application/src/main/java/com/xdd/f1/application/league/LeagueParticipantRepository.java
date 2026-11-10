@@ -6,12 +6,15 @@ import com.xdd.f1.domain.league.LeagueParticipantId;
 import com.xdd.f1.domain.user.UserId;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public interface LeagueParticipantRepository {
     Optional<LeagueParticipant> findByLeagueAndUser(LeagueId leagueId, UserId userId);
 
     List<UserLeague> findLeaguesByUserId(UserId userId);
+
+    Map<LeagueParticipantId, String> findNamesByIds(List<LeagueParticipantId> ids);
 
     void create(LeagueParticipant participant);
 

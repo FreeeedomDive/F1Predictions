@@ -7,6 +7,7 @@ import com.xdd.f1.domain.league.LeagueParticipantId;
 import com.xdd.f1.domain.prediction.*;
 import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.lineup.Driver;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -47,6 +48,7 @@ public class PredictionRepositoryAdapter implements PredictionRepository {
     }
 
     private Prediction toDomain(PredictionEntity entity) {
+        entity = Hibernate.unproxy(entity, PredictionEntity.class);
         return new Prediction(
                 new PredictionId(entity.id),
                 new LeagueId(entity.leagueId),
@@ -65,6 +67,7 @@ public class PredictionRepositoryAdapter implements PredictionRepository {
     }
 
     private void updateEntity(PredictionEntity entity, Prediction prediction) {
+        entity = Hibernate.unproxy(entity, PredictionEntity.class);
         entity.leagueId = prediction.leagueId().value();
         entity.participantId = prediction.participantId().value();
         entity.raceId = prediction.raceId().value();
