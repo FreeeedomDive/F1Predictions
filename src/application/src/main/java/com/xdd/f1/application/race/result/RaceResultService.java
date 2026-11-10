@@ -1,7 +1,10 @@
 package com.xdd.f1.application.race.result;
 
+import com.xdd.f1.application.league.LeagueAccessGuard;
+import com.xdd.f1.application.league.LeagueNotFoundException;
 import com.xdd.f1.application.league.LeagueParticipantNotFoundException;
 import com.xdd.f1.application.league.LeagueParticipantRepository;
+import com.xdd.f1.application.league.LeagueRepository;
 import com.xdd.f1.application.locking.TransactionLock;
 import com.xdd.f1.application.prediction.PredictionConditionsRepository;
 import com.xdd.f1.application.prediction.PredictionPointsRepository;
@@ -14,14 +17,17 @@ import com.xdd.f1.contract.race.RaceFinishedEvent;
 import com.xdd.f1.contract.race.RaceResultUpdatedEvent;
 import com.xdd.f1.contract.race.result.*;
 import com.xdd.f1.domain.error.DomainValidationException;
+import com.xdd.f1.domain.league.LeagueId;
 import com.xdd.f1.domain.prediction.*;
 import com.xdd.f1.domain.race.*;
 import com.xdd.f1.domain.race.lineup.RaceLineup;
 import com.xdd.f1.domain.race.result.RaceClassificationEntry;
 import com.xdd.f1.domain.race.result.RaceResult;
 import com.xdd.f1.domain.race.result.RaceResultValues;
+import com.xdd.f1.domain.user.UserId;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
@@ -38,10 +44,13 @@ public class RaceResultService {
     private final LeagueParticipantRepository participants;
     private final TransactionLock lock;
     private final ApplicationEventPublisher events;
+    private final LeagueAccessGuard access;
+    private final LeagueRepository leagues;
 
     public RaceResultService(RaceResultRepository results, PredictionPointsRepository points, PredictionRepository predictions,
                              PredictionConditionsRepository conditions, RaceRepository races, RaceLineupRepository lineups,
-                             LeagueParticipantRepository participants, TransactionLock lock, ApplicationEventPublisher events) {
+                             LeagueParticipantRepository participants, TransactionLock lock, ApplicationEventPublisher events,
+                             LeagueAccessGuard access, LeagueRepository leagues) {
         this.results = results;
         this.points = points;
         this.predictions = predictions;
@@ -51,6 +60,33 @@ public class RaceResultService {
         this.participants = participants;
         this.lock = lock;
         this.events = events;
+        this.access = access;
+        this.leagues = leagues;
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public RaceResultEditor getForEditing(RaceId raceId) {
+        var race = races.findById(raceId).orElseThrow(() -> new RaceNotFoundException(raceId));
+        var lineup = lineups.findByRaceId(raceId);
+        return new RaceResultEditor(race, lineup.map(RaceLineup::teams).orElse(List.of()), lineup.isPresent(),
+                conditions.findByRaceId(raceId).orElse(null), results.findByRaceId(raceId).orElse(null));
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public Optional<RaceResultDetails> findOwnResult(UserId userId, LeagueId leagueId, RaceId raceId) {
+        var participant = access.checkAccess(userId, leagueId);
+        var race = races.findById(raceId).orElseThrow(() -> new RaceNotFoundException(raceId));
+        var league = leagues.findById(leagueId).orElseThrow(() -> new LeagueNotFoundException(leagueId));
+        if (race.season() < league.settings().firstSeason()) {
+            throw new RaceNotFoundException(raceId);
+        }
+        var own = predictions.findByLeagueAndRaceAndParticipant(leagueId, raceId, participant.id());
+        if (race.type() == RaceType.SPRINT && !league.settings().sprintsEnabled() && own.isEmpty()) {
+            throw new RaceNotFoundException(raceId);
+        }
+        return results.findByRaceId(raceId).filter(saved -> saved.result() != null)
+                .map(saved -> new RaceResultDetails(race, saved.rulesVersion(), saved.result(),
+                        own.flatMap(prediction -> points.findByPredictionId(prediction.id())).orElse(null)));
     }
 
     @Transactional

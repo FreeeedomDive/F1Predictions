@@ -1,9 +1,11 @@
 package com.xdd.f1.bootstrap.race;
 
 import com.xdd.f1.application.league.LeagueParticipantService;
+import com.xdd.f1.application.league.LeagueParticipantNotFoundException;
 import com.xdd.f1.application.league.LeagueRepository;
 import com.xdd.f1.application.prediction.*;
 import com.xdd.f1.application.race.RaceService;
+import com.xdd.f1.application.race.RaceNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.application.race.result.*;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
@@ -127,6 +129,90 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
         });
         assertThat(jdbc.sql("SELECT version FROM race_results WHERE race_id = :id")
                 .param("id", race.id().value()).query(Long.class).single()).isZero();
+    }
+
+    @Test
+    void readsOnlyPublishedResultAndOwnPointsAcrossParticipantsAndLeaguesWhileTheEditorKeepsTheDraft() {
+        var race = openRace(2027, 1, RaceType.RACE);
+        var saved = savePredictions(race);
+        var bob = participants.ensureParticipant(firstLeague.id(),
+                new UserIdentityId(UserIdentitySource.MANUAL, UUID.randomUUID().toString()), "Bob");
+        var bobPrediction = predictionService.save(bob.userId(), firstLeague.id(), race.id(), predictionValues("Leclerc"));
+        var editor = service.getForEditing(race.id());
+        assertThat(editor.race().id()).isEqualTo(race.id());
+        assertThat(editor.race().status()).isEqualTo(RaceStatus.OPEN);
+        assertThat(editor.teams()).hasSize(3);
+        assertThat(editor.lineupPrepared()).isTrue();
+        assertThat(editor.conditions().positionPredictionDriver()).isEqualTo(new Driver("Norris"));
+        assertThat(editor.result()).isNull();
+        assertThat(service.findOwnResult(firstParticipant.userId(), firstLeague.id(), race.id())).isEmpty();
+        service.saveDraft(race.id(), resultValues());
+        assertThat(service.getForEditing(race.id()).result().draft()).isEqualTo(resultValues());
+        assertThat(service.findOwnResult(firstParticipant.userId(), firstLeague.id(), race.id())).isEmpty();
+
+        races.closeRacePredictions(race.id());
+        service.finalizeResult(race.id());
+        var own = service.findOwnResult(firstParticipant.userId(), firstLeague.id(), race.id()).orElseThrow();
+        assertThat(own.race().status()).isEqualTo(RaceStatus.FINISHED);
+        assertThat(own.rulesVersion()).isEqualTo(RULES_2027);
+        assertThat(own.result()).isEqualTo(resultValues());
+        assertThat(own.points()).isEqualTo(new PredictionPoints(saved.getFirst().id(), RULES_2027, 28, 6, 2, 5, 5, 10, null));
+        assertThat(service.findOwnResult(secondParticipant.userId(), secondLeague.id(), race.id()).orElseThrow().points().predictionId())
+                .isEqualTo(saved.getLast().id());
+        assertThat(service.findOwnResult(bob.userId(), firstLeague.id(), race.id()).orElseThrow().points())
+                .isEqualTo(new PredictionPoints(bobPrediction.id(), RULES_2027, 24, 2, 2, 5, 5, 10, null));
+        var observer = participants.ensureParticipant(firstLeague.id(),
+                new UserIdentityId(UserIdentitySource.MANUAL, UUID.randomUUID().toString()), "Observer");
+        var observed = service.findOwnResult(observer.userId(), firstLeague.id(), race.id()).orElseThrow();
+        assertThat(observed.result()).isEqualTo(resultValues());
+        assertThat(observed.points()).isNull();
+        assertThatThrownBy(() -> service.findOwnResult(bob.userId(), secondLeague.id(), race.id()))
+                .isInstanceOf(LeagueParticipantNotFoundException.class);
+
+        service.saveDraft(race.id(), correctedValues());
+        assertThat(service.getForEditing(race.id()).result().draft()).isEqualTo(correctedValues());
+        assertThat(service.findOwnResult(firstParticipant.userId(), firstLeague.id(), race.id())).contains(own);
+        service.finalizeResult(race.id());
+        var updated = service.findOwnResult(firstParticipant.userId(), firstLeague.id(), race.id()).orElseThrow();
+        assertThat(updated.result()).isEqualTo(correctedValues());
+        assertThat(updated.points()).isEqualTo(new PredictionPoints(saved.getFirst().id(), RULES_2027, 19, 2, 2, 5, 5, 5, null));
+    }
+
+    @Test
+    void readsAnUnpreparedRaceEditorWithoutCreatingResultLineupOrConditions() {
+        var race = races.create(2027, 1, RaceType.RACE, "Scheduled Grand Prix", NOW.plusSeconds(60), NOW.plusSeconds(3600));
+        var editor = service.getForEditing(race.id());
+        assertThat(editor.race()).isEqualTo(race);
+        assertThat(editor.teams()).isEmpty();
+        assertThat(editor.lineupPrepared()).isFalse();
+        assertThat(editor.conditions()).isNull();
+        assertThat(editor.result()).isNull();
+        transactions.executeWithoutResult(status -> {
+            assertThat(results.findByRaceId(race.id())).isEmpty();
+            assertThat(lineups.findByRaceId(race.id())).isEmpty();
+            assertThat(conditions.findByRaceId(race.id())).isEmpty();
+        });
+    }
+
+    @Test
+    void keepsOwnSavedSprintResultReadableAfterDisablingSprintsAndRejectsIneligibleReads() {
+        var race = openRace(2027, 1, RaceType.SPRINT);
+        var saved = savePredictions(race);
+        publish(race);
+        jdbc.sql("UPDATE league_settings SET sprints_enabled = false WHERE league_id = :id")
+                .param("id", firstLeague.id().value()).update();
+        var own = service.findOwnResult(firstParticipant.userId(), firstLeague.id(), race.id()).orElseThrow();
+        assertThat(own.points().predictionId()).isEqualTo(saved.getFirst().id());
+        assertThat(own.points().totalPoints()).isEqualTo(8);
+        var observer = participants.ensureParticipant(firstLeague.id(),
+                new UserIdentityId(UserIdentitySource.MANUAL, UUID.randomUUID().toString()), "Observer");
+        assertThatThrownBy(() -> service.findOwnResult(observer.userId(), firstLeague.id(), race.id()))
+                .isInstanceOf(RaceNotFoundException.class);
+        var earlier = races.create(2022, 1, RaceType.RACE, "Earlier Grand Prix", NOW.plusSeconds(60), NOW.plusSeconds(3600));
+        assertThatThrownBy(() -> service.findOwnResult(firstParticipant.userId(), firstLeague.id(), earlier.id()))
+                .isInstanceOf(RaceNotFoundException.class);
+        assertThatThrownBy(() -> service.findOwnResult(firstParticipant.userId(), firstLeague.id(), new RaceId(UUID.randomUUID())))
+                .isInstanceOf(RaceNotFoundException.class);
     }
 
     @Test
@@ -325,6 +411,7 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
             results.create(historical);
             points.create(historicalPoints);
         });
+        assertThat(service.getForEditing(race.id()).result()).isEqualTo(historical);
         assertThatThrownBy(() -> service.saveDraft(race.id(), correctedValues())).isInstanceOf(RaceResultRulesException.class);
         assertThatThrownBy(() -> service.finalizeResult(race.id())).isInstanceOf(RaceResultRulesException.class);
         var supported = new RaceResult(race.id(), new RulesVersion("2026"), resultValues(), null);

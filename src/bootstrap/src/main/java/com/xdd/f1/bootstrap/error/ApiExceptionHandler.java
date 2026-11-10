@@ -6,10 +6,15 @@ import com.xdd.f1.application.race.RaceNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupNotEditableException;
 import com.xdd.f1.application.race.lineup.RaceLineupNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupNotPreparedException;
+import com.xdd.f1.application.race.result.RaceResultIncompleteException;
+import com.xdd.f1.application.race.result.RaceResultNotFoundException;
+import com.xdd.f1.application.race.result.RaceResultOperationNotAllowedException;
+import com.xdd.f1.application.race.result.RaceResultRulesException;
 import com.xdd.f1.application.session.SessionNotFoundException;
 import com.xdd.f1.application.prediction.PredictionNotFoundException;
 import com.xdd.f1.application.prediction.PredictionConditionsNotFoundException;
 import com.xdd.f1.application.prediction.PredictionsClosedException;
+import com.xdd.f1.application.prediction.PredictionPointsNotFoundException;
 import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.race.InvalidRaceStatusException;
 import org.springframework.http.HttpStatus;
@@ -36,7 +41,9 @@ public class ApiExceptionHandler {
             RaceNotFoundException.class,
             RaceLineupNotFoundException.class,
             PredictionNotFoundException.class,
-            PredictionConditionsNotFoundException.class
+            PredictionConditionsNotFoundException.class,
+            PredictionPointsNotFoundException.class,
+            RaceResultNotFoundException.class
     })
     public ProblemDetail notFound(RuntimeException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
@@ -46,7 +53,10 @@ public class ApiExceptionHandler {
             InvalidRaceStatusException.class,
             RaceLineupNotPreparedException.class,
             RaceLineupNotEditableException.class,
-            PredictionsClosedException.class
+            PredictionsClosedException.class,
+            RaceResultOperationNotAllowedException.class,
+            RaceResultIncompleteException.class,
+            RaceResultRulesException.class
     })
     public ProblemDetail conflict(RuntimeException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
