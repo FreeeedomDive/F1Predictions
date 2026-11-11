@@ -30,4 +30,11 @@ public interface LeagueParticipantJpaRepository extends JpaRepository<LeaguePart
     List<UserLeagueProjection> findLeaguesByUserId(
             @Param("userId") UUID userId
     );
+
+    @Query("""
+        select p.id as id, p.displayName as displayName
+        from LeagueParticipantEntity p
+        where p.id in :ids
+        """)
+    List<LeagueParticipantNameProjection> findNamesByIds(@Param("ids") List<UUID> ids);
 }

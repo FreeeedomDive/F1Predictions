@@ -23,8 +23,11 @@ public class PredictionController {
     }
 
     @GetMapping
-    public ResponseEntity<PredictionDto> getOwn(@CurrentUser AuthenticatedUser user,
-                                               @PathVariable UUID leagueId, @PathVariable UUID raceId) {
+    public ResponseEntity<PredictionDto> getOwn(
+            @CurrentUser AuthenticatedUser user,
+            @PathVariable UUID leagueId,
+            @PathVariable UUID raceId
+    ) {
         var prediction = service.findOwn(user.id(), new LeagueId(leagueId), new RaceId(raceId));
         return prediction.map(value -> ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate())
                         .body(PredictionDtoMapper.toDto(value)))
@@ -32,9 +35,12 @@ public class PredictionController {
     }
 
     @PutMapping
-    public ResponseEntity<PredictionDto> save(@CurrentUser AuthenticatedUser user,
-                                              @PathVariable UUID leagueId, @PathVariable UUID raceId,
-                                              @RequestBody SavePredictionRequestDto request) {
+    public ResponseEntity<PredictionDto> save(
+            @CurrentUser AuthenticatedUser user,
+            @PathVariable UUID leagueId,
+            @PathVariable UUID raceId,
+            @RequestBody SavePredictionRequestDto request
+    ) {
         var prediction = service.save(user.id(), new LeagueId(leagueId), new RaceId(raceId), PredictionDtoMapper.toDomain(request));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(PredictionDtoMapper.toDto(prediction));
     }

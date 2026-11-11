@@ -6,6 +6,7 @@ import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
 import com.xdd.f1.domain.race.RaceType;
+import org.hibernate.Hibernate;
 import org.springframework.stereotype.Repository;
 
 import java.time.Instant;
@@ -88,6 +89,7 @@ public class RaceRepositoryAdapter implements RaceRepository {
     }
 
     private void updateEntity(RaceEntity entity, Race race) {
+        entity = Hibernate.unproxy(entity, RaceEntity.class);
         entity.season = race.season();
         entity.round = race.round();
         entity.type = race.type().name();

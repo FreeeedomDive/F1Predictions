@@ -1,0 +1,43 @@
+package com.xdd.f1.bootstrap.race;
+
+import com.xdd.f1.application.race.result.RaceResultService;
+import com.xdd.f1.bootstrap.auth.AuthenticatedUser;
+import com.xdd.f1.bootstrap.auth.CurrentUser;
+import com.xdd.f1.contract.race.result.RaceResultDto;
+import com.xdd.f1.contract.race.result.RaceResultEditorDto;
+import com.xdd.f1.contract.race.result.RaceResultValuesDto;
+import com.xdd.f1.domain.race.RaceId;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/adminApi/v1/races/{raceId}/result")
+public class AdminRaceResultController {
+    private final RaceResultService service;
+
+    public AdminRaceResultController(RaceResultService service) {
+        this.service = service;
+    }
+
+    @GetMapping
+    public ResponseEntity<RaceResultEditorDto> getForEditing(@CurrentUser AuthenticatedUser user, @PathVariable UUID raceId) {
+        var editor = service.getForEditing(new RaceId(raceId));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(RaceResultDtoMapper.toDto(editor));
+    }
+
+    @PutMapping("/draft")
+    public ResponseEntity<RaceResultDto> saveDraft(@CurrentUser AuthenticatedUser user, @PathVariable UUID raceId,
+                                                 @RequestBody RaceResultValuesDto request) {
+        var saved = service.saveDraft(new RaceId(raceId), RaceResultDtoMapper.toDomain(request));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(RaceResultDtoMapper.toDto(saved));
+    }
+
+    @PostMapping("/finalize")
+    public ResponseEntity<RaceResultDto> finalizeResult(@CurrentUser AuthenticatedUser user, @PathVariable UUID raceId) {
+        var saved = service.finalizeResult(new RaceId(raceId));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(RaceResultDtoMapper.toDto(saved));
+    }
+}

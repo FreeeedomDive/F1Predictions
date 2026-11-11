@@ -19,6 +19,23 @@ export interface PredictionDto extends SavePredictionRequestDto {
   teamsPickedDrivers: string[] | null
 }
 
+export interface AdminPredictionDto {
+  prediction: PredictionDto
+  participantName: string
+  leagueName: string
+}
+
+export interface PredictionPointsDto {
+  rulesVersion: string
+  totalPoints: number
+  tenthPlacePoints: number | null
+  dnfsPoints: number | null
+  safetyCarsPoints: number | null
+  firstPlaceLeadPoints: number | null
+  teamMatesPoints: number | null
+  driverPositionPoints: number | null
+}
+
 export interface RaceDetailsDto {
   race: RaceDto
   season: number

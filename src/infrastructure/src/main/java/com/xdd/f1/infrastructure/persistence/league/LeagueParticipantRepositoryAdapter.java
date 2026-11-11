@@ -11,7 +11,9 @@ import com.xdd.f1.infrastructure.persistence.user.UserJpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Repository
 public class LeagueParticipantRepositoryAdapter implements LeagueParticipantRepository {
@@ -49,6 +51,15 @@ public class LeagueParticipantRepositoryAdapter implements LeagueParticipantRepo
                         row.getSprintsEnabled()
                 ))
                 .toList();
+    }
+
+    @Override
+    public Map<LeagueParticipantId, String> findNamesByIds(List<LeagueParticipantId> ids) {
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return leagueParticipantJpaRepository.findNamesByIds(ids.stream().map(LeagueParticipantId::value).toList())
+                .stream().collect(Collectors.toMap(row -> new LeagueParticipantId(row.getId()), LeagueParticipantNameProjection::getDisplayName));
     }
 
     @Override

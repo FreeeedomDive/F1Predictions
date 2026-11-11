@@ -3,6 +3,7 @@ import CalendarMonthRounded from '@mui/icons-material/CalendarMonthRounded'
 import EditCalendarRounded from '@mui/icons-material/EditCalendarRounded'
 import GroupsRounded from '@mui/icons-material/GroupsRounded'
 import EditNoteRounded from '@mui/icons-material/EditNoteRounded'
+import SportsScoreRounded from '@mui/icons-material/SportsScoreRounded'
 import {
   Avatar,
   Box,
@@ -102,6 +103,23 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           </ListItemIcon>
           <ListItemText
             primary="Calendar"
+            slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
+          />
+        </ListItemButton>
+        <ListItemButton
+          component={NavLink}
+          to="/admin/results"
+          onClick={onClose}
+          sx={{
+            borderRadius: 1,
+            '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+            <SportsScoreRounded fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="Results"
             slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
           />
         </ListItemButton>

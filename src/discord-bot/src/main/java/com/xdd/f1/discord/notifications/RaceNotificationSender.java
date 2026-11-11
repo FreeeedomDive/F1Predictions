@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -29,16 +30,20 @@ public class RaceNotificationSender {
     public void sendToLeagues(String raceType, MessageEmbed embed) {
         var discordLeagues = leagueApi.findDiscordLeagues();
         for (var league : discordLeagues) {
-            send(league, raceType, embed);
+            send(league, raceType, List.of(embed));
         }
     }
 
     public void sendToLeague(UUID leagueId, String raceType, MessageEmbed embed) {
-        leagueApi.findDiscordLeagues().stream().filter(league -> league.id().equals(leagueId))
-                .findFirst().ifPresent(league -> send(league, raceType, embed));
+        sendToLeague(leagueId, raceType, List.of(embed));
     }
 
-    private void send(LeagueDto league, String raceType, MessageEmbed embed) {
+    public void sendToLeague(UUID leagueId, String raceType, List<MessageEmbed> embeds) {
+        leagueApi.findDiscordLeagues().stream().filter(league -> league.id().equals(leagueId))
+                .findFirst().ifPresent(league -> send(league, raceType, embeds));
+    }
+
+    private void send(LeagueDto league, String raceType, List<MessageEmbed> embeds) {
         if (raceType.equals("SPRINT") && !league.settings().sprintsEnabled()) {
             return;
         }
@@ -51,6 +56,8 @@ public class RaceNotificationSender {
             log.warn("Discord notification channel {} for league {} was not found", channelId, league.id());
             return;
         }
-        channel.sendMessageEmbeds(embed).complete();
+        for (var embed : embeds) {
+            channel.sendMessageEmbeds(embed).complete();
+        }
     }
 }
