@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
 
 @Service
 public class SeasonStandingsService {
-    private static final Comparator<Race> EVENT_ORDER = Comparator.comparing(Race::closeAt)
+    static final Comparator<Race> EVENT_ORDER = Comparator.comparing(Race::closeAt)
             .thenComparingInt(Race::round)
             .thenComparingInt(race -> race.type() == RaceType.SPRINT ? 0 : 1)
             .thenComparing(race -> race.id().value());
@@ -35,14 +35,16 @@ public class SeasonStandingsService {
     private final RaceRepository races;
     private final PredictionPointsRepository points;
     private final RaceResultRepository results;
+    private final SeasonPodiumRepository podiums;
 
     public SeasonStandingsService(LeagueAccessGuard access, LeagueRepository leagues, RaceRepository races,
-                                  PredictionPointsRepository points, RaceResultRepository results) {
+                                  PredictionPointsRepository points, RaceResultRepository results, SeasonPodiumRepository podiums) {
         this.access = access;
         this.leagues = leagues;
         this.races = races;
         this.points = points;
         this.results = results;
+        this.podiums = podiums;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -56,18 +58,14 @@ public class SeasonStandingsService {
 
         var calendar = races.findAllBySeason(season);
         var publishedRaceIds = new HashSet<>(results.findPublishedRaceIdsBySeason(season));
-        var history = new ArrayList<>(points.findAllByLeagueAndSeasons(leagueId, firstSeason, season));
-        history.sort(Comparator.comparing(ParticipantRacePoints::race, EVENT_ORDER)
-                .thenComparing(ParticipantRacePoints::participantJoinedAt)
-                .thenComparing(saved -> saved.points().predictionId().value()));
-
-        var currentSeason = history.stream().filter(saved -> saved.race().season() == season).toList();
+        var currentSeason = orderedHistory(points.findAllByLeagueAndSeason(leagueId, season));
         var visibleCalendar = calendar.stream()
                 .filter(race -> league.settings().sprintsEnabled() || race.type() != RaceType.SPRINT)
                 .toList();
         var events = completedEvents(visibleCalendar, currentSeason, publishedRaceIds);
         var potentialCalendar = potentialCalendar(visibleCalendar, currentSeason);
-        var previousPodiums = previousPodiums(history, season);
+        var previousPodiums = previousPodiums(podiums.findAllByLeagueBeforeSeason(leagueId, season).stream()
+                .filter(podium -> podium.season() >= firstSeason).toList());
         var rows = buildRows(currentSeason, previousPodiums);
         var charts = buildCharts(rows, events);
         var totalMaximum = maximumPoints(potentialCalendar);
@@ -86,6 +84,14 @@ public class SeasonStandingsService {
         );
     }
 
+    static List<ParticipantRacePoints> orderedHistory(List<ParticipantRacePoints> saved) {
+        var history = new ArrayList<>(saved);
+        history.sort(Comparator.comparing(ParticipantRacePoints::race, EVENT_ORDER)
+                .thenComparing(ParticipantRacePoints::participantJoinedAt)
+                .thenComparing(value -> value.points().predictionId().value()));
+        return history;
+    }
+
     private List<Race> completedEvents(List<Race> calendar, List<ParticipantRacePoints> saved, Set<RaceId> publishedRaceIds) {
         var events = calendar.stream()
                 .filter(race -> race.status() == RaceStatus.FINISHED && publishedRaceIds.contains(race.id()))
@@ -102,24 +108,25 @@ public class SeasonStandingsService {
         return events.values().stream().sorted(EVENT_ORDER).toList();
     }
 
-    private Map<LeagueParticipantId, List<SeasonPodium>> previousPodiums(List<ParticipantRacePoints> history, int season) {
-        var bySeason = history.stream()
-                .filter(saved -> saved.race().season() < season)
-                .collect(Collectors.groupingBy(saved -> saved.race().season(), TreeMap::new, Collectors.toList()));
+    private Map<LeagueParticipantId, List<SeasonPodium>> previousPodiums(List<SeasonPodiumEntry> saved) {
         var podiums = new HashMap<LeagueParticipantId, List<SeasonPodium>>();
-        bySeason.forEach((previousSeason, saved) -> {
-            var rows = buildRows(saved, Map.of());
-            for (var index = 0; index < Math.min(3, rows.size()); index++) {
-                var row = rows.get(index);
-                podiums.computeIfAbsent(row.participantId(), ignored -> new ArrayList<>())
-                        .add(new SeasonPodium(previousSeason, index + 1));
-            }
+        saved.forEach(podium -> {
+            addPodium(podiums, podium.season(), 1, podium.firstPlaceParticipantId());
+            addPodium(podiums, podium.season(), 2, podium.secondPlaceParticipantId());
+            addPodium(podiums, podium.season(), 3, podium.thirdPlaceParticipantId());
         });
         return podiums;
     }
 
-    private List<SeasonStandingsRow> buildRows(List<ParticipantRacePoints> saved,
-                                                Map<LeagueParticipantId, List<SeasonPodium>> previousPodiums) {
+    private void addPodium(Map<LeagueParticipantId, List<SeasonPodium>> podiums, int season, int place,
+                           LeagueParticipantId participantId) {
+        if (participantId != null) {
+            podiums.computeIfAbsent(participantId, ignored -> new ArrayList<>()).add(new SeasonPodium(season, place));
+        }
+    }
+
+    static List<SeasonStandingsRow> buildRows(List<ParticipantRacePoints> saved,
+                                               Map<LeagueParticipantId, List<SeasonPodium>> previousPodiums) {
         var byParticipant = saved.stream().collect(Collectors.groupingBy(
                 ParticipantRacePoints::participantId, LinkedHashMap::new, Collectors.toList()
         ));

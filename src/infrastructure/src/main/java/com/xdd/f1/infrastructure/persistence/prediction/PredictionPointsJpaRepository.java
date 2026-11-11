@@ -40,11 +40,8 @@ public interface PredictionPointsJpaRepository extends JpaRepository<PredictionP
         join points.prediction prediction
         join prediction.participant participant
         join prediction.race race
-        where prediction.leagueId = :leagueId
-          and race.season between :firstSeason and :lastSeason
+        where prediction.leagueId = :leagueId and race.season = :season
         order by race.closeAt, race.round, race.type, participant.joinedAt, prediction.id
         """)
-    List<SeasonPointsProjection> findAllByLeagueAndSeasons(@Param("leagueId") UUID leagueId,
-                                                           @Param("firstSeason") int firstSeason,
-                                                           @Param("lastSeason") int lastSeason);
+    List<SeasonPointsProjection> findAllByLeagueAndSeason(@Param("leagueId") UUID leagueId, @Param("season") int season);
 }

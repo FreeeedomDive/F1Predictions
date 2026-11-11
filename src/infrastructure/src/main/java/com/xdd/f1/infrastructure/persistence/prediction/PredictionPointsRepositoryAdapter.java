@@ -36,8 +36,8 @@ public class PredictionPointsRepositoryAdapter implements PredictionPointsReposi
     }
 
     @Override
-    public List<ParticipantRacePoints> findAllByLeagueAndSeasons(LeagueId leagueId, int firstSeason, int lastSeason) {
-        return repository.findAllByLeagueAndSeasons(leagueId.value(), firstSeason, lastSeason).stream()
+    public List<ParticipantRacePoints> findAllByLeagueAndSeason(LeagueId leagueId, int season) {
+        return repository.findAllByLeagueAndSeason(leagueId.value(), season).stream()
                 .map(row -> new ParticipantRacePoints(
                         new LeagueParticipantId(row.getParticipantId()),
                         row.getParticipantName(),

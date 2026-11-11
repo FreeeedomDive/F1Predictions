@@ -6,6 +6,8 @@ import com.xdd.f1.application.prediction.PredictionRepository;
 import com.xdd.f1.application.race.RaceRepository;
 import com.xdd.f1.application.race.result.RaceResultRepository;
 import com.xdd.f1.application.standings.SeasonPodium;
+import com.xdd.f1.application.standings.SeasonPodiumEntry;
+import com.xdd.f1.application.standings.SeasonPodiumRepository;
 import com.xdd.f1.application.standings.SeasonStandings;
 import com.xdd.f1.application.standings.SeasonStandingsRow;
 import com.xdd.f1.application.standings.SeasonStandingsService;
@@ -39,6 +41,7 @@ class SeasonStandingsServiceIntegrationTest extends AbstractIntegrationTest {
     private final PredictionRepository predictions;
     private final PredictionPointsRepository points;
     private final RaceResultRepository results;
+    private final SeasonPodiumRepository podiums;
     private final RaceJpaRepository raceJpaRepository;
     private final TransactionTemplate transactions;
 
@@ -55,8 +58,8 @@ class SeasonStandingsServiceIntegrationTest extends AbstractIntegrationTest {
     SeasonStandingsServiceIntegrationTest(SeasonStandingsService service, LeagueRepository leagues,
                                           LeagueParticipantService participants, RaceRepository races,
                                           PredictionRepository predictions, PredictionPointsRepository points,
-                                          RaceResultRepository results, RaceJpaRepository raceJpaRepository,
-                                          PlatformTransactionManager transactionManager) {
+                                          RaceResultRepository results, SeasonPodiumRepository podiums,
+                                          RaceJpaRepository raceJpaRepository, PlatformTransactionManager transactionManager) {
         this.service = service;
         this.leagues = leagues;
         this.participants = participants;
@@ -64,6 +67,7 @@ class SeasonStandingsServiceIntegrationTest extends AbstractIntegrationTest {
         this.predictions = predictions;
         this.points = points;
         this.results = results;
+        this.podiums = podiums;
         this.raceJpaRepository = raceJpaRepository;
         this.transactions = new TransactionTemplate(transactionManager);
     }
@@ -191,7 +195,7 @@ class SeasonStandingsServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void buildsPreviousPodiumsFromSelectedLeagueAndFirstSeason() {
+    void readsPreviousPodiumsFromSavedResultsInsteadOfRecalculatingHistory() {
         var historicalLeague = createLeague(true, 2024);
         var historicalAlice = participant(historicalLeague, "Alice");
         var historicalBob = participant(historicalLeague, "Bob");
@@ -201,15 +205,20 @@ class SeasonStandingsServiceIntegrationTest extends AbstractIntegrationTest {
         var previous = race(2024, 1, RaceType.RACE, RaceStatus.FINISHED);
         var current = race(2025, 1, RaceType.RACE, RaceStatus.FINISHED);
         savePoints(beforeFirstSeason, historicalDave, 100, 25);
-        savePoints(previous, historicalAlice, 40, 25);
-        savePoints(previous, historicalBob, 30, 18);
-        savePoints(previous, historicalCarol, 20, 15);
-        savePoints(previous, historicalDave, 10, 12);
-        savePoints(previous, other, 1000, 25);
+        savePoints(previous, historicalDave, 100, 25);
+        savePoints(previous, historicalCarol, 90, 25);
+        savePoints(previous, historicalBob, 80, 25);
+        savePoints(previous, historicalAlice, 70, 25);
         savePoints(current, historicalAlice, 5, 0);
         savePoints(current, historicalBob, 4, 0);
         savePoints(current, historicalCarol, 3, 0);
         savePoints(current, historicalDave, 2, 0);
+        transactions.executeWithoutResult(status -> {
+            podiums.save(new SeasonPodiumEntry(historicalLeague.id(), 2023, historicalDave.id(), null, null));
+            podiums.save(new SeasonPodiumEntry(historicalLeague.id(), 2024,
+                    historicalAlice.id(), historicalBob.id(), historicalCarol.id()));
+            podiums.save(new SeasonPodiumEntry(otherLeague.id(), 2024, other.id(), null, null));
+        });
 
         var standings = get(historicalLeague, historicalAlice, 2025);
 

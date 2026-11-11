@@ -11,7 +11,7 @@ import java.util.Optional;
 public interface PredictionPointsRepository {
     Optional<PredictionPoints> findByPredictionId(PredictionId predictionId);
     List<PredictionPoints> findAllByRaceId(RaceId raceId);
-    List<ParticipantRacePoints> findAllByLeagueAndSeasons(LeagueId leagueId, int firstSeason, int lastSeason);
+    List<ParticipantRacePoints> findAllByLeagueAndSeason(LeagueId leagueId, int season);
     void create(PredictionPoints points);
     void update(PredictionPoints points);
 }
