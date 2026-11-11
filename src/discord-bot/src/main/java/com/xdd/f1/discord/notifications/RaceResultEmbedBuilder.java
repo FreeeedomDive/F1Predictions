@@ -28,17 +28,24 @@ public class RaceResultEmbedBuilder {
     }
 
     public List<MessageEmbed> build(RaceFinishedEvent event) {
-        return build(event.raceId(), event.raceName(), event.raceType(), event.season(), event.rulesVersion(),
+        return build(event.raceId(), event.raceName(), event.raceType(), event.season(),
                 event.result(), event.points(), false);
     }
 
     public List<MessageEmbed> build(RaceResultUpdatedEvent event) {
-        return build(event.raceId(), event.raceName(), event.raceType(), event.season(), event.rulesVersion(),
+        return build(event.raceId(), event.raceName(), event.raceType(), event.season(),
                 event.result(), event.points(), true);
     }
 
-    private List<MessageEmbed> build(UUID raceId, String raceName, String raceType, int season, String rulesVersion,
-                                      RaceResultValuesDto result, List<RaceParticipantPointsDto> points, boolean updated) {
+    private List<MessageEmbed> build(
+            UUID raceId,
+            String raceName,
+            String raceType,
+            int season,
+            RaceResultValuesDto result,
+            List<RaceParticipantPointsDto> points,
+            boolean updated
+    ) {
         var title = (updated ? "Race results updated" : "Race finished") + " · " + name(raceName)
                 + (raceType.equals("SPRINT") ? " (Sprint)" : "") + " · " + season;
         var url = UriComponentsBuilder.fromUriString(webAppProperties.appBaseUrl())

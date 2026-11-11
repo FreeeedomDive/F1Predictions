@@ -12,6 +12,7 @@ import com.xdd.f1.application.race.lineup.RaceLineupNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.contract.prediction.PredictionChangedEvent;
 import com.xdd.f1.domain.error.DomainValidationException;
+import com.xdd.f1.domain.league.League;
 import com.xdd.f1.domain.league.LeagueId;
 import com.xdd.f1.domain.league.LeagueParticipantId;
 import com.xdd.f1.domain.prediction.*;
@@ -61,7 +62,7 @@ public class PredictionService {
     public Optional<RaceDetails> findCurrentDetails(UserId userId, LeagueId leagueId, Optional<Integer> season) {
         access.checkAccess(userId, leagueId);
         var league = leagues.findById(leagueId).orElseThrow(() -> new LeagueNotFoundException(leagueId));
-        var requestedSeason = season.orElse(Year.now(clock).getValue());
+        int requestedSeason = season.orElse(Year.now(clock).getValue());
         if (requestedSeason < league.settings().firstSeason()) {
             return Optional.empty();
         }
@@ -109,7 +110,7 @@ public class PredictionService {
         var saved = predictions.findAllByRaceId(raceId);
         var names = participants.findNamesByIds(saved.stream().map(Prediction::participantId).distinct().toList());
         var leagueNames = leagues.findAll().stream()
-                .collect(java.util.stream.Collectors.toMap(league -> league.id(), league -> league.name()));
+                .collect(java.util.stream.Collectors.toMap(League::id, League::name));
         return saved.stream().map(prediction -> {
                     var participantName = names.get(prediction.participantId());
                     if (participantName == null) {

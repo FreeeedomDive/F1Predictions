@@ -1,8 +1,6 @@
 package com.xdd.f1.bootstrap.prediction;
 
 import com.xdd.f1.application.prediction.PredictionService;
-import com.xdd.f1.bootstrap.auth.AuthenticatedUser;
-import com.xdd.f1.bootstrap.auth.CurrentUser;
 import com.xdd.f1.contract.common.ListResponseDto;
 import com.xdd.f1.contract.prediction.AdminPredictionDto;
 import com.xdd.f1.contract.prediction.PredictionDto;
@@ -25,8 +23,7 @@ public class AdminPredictionController {
     }
 
     @GetMapping
-    public ResponseEntity<ListResponseDto<AdminPredictionDto>> getAll(@CurrentUser AuthenticatedUser user,
-                                                                       @PathVariable UUID raceId) {
+    public ResponseEntity<ListResponseDto<AdminPredictionDto>> getAll(@PathVariable UUID raceId) {
         var predictions = service.findAllForAdmin(new RaceId(raceId)).stream()
                 .map(details -> new AdminPredictionDto(PredictionDtoMapper.toDto(details.prediction()),
                         details.participantName(), details.leagueName()))
@@ -36,9 +33,11 @@ public class AdminPredictionController {
     }
 
     @PutMapping("/{predictionId}")
-    public ResponseEntity<PredictionDto> save(@CurrentUser AuthenticatedUser user, @PathVariable UUID raceId,
-                                              @PathVariable UUID predictionId,
-                                              @RequestBody SavePredictionRequestDto request) {
+    public ResponseEntity<PredictionDto> save(
+            @PathVariable UUID raceId,
+            @PathVariable UUID predictionId,
+            @RequestBody SavePredictionRequestDto request
+    ) {
         var prediction = service.saveForAdmin(new RaceId(raceId), new PredictionId(predictionId),
                 PredictionDtoMapper.toDomain(request));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate())
