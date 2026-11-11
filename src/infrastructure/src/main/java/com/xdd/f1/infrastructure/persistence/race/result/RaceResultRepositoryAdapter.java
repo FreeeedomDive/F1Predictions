@@ -8,6 +8,7 @@ import com.xdd.f1.domain.race.lineup.Driver;
 import com.xdd.f1.domain.race.result.*;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -24,6 +25,11 @@ public class RaceResultRepositoryAdapter implements RaceResultRepository {
                 new RaceId(entity.raceId), new RulesVersion(entity.rulesVersion),
                 toDomain(entity.result), toDomain(entity.draft)
         ));
+    }
+
+    @Override
+    public List<RaceId> findPublishedRaceIdsBySeason(int season) {
+        return repository.findPublishedRaceIdsBySeason(season).stream().map(RaceId::new).toList();
     }
 
     @Override

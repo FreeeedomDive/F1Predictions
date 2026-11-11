@@ -1,11 +1,17 @@
 package com.xdd.f1.infrastructure.persistence.prediction;
 
+import com.xdd.f1.application.prediction.ParticipantRacePoints;
 import com.xdd.f1.application.prediction.PredictionPointsNotFoundException;
 import com.xdd.f1.application.prediction.PredictionPointsRepository;
+import com.xdd.f1.domain.league.LeagueId;
+import com.xdd.f1.domain.league.LeagueParticipantId;
 import com.xdd.f1.domain.prediction.PredictionId;
 import com.xdd.f1.domain.prediction.PredictionPoints;
 import com.xdd.f1.domain.prediction.RulesVersion;
+import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceId;
+import com.xdd.f1.domain.race.RaceStatus;
+import com.xdd.f1.domain.race.RaceType;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -27,6 +33,26 @@ public class PredictionPointsRepositoryAdapter implements PredictionPointsReposi
     @Override
     public List<PredictionPoints> findAllByRaceId(RaceId raceId) {
         return repository.findAllByRaceId(raceId.value()).stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public List<ParticipantRacePoints> findAllByLeagueAndSeasons(LeagueId leagueId, int firstSeason, int lastSeason) {
+        return repository.findAllByLeagueAndSeasons(leagueId.value(), firstSeason, lastSeason).stream()
+                .map(row -> new ParticipantRacePoints(
+                        new LeagueParticipantId(row.getParticipantId()),
+                        row.getParticipantName(),
+                        row.getParticipantJoinedAt(),
+                        new Race(
+                                new RaceId(row.getRaceId()), row.getSeason(), row.getRound(), RaceType.valueOf(row.getType()),
+                                row.getName(), RaceStatus.valueOf(row.getStatus()), row.getOpenAt(), row.getCloseAt()
+                        ),
+                        new PredictionPoints(
+                                new PredictionId(row.getPredictionId()), new RulesVersion(row.getRulesVersion()), row.getTotalPoints(),
+                                row.getTenthPlacePoints(), row.getDnfPoints(), row.getSafetyCarsPoints(),
+                                row.getFirstPlaceLeadPoints(), row.getDriverPositionPoints(), row.getTeamMatesPoints()
+                        )
+                ))
+                .toList();
     }
 
     @Override
