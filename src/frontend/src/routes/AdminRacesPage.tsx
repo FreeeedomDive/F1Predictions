@@ -121,6 +121,7 @@ export default function AdminRacesPage() {
             </Typography>
             <RaceTable
               races={calendar.data}
+              raceLink={(race) => `/admin/results/${encodeURIComponent(race.id)}`}
               renderActions={(race) => {
                 const action =
                   race.status === 'SCHEDULED' ? 'open' : race.status === 'OPEN' ? 'close' : null
