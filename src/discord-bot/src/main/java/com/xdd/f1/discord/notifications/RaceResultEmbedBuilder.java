@@ -17,7 +17,6 @@ import java.awt.Color;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.IntStream;
 
 @Component
 @ConditionalOnProperty(prefix = "discord", name = "enabled", havingValue = "true")
@@ -66,39 +65,19 @@ public class RaceResultEmbedBuilder {
         }
         lines.add("");
         lines.add("**Prediction points**");
-        for (var participant : points) {
+        for (var participant : points.stream().limit(10).toList()) {
             lines.add("• " + name(participant.participantName()) + " — **" + participant.totalPoints() + "** "
                     + (participant.totalPoints() == 1 ? "point" : "points"));
         }
         if (points.isEmpty()) {
             lines.add("No predictions.");
         }
-        var pages = pages(lines);
-        return IntStream.range(0, pages.size()).mapToObj(index -> new EmbedBuilder()
+        var embed = new EmbedBuilder()
                 .setColor(updated ? new Color(0x006400) : new Color(0xFFD700))
                 .setTitle(title, url)
-                .setDescription(pages.get(index))
-                .setFooter(pages.size() > 1 ? " · Page " + (index + 1) + " of " + pages.size() : null)
-                .build()).toList();
-    }
-
-    private List<String> pages(List<String> lines) {
-        var pages = new ArrayList<String>();
-        var page = new StringBuilder();
-        for (var line : lines) {
-            if (page.length() + line.length() + 1 > MessageEmbed.DESCRIPTION_MAX_LENGTH) {
-                pages.add(page.toString());
-                page.setLength(0);
-            }
-            if (!page.isEmpty()) {
-                page.append('\n');
-            }
-            page.append(line);
-        }
-        if (!page.isEmpty()) {
-            pages.add(page.toString());
-        }
-        return pages;
+                .setDescription(String.join("\n", lines))
+                .build();
+        return List.of(embed);
     }
 
     private String name(String value) {

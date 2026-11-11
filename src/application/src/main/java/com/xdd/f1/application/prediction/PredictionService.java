@@ -2,6 +2,8 @@ package com.xdd.f1.application.prediction;
 
 import com.xdd.f1.application.league.LeagueAccessGuard;
 import com.xdd.f1.application.league.LeagueNotFoundException;
+import com.xdd.f1.application.league.LeagueParticipantNotFoundException;
+import com.xdd.f1.application.league.LeagueParticipantRepository;
 import com.xdd.f1.application.league.LeagueRepository;
 import com.xdd.f1.application.locking.TransactionLock;
 import com.xdd.f1.application.race.RaceNotFoundException;
@@ -11,6 +13,7 @@ import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.contract.prediction.PredictionChangedEvent;
 import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.league.LeagueId;
+import com.xdd.f1.domain.league.LeagueParticipantId;
 import com.xdd.f1.domain.prediction.*;
 import com.xdd.f1.domain.race.*;
 import com.xdd.f1.domain.race.lineup.Driver;
@@ -32,6 +35,7 @@ public class PredictionService {
     private final RaceRepository races;
     private final RaceLineupRepository lineups;
     private final LeagueRepository leagues;
+    private final LeagueParticipantRepository participants;
     private final LeagueAccessGuard access;
     private final TransactionLock lock;
     private final ApplicationEventPublisher events;
@@ -39,12 +43,14 @@ public class PredictionService {
 
     public PredictionService(PredictionRepository predictions, PredictionConditionsRepository conditions,
                              RaceRepository races, RaceLineupRepository lineups, LeagueRepository leagues,
-                             LeagueAccessGuard access, TransactionLock lock, ApplicationEventPublisher events, Clock clock) {
+                             LeagueParticipantRepository participants, LeagueAccessGuard access, TransactionLock lock,
+                             ApplicationEventPublisher events, Clock clock) {
         this.predictions = predictions;
         this.conditions = conditions;
         this.races = races;
         this.lineups = lineups;
         this.leagues = leagues;
+        this.participants = participants;
         this.access = access;
         this.lock = lock;
         this.events = events;
@@ -97,20 +103,65 @@ public class PredictionService {
         return predictions.findByLeagueAndRaceAndParticipant(leagueId, raceId, participant.id());
     }
 
+    @Transactional(readOnly = true)
+    public List<PredictionDetails> findAllForAdmin(RaceId raceId) {
+        races.findById(raceId).orElseThrow(() -> new RaceNotFoundException(raceId));
+        var saved = predictions.findAllByRaceId(raceId);
+        var names = participants.findNamesByIds(saved.stream().map(Prediction::participantId).distinct().toList());
+        var leagueNames = leagues.findAll().stream()
+                .collect(java.util.stream.Collectors.toMap(league -> league.id(), league -> league.name()));
+        return saved.stream().map(prediction -> {
+                    var participantName = names.get(prediction.participantId());
+                    if (participantName == null) {
+                        throw new LeagueParticipantNotFoundException(prediction.participantId());
+                    }
+                    var leagueName = leagueNames.get(prediction.leagueId());
+                    if (leagueName == null) {
+                        throw new LeagueNotFoundException(prediction.leagueId());
+                    }
+                    return new PredictionDetails(prediction, participantName, leagueName);
+                }).sorted(Comparator.comparing(PredictionDetails::leagueName)
+                        .thenComparing(PredictionDetails::participantName))
+                .toList();
+    }
+
     @Transactional
     public Prediction save(UserId userId, LeagueId leagueId, RaceId raceId, PredictionValues values) {
         lock.acquire("race:" + raceId.value());
         var race = getRace(leagueId, raceId);
         var participant = access.checkAccess(userId, leagueId);
-        checkOpen(race);
         var previous = predictions.findByLeagueAndRaceAndParticipant(leagueId, raceId, participant.id());
+        return save(race, leagueId, participant.id(), participant.displayName(), previous, values, true);
+    }
+
+    @Transactional
+    public Prediction saveForAdmin(RaceId raceId, PredictionId predictionId, PredictionValues values) {
+        lock.acquire("race:" + raceId.value());
+        var race = races.findById(raceId).orElseThrow(() -> new RaceNotFoundException(raceId));
+        var previous = predictions.findAllByRaceId(raceId).stream()
+                .filter(prediction -> prediction.id().equals(predictionId))
+                .findFirst().orElseThrow(() -> new PredictionNotFoundException(predictionId));
+        var participantName = participants.findNamesByIds(List.of(previous.participantId())).get(previous.participantId());
+        if (participantName == null) {
+            throw new LeagueParticipantNotFoundException(previous.participantId());
+        }
+        return save(race, previous.leagueId(), previous.participantId(), participantName, Optional.of(previous), values, false);
+    }
+
+    private Prediction save(Race race, LeagueId leagueId, LeagueParticipantId participantId, String participantName,
+                            Optional<Prediction> previous, PredictionValues values, boolean requireOpen) {
+        if (requireOpen) {
+            checkOpen(race);
+        }
         var updated = new Prediction(previous.map(Prediction::id).orElseGet(() -> new PredictionId(UUID.randomUUID())),
-                leagueId, participant.id(), raceId, values, previous.map(Prediction::teamsPickedDrivers).orElse(null));
+                leagueId, participantId, race.id(), values, previous.map(Prediction::teamsPickedDrivers).orElse(null));
         PredictionValidator.validate(race.season(), updated);
-        var raceConditions = conditions.findByRaceId(raceId).orElse(null);
-        var lineup = lineups.findByRaceId(raceId).orElseThrow(() -> new RaceLineupNotFoundException(raceId));
+        var raceConditions = conditions.findByRaceId(race.id()).orElse(null);
+        var lineup = lineups.findByRaceId(race.id()).orElseThrow(() -> new RaceLineupNotFoundException(race.id()));
         validatePredictionAgainstLineup(updated, lineup, raceConditions);
-        checkOpen(race);
+        if (requireOpen) {
+            checkOpen(race);
+        }
         if (previous.isPresent() && sameValues(previous.get().values(), values)) {
             return previous.get();
         }
@@ -119,8 +170,10 @@ public class PredictionService {
         } else {
             predictions.create(updated);
         }
-        events.publishEvent(new PredictionChangedEvent(leagueId.value(), participant.id().value(), participant.displayName(),
-                raceId.value(), race.name(), race.type().name(), previous.isEmpty()));
+        if (requireOpen) {
+            events.publishEvent(new PredictionChangedEvent(leagueId.value(), participantId.value(), participantName,
+                    race.id().value(), race.name(), race.type().name(), previous.isEmpty()));
+        }
         return updated;
     }
 

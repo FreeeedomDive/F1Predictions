@@ -14,6 +14,8 @@ import {
   Paper,
   Snackbar,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from '@mui/material'
@@ -21,9 +23,11 @@ import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { Link, Navigate } from 'react-router'
 import { raceResultErrorMessage } from '../../api/raceResults'
 import { isUnauthorized } from '../../api/session'
+import type { AdminPredictionDto } from '../../dto/prediction'
 import type { RaceResultEditorDto } from '../../dto/raceResult'
 import { useFinalizeRaceResult, useSaveRaceResultDraft } from '../../queries/raceResults'
 import { useChangeRacePredictionsStatus } from '../../queries/races'
+import AdminPredictionsPanel from '../prediction/AdminPredictionsPanel'
 import ResultClassificationTable from './ResultClassificationTable'
 import { resultDraft, resultSignature, resultValues } from './resultDraft'
 import type { ResultDraft } from './resultDraft'
@@ -42,21 +46,33 @@ export default function AdminResultEditor({
   userId,
   draft,
   busy,
+  predictions,
+  predictionsLoading,
+  predictionsError,
   onDraftChange,
   onBusyChange,
+  onPredictionsRefresh,
 }: {
   page: RaceResultEditorDto
   userId: string
   draft: ResultDraft | undefined
   busy: boolean
+  predictions: AdminPredictionDto[] | undefined
+  predictionsLoading: boolean
+  predictionsError: Error | null
   onDraftChange: (raceId: string, draft: ResultDraft | undefined) => void
   onBusyChange: (busy: boolean) => void
+  onPredictionsRefresh: () => void
 }) {
   const save = useSaveRaceResultDraft()
   const finalize = useFinalizeRaceResult()
   const transition = useChangeRacePredictionsStatus()
   const [operation, setOperation] = useState<'save' | 'finalize' | 'close' | null>(null)
   const [dragging, setDragging] = useState(false)
+  const [tab, setTab] = useState(0)
+  const [savingPrediction, setSavingPrediction] = useState(false)
+  const [dirtyPredictions, setDirtyPredictions] = useState<Set<string>>(new Set())
+  const [needsRecalculation, setNeedsRecalculation] = useState(false)
   const [lastSaved, setLastSaved] = useState<number | null>(null)
   const [notice, setNotice] = useState<{ severity: 'success' | 'error'; message: string } | null>(
     null,
@@ -90,12 +106,24 @@ export default function AdminResultEditor({
     page.season <= 2027 &&
     (!page.result || page.result.rulesVersion === expectedRules)
   const editable = page.race.status !== 'SCHEDULED' && page.lineupPrepared && supportedRules
-  const pending = busy || operation !== null
+  const pending = busy || operation !== null || savingPrediction
   const canSave = editable && validLead && validIncidents && rosterMatches
   const complete =
     canSave && (!additional || (normalizedLead !== '' && current.incidents.trim() !== ''))
-  const canFinalize = complete && (page.race.status === 'CLOSED' || page.race.status === 'FINISHED')
+  const canFinalize =
+    complete &&
+    dirtyPredictions.size === 0 &&
+    (page.race.status === 'CLOSED' || page.race.status === 'FINISHED')
   const variables = { userId, raceId: page.race.id, season: page.season }
+
+  function predictionDirtyChanged(predictionId: string, predictionDirty: boolean) {
+    setDirtyPredictions((currentIds) => {
+      const next = new Set(currentIds)
+      if (predictionDirty) next.add(predictionId)
+      else next.delete(predictionId)
+      return next
+    })
+  }
 
   function update(changes: Partial<ResultDraft>) {
     onDraftChange(page.race.id, { ...current, ...changes })
@@ -136,6 +164,7 @@ export default function AdminResultEditor({
       if (dirty) await save.mutateAsync({ ...variables, values })
       await finalize.mutateAsync(variables)
       onDraftChange(page.race.id, undefined)
+      setNeedsRecalculation(false)
       setNotice({
         severity: 'success',
         message: correction
@@ -247,6 +276,12 @@ export default function AdminResultEditor({
             {page.result?.result && (dirty || page.result.draft) && (
               <Chip size="small" variant="outlined" color="warning" label="Unpublished changes" />
             )}
+            {dirtyPredictions.size > 0 && (
+              <Chip size="small" variant="outlined" color="warning" label="Unsaved predictions" />
+            )}
+            {needsRecalculation && page.race.status === 'FINISHED' && (
+              <Chip size="small" variant="outlined" color="warning" label="Recalculation needed" />
+            )}
             {page.race.status === 'OPEN' && (
               <Button
                 size="small"
@@ -299,162 +334,199 @@ export default function AdminResultEditor({
           The classification does not match this race's lineup. Update it before saving.
         </Alert>
       )}
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: {
-            xs: 'minmax(0, 1fr)',
-            lg: 'minmax(0, 2fr) minmax(280px, 1fr)',
-          },
-          gap: 2,
-          alignItems: 'start',
-        }}
+      <Tabs
+        value={tab}
+        onChange={(_, value) => setTab(value)}
+        variant="scrollable"
+        scrollButtons="auto"
+        sx={{ minHeight: 40, borderBottom: 1, borderColor: 'divider' }}
       >
-        <Paper variant="outlined" sx={{ minWidth: 0, borderRadius: 2 }}>
-          <Stack
-            direction="row"
-            sx={{
-              p: 2,
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: 1,
-            }}
-          >
-            <Typography sx={{ fontWeight: 600 }}>Race result</Typography>
-            <Chip
-              size="small"
-              variant="outlined"
-              color={dirty ? 'warning' : 'default'}
-              label={savedText}
-            />
-          </Stack>
-          <ResultClassificationTable
-            entries={current.classification}
-            teams={page.teams}
-            positionDriver={page.conditions?.positionPredictionDriver}
-            disabled={!editable || pending}
-            onChange={(classification) => update({ classification })}
-            onDraggingChange={setDragging}
-          />
-          <Stack direction="row" spacing={1} sx={{ p: 2, flexWrap: 'wrap', rowGap: 1 }}>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<SaveRounded />}
-              loading={operation === 'save'}
-              disabled={!canSave || !dirty || pending || dragging}
-              onClick={() => void persistDraft()}
+        <Tab label="Race result" sx={{ minHeight: 40 }} />
+        <Tab label={`Predictions · ${predictions?.length ?? '…'}`} sx={{ minHeight: 40 }} />
+      </Tabs>
+      <Box hidden={tab !== 0}>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: 'minmax(0, 1fr)',
+              lg: 'minmax(0, 2fr) minmax(280px, 1fr)',
+            },
+            gap: 2,
+            alignItems: 'start',
+          }}
+        >
+          <Paper variant="outlined" sx={{ minWidth: 0, borderRadius: 2 }}>
+            <Stack
+              direction="row"
+              sx={{
+                p: 2,
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 1,
+              }}
             >
-              Save draft
-            </Button>
-            {draft !== undefined && (
-              <Button
+              <Typography sx={{ fontWeight: 600 }}>Race result</Typography>
+              <Chip
                 size="small"
-                disabled={pending || dragging}
-                onClick={() => onDraftChange(page.race.id, undefined)}
+                variant="outlined"
+                color={dirty ? 'warning' : 'default'}
+                label={savedText}
+              />
+            </Stack>
+            <ResultClassificationTable
+              entries={current.classification}
+              teams={page.teams}
+              positionDriver={page.conditions?.positionPredictionDriver}
+              disabled={!editable || pending}
+              onChange={(classification) => update({ classification })}
+              onDraggingChange={setDragging}
+            />
+            <Stack direction="row" spacing={1} sx={{ p: 2, flexWrap: 'wrap', rowGap: 1 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<SaveRounded />}
+                loading={operation === 'save'}
+                disabled={!canSave || !dirty || pending || dragging}
+                onClick={() => void persistDraft()}
               >
-                Discard local changes
+                Save draft
               </Button>
-            )}
-          </Stack>
-        </Paper>
-        <Paper variant="outlined" sx={{ p: 2, minWidth: 0, borderRadius: 2 }}>
-          <Stack spacing={2}>
-            <Typography sx={{ fontWeight: 600 }}>Race parameters</Typography>
-            {additional && (
-              <>
-                <Stack spacing={0.5}>
-                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                    <IconButton
-                      size="small"
-                      aria-label="Decrease incident count"
-                      disabled={
-                        !editable ||
-                        pending ||
-                        !current.incidents.trim() ||
-                        !validIncidents ||
-                        incidents <= 0
-                      }
-                      onClick={() => update({ incidents: String(incidents - 1) })}
-                      sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
-                    >
-                      <RemoveRounded fontSize="small" />
-                    </IconButton>
-                    <TextField
-                      label="Incidents"
-                      size="small"
-                      fullWidth
-                      value={current.incidents}
-                      disabled={!editable || pending}
-                      error={!validIncidents}
-                      slotProps={{ htmlInput: { inputMode: 'numeric' } }}
-                      onChange={(event) => update({ incidents: event.target.value })}
-                    />
-                    <IconButton
-                      size="small"
-                      aria-label="Increase incident count"
-                      disabled={!editable || pending || !validIncidents || incidents >= 2147483647}
-                      onClick={() => update({ incidents: String(incidents + 1) })}
-                      sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
-                    >
-                      <AddRounded fontSize="small" />
-                    </IconButton>
-                  </Stack>
-                  <Typography variant="caption" color={validIncidents ? 'text.secondary' : 'error'}>
-                    {validIncidents
-                      ? 'VSC, SC and red flags. Enter 0 if none.'
-                      : 'Enter a non-negative whole number.'}
-                  </Typography>
-                </Stack>
-                <TextField
-                  label="Winner's gap"
+              {draft !== undefined && (
+                <Button
                   size="small"
-                  fullWidth
-                  value={current.lead}
-                  disabled={!editable || pending}
-                  error={!validLead}
-                  helperText={
-                    validLead
-                      ? 'Gap to second place; comma or dot accepted.'
-                      : 'Use 0–999999.999 seconds, up to 3 decimal places.'
-                  }
-                  slotProps={{
-                    htmlInput: { inputMode: 'decimal' },
-                    input: { endAdornment: <InputAdornment position="end">s</InputAdornment> },
-                  }}
-                  onChange={(event) => update({ lead: event.target.value.replace(',', '.') })}
-                />
-                <Divider />
-              </>
-            )}
-            <Typography sx={{ fontWeight: 600 }}>
-              {page.race.status === 'FINISHED'
-                ? 'Recalculate predictions'
-                : 'Calculate predictions'}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {page.race.status === 'OPEN'
-                ? 'Close predictions before finalizing the result.'
-                : !complete
-                  ? 'Fill the complete classification and all race parameters before calculating.'
-                  : 'The latest draft is saved first, then the result and points are finalized for all leagues.'}
-            </Typography>
-            <Button
-              variant="contained"
-              startIcon={<DoneRounded />}
-              loading={operation === 'finalize'}
-              disabled={!canFinalize || pending || dragging}
-              onClick={() => void finalizeResult()}
-            >
-              {page.race.status === 'FINISHED' ? 'Save & recalculate' : 'Calculate & finish'}
-            </Button>
-            <Typography variant="caption" color="text.secondary">
-              Drafts are autosaved every minute while this editor is open. Saving a draft does not
-              calculate points.
-            </Typography>
-          </Stack>
-        </Paper>
+                  disabled={pending || dragging}
+                  onClick={() => onDraftChange(page.race.id, undefined)}
+                >
+                  Discard local changes
+                </Button>
+              )}
+            </Stack>
+          </Paper>
+          <Paper variant="outlined" sx={{ p: 2, minWidth: 0, borderRadius: 2 }}>
+            <Stack spacing={2}>
+              <Typography sx={{ fontWeight: 600 }}>Race parameters</Typography>
+              {additional && (
+                <>
+                  <Stack spacing={0.5}>
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                      <IconButton
+                        size="small"
+                        aria-label="Decrease incident count"
+                        disabled={
+                          !editable ||
+                          pending ||
+                          !current.incidents.trim() ||
+                          !validIncidents ||
+                          incidents <= 0
+                        }
+                        onClick={() => update({ incidents: String(incidents - 1) })}
+                        sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
+                      >
+                        <RemoveRounded fontSize="small" />
+                      </IconButton>
+                      <TextField
+                        label="Incidents"
+                        size="small"
+                        fullWidth
+                        value={current.incidents}
+                        disabled={!editable || pending}
+                        error={!validIncidents}
+                        slotProps={{ htmlInput: { inputMode: 'numeric' } }}
+                        onChange={(event) => update({ incidents: event.target.value })}
+                      />
+                      <IconButton
+                        size="small"
+                        aria-label="Increase incident count"
+                        disabled={
+                          !editable || pending || !validIncidents || incidents >= 2147483647
+                        }
+                        onClick={() => update({ incidents: String(incidents + 1) })}
+                        sx={{ border: 1, borderColor: 'divider', borderRadius: 1 }}
+                      >
+                        <AddRounded fontSize="small" />
+                      </IconButton>
+                    </Stack>
+                    <Typography
+                      variant="caption"
+                      color={validIncidents ? 'text.secondary' : 'error'}
+                    >
+                      {validIncidents
+                        ? 'VSC, SC and red flags. Enter 0 if none.'
+                        : 'Enter a non-negative whole number.'}
+                    </Typography>
+                  </Stack>
+                  <TextField
+                    label="Winner's gap"
+                    size="small"
+                    fullWidth
+                    value={current.lead}
+                    disabled={!editable || pending}
+                    error={!validLead}
+                    helperText={
+                      validLead
+                        ? 'Gap to second place; comma or dot accepted.'
+                        : 'Use 0–999999.999 seconds, up to 3 decimal places.'
+                    }
+                    slotProps={{
+                      htmlInput: { inputMode: 'decimal' },
+                      input: { endAdornment: <InputAdornment position="end">s</InputAdornment> },
+                    }}
+                    onChange={(event) => update({ lead: event.target.value.replace(',', '.') })}
+                  />
+                  <Divider />
+                </>
+              )}
+              <Typography sx={{ fontWeight: 600 }}>
+                {page.race.status === 'FINISHED'
+                  ? 'Recalculate predictions'
+                  : 'Calculate predictions'}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {page.race.status === 'OPEN'
+                  ? 'Close predictions before finalizing the result.'
+                  : !complete
+                    ? 'Fill the complete classification and all race parameters before calculating.'
+                    : dirtyPredictions.size > 0
+                      ? 'Save edited predictions before calculating points.'
+                      : 'The latest draft is saved first, then the result and points are finalized for all leagues.'}
+              </Typography>
+              <Button
+                variant="contained"
+                startIcon={<DoneRounded />}
+                loading={operation === 'finalize'}
+                disabled={!canFinalize || pending || dragging}
+                onClick={() => void finalizeResult()}
+              >
+                {page.race.status === 'FINISHED' ? 'Save & recalculate' : 'Calculate & finish'}
+              </Button>
+              <Typography variant="caption" color="text.secondary">
+                Drafts are autosaved every minute while this editor is open. Saving a draft does not
+                calculate points.
+              </Typography>
+            </Stack>
+          </Paper>
+        </Box>
+      </Box>
+      <Box hidden={tab !== 1}>
+        <AdminPredictionsPanel
+          data={predictions}
+          loading={predictionsLoading}
+          error={predictionsError}
+          userId={userId}
+          season={page.season}
+          teams={page.teams}
+          positionDriver={page.conditions?.positionPredictionDriver ?? null}
+          disabled={pending}
+          onRefresh={onPredictionsRefresh}
+          onSavingChange={setSavingPrediction}
+          onDirtyChange={predictionDirtyChanged}
+          onSaved={() => {
+            if (page.race.status === 'FINISHED') setNeedsRecalculation(true)
+          }}
+        />
       </Box>
       <Snackbar open={notice !== null} autoHideDuration={6000} onClose={() => setNotice(null)}>
         <Alert severity={notice?.severity} variant="filled" onClose={() => setNotice(null)}>

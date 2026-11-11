@@ -21,6 +21,7 @@ import { isUnauthorized } from '../api/session'
 import AdminResultEditor from '../components/result/AdminResultEditor'
 import type { ResultDraft } from '../components/result/resultDraft'
 import { useLeague } from '../context/league'
+import { useAdminRacePredictions } from '../queries/predictions'
 import { useAdminRaceResult } from '../queries/raceResults'
 import { useAdminRaceCalendar } from '../queries/races'
 
@@ -43,6 +44,7 @@ export default function AdminResultsPage() {
       ? selection.raceId
       : undefined
   const editor = useAdminRaceResult(profile.userId, raceId)
+  const predictions = useAdminRacePredictions(profile.userId, raceId)
   const page = editor.data
   const labelId = useId()
   const changeDraft = useCallback((id: string, draft: ResultDraft | undefined) => {
@@ -51,13 +53,17 @@ export default function AdminResultsPage() {
 
   if (
     (calendar.isError && isUnauthorized(calendar.error)) ||
-    (editor.isError && isUnauthorized(editor.error))
+    (editor.isError && isUnauthorized(editor.error)) ||
+    (predictions.isError && isUnauthorized(predictions.error))
   )
     return <Navigate to="/auth" replace />
 
   function refresh() {
     void calendar.refetch()
-    if (raceId) void editor.refetch()
+    if (raceId) {
+      void editor.refetch()
+      void predictions.refetch()
+    }
   }
 
   return (
@@ -191,8 +197,12 @@ export default function AdminResultsPage() {
                   userId={profile.userId}
                   draft={drafts[page.race.id]}
                   busy={busy}
+                  predictions={predictions.data}
+                  predictionsLoading={predictions.isPending}
+                  predictionsError={predictions.error}
                   onDraftChange={changeDraft}
                   onBusyChange={setBusy}
+                  onPredictionsRefresh={() => void predictions.refetch()}
                 />
               </>
             )}

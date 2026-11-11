@@ -2,12 +2,14 @@ import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/reac
 import type { QueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
 import {
+  getAdminRacePredictions,
   getCurrentRace,
   getOwnPrediction,
   getRaceDetails,
+  saveAdminPrediction,
   savePrediction,
 } from '../api/predictions'
-import type { PredictionDto, SavePredictionRequestDto } from '../dto/prediction'
+import type { AdminPredictionDto, PredictionDto, SavePredictionRequestDto } from '../dto/prediction'
 import type { UserLeagueDto } from '../dto/user'
 
 export interface SavePredictionsVariables {
@@ -77,6 +79,19 @@ export function useOwnPrediction(
   })
 }
 
+export const adminRacePredictionsKey = (userId: string, raceId: string | undefined) =>
+  ['admin', 'racePredictions', userId, raceId] as const
+
+export function useAdminRacePredictions(userId: string, raceId: string | undefined) {
+  return useQuery({
+    queryKey: adminRacePredictionsKey(userId, raceId),
+    queryFn: raceId ? ({ signal }) => getAdminRacePredictions(raceId, signal) : skipToken,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    retry: retryPredictionQuery,
+  })
+}
+
 export function invalidateRacePredictions(client: QueryClient, raceId: string) {
   return Promise.all([
     ...['raceDetails', 'predictions', 'raceResults'].map((prefix) =>
@@ -85,12 +100,41 @@ export function invalidateRacePredictions(client: QueryClient, raceId: string) {
         predicate: (query) => query.queryKey[3] === raceId,
       }),
     ),
-    client.invalidateQueries({
-      queryKey: ['admin', 'raceResults'],
-      predicate: (query) => query.queryKey[3] === raceId,
-    }),
+    ...['raceResults', 'racePredictions'].map((key) =>
+      client.invalidateQueries({
+        queryKey: ['admin', key],
+        predicate: (query) => query.queryKey[3] === raceId,
+      }),
+    ),
     client.invalidateQueries({ queryKey: ['currentPrediction'] }),
   ])
+}
+
+export function useSaveAdminPrediction() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      raceId,
+      predictionId,
+      values,
+    }: {
+      userId: string
+      raceId: string
+      predictionId: string
+      values: SavePredictionRequestDto
+    }) => saveAdminPrediction(raceId, predictionId, values),
+    retry: false,
+    onSuccess: async (prediction, variables) => {
+      const key = adminRacePredictionsKey(variables.userId, variables.raceId)
+      await client.cancelQueries({ queryKey: key })
+      client.setQueryData<AdminPredictionDto[]>(key, (predictions) =>
+        predictions?.map((item) =>
+          item.prediction.id === prediction.id ? { ...item, prediction } : item,
+        ),
+      )
+    },
+    onSettled: (_data, _error, variables) => invalidateRacePredictions(client, variables.raceId),
+  })
 }
 
 export function useSavePredictions() {
