@@ -69,6 +69,20 @@ const router = createBrowserRouter([
             ),
           },
           {
+            path: 'admin/results',
+            lazy: async () => {
+              const { default: AdminResultsPage } = await import('./routes/AdminResultsPage')
+              return {
+                element: (
+                  <>
+                    <title>{withDevPrefix('[Admin] Results')}</title>
+                    <AdminResultsPage />
+                  </>
+                ),
+              }
+            },
+          },
+          {
             path: 'admin/teams',
             element: (
               <>

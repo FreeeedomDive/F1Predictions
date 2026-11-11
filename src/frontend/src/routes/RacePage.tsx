@@ -5,6 +5,7 @@ import {
   Button,
   Container,
   IconButton,
+  Paper,
   Skeleton,
   Stack,
   Tooltip,
@@ -14,8 +15,10 @@ import { useEffect, useRef } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
 import { isUnauthorized } from '../api/session'
 import PredictionForm from '../components/prediction/PredictionForm'
+import RaceResultPanel from '../components/result/RaceResultPanel'
 import { useLeague } from '../context/league'
 import { useCurrentRace, useOwnPrediction, useRaceDetails } from '../queries/predictions'
+import { useOwnRaceResult } from '../queries/raceResults'
 
 export default function RacePage({ current = false }: { current?: boolean }) {
   const { raceId } = useParams()
@@ -32,11 +35,9 @@ export default function RacePage({ current = false }: { current?: boolean }) {
   )
   const details = current ? currentRace : specificRace
   const page = details.data
-  const own = useOwnPrediction(
-    profile.userId,
-    selectedLeague?.leagueId,
-    current ? page?.race.id : raceId,
-  )
+  const targetRaceId = current ? page?.race.id : raceId
+  const own = useOwnPrediction(profile.userId, selectedLeague?.leagueId, targetRaceId)
+  const outcome = useOwnRaceResult(profile.userId, selectedLeague?.leagueId, targetRaceId)
   const season = page?.season
   const navigate = useNavigate()
   const previousSeason = useRef(selectedSeason)
@@ -54,14 +55,50 @@ export default function RacePage({ current = false }: { current?: boolean }) {
 
   if (
     (details.isError && isUnauthorized(details.error)) ||
-    (own.isError && isUnauthorized(own.error))
+    (own.isError && isUnauthorized(own.error)) ||
+    (outcome.isError && isUnauthorized(outcome.error))
   )
     return <Navigate to="/auth" replace />
 
   function refresh() {
     void details.refetch()
-    if (page || !current) void own.refetch()
+    if (targetRaceId) {
+      void own.refetch()
+      void outcome.refetch()
+    }
   }
+
+  const formPage =
+    page && outcome.data?.race.status === 'FINISHED'
+      ? { ...page, race: { ...page.race, status: 'FINISHED' as const }, predictionsOpen: false }
+      : page
+  const predictionState =
+    own.isPending || (own.isError && own.data === undefined) ? (
+      <Paper variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
+        <Stack spacing={1.5}>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            Prediction
+          </Typography>
+          {own.isPending ? (
+            <Stack spacing={1} role="status" aria-label="Loading your prediction">
+              <Skeleton variant="rounded" height={40} />
+              <Skeleton variant="rounded" height={240} />
+            </Stack>
+          ) : (
+            <Alert
+              severity="error"
+              action={
+                <Button color="inherit" size="small" onClick={refresh}>
+                  Retry
+                </Button>
+              }
+            >
+              Could not load your saved prediction.
+            </Alert>
+          )}
+        </Stack>
+      </Paper>
+    ) : undefined
 
   return (
     <Container
@@ -93,7 +130,9 @@ export default function RacePage({ current = false }: { current?: boolean }) {
               <IconButton
                 size="small"
                 aria-label="Refresh race"
-                disabled={!selectedLeague || details.isFetching || own.isFetching}
+                disabled={
+                  !selectedLeague || details.isFetching || own.isFetching || outcome.isFetching
+                }
                 onClick={refresh}
               >
                 <RefreshRounded fontSize="small" />
@@ -115,7 +154,7 @@ export default function RacePage({ current = false }: { current?: boolean }) {
             No open or upcoming race in {selectedSeason}. You can view past predictions in the
             calendar.
           </Alert>
-        ) : !page ? (
+        ) : !formPage ? (
           <Alert
             severity="error"
             action={
@@ -140,42 +179,32 @@ export default function RacePage({ current = false }: { current?: boolean }) {
                 Could not refresh the race. Your draft is still here.
               </Alert>
             )}
-            {own.isPending ? (
-              <Stack spacing={1.5} role="status" aria-label="Loading your prediction">
-                <Typography component="h1" variant="h6">
-                  {page.race.name} · {page.season}
-                </Typography>
-                <Skeleton variant="rounded" height={360} />
-              </Stack>
-            ) : own.isError && own.data === undefined ? (
-              <Alert
-                severity="error"
-                action={
-                  <Button color="inherit" size="small" onClick={refresh}>
-                    Retry
-                  </Button>
-                }
-              >
-                Could not load your saved prediction.
+            {own.isError && own.data !== undefined && (
+              <Alert severity="warning">
+                Could not refresh your saved prediction. Your draft is still here.
               </Alert>
-            ) : (
-              <>
-                {own.isError && (
-                  <Alert severity="warning">
-                    Could not refresh your saved prediction. Your draft is still here.
-                  </Alert>
-                )}
-                <PredictionForm
-                  key={`${profile.userId}:${selectedLeague.leagueId}:${page.race.id}`}
-                  page={page}
-                  prediction={own.data ?? null}
-                  userId={profile.userId}
-                  league={selectedLeague}
-                  leagues={profile.leagues}
-                  receivedAt={details.dataUpdatedAt}
-                />
-              </>
             )}
+            <PredictionForm
+              key={`${profile.userId}:${selectedLeague.leagueId}:${formPage.race.id}`}
+              page={formPage}
+              prediction={own.data ?? null}
+              userId={profile.userId}
+              league={selectedLeague}
+              leagues={profile.leagues}
+              receivedAt={details.dataUpdatedAt}
+              predictionState={predictionState}
+              resultPanel={
+                <RaceResultPanel
+                  data={outcome.data}
+                  loading={outcome.isPending}
+                  error={outcome.error}
+                  teams={formPage.teams}
+                  prediction={own.data}
+                  positionDriver={formPage.conditions?.positionPredictionDriver}
+                  onRefresh={() => void outcome.refetch()}
+                />
+              }
+            />
           </>
         )}
       </Stack>

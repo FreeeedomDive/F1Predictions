@@ -79,12 +79,16 @@ export function useOwnPrediction(
 
 export function invalidateRacePredictions(client: QueryClient, raceId: string) {
   return Promise.all([
-    ...['raceDetails', 'predictions'].map((prefix) =>
+    ...['raceDetails', 'predictions', 'raceResults'].map((prefix) =>
       client.invalidateQueries({
         queryKey: [prefix],
         predicate: (query) => query.queryKey[3] === raceId,
       }),
     ),
+    client.invalidateQueries({
+      queryKey: ['admin', 'raceResults'],
+      predicate: (query) => query.queryKey[3] === raceId,
+    }),
     client.invalidateQueries({ queryKey: ['currentPrediction'] }),
   ])
 }

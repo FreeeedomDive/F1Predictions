@@ -25,7 +25,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useEffect, useId, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { Navigate } from 'react-router'
 import { predictionErrorMessage } from '../../api/predictions'
 import { isUnauthorized } from '../../api/session'
@@ -105,6 +105,8 @@ export default function PredictionForm({
   league,
   leagues,
   receivedAt,
+  resultPanel,
+  predictionState,
 }: {
   page: RaceDetailsDto
   prediction: PredictionDto | null
@@ -112,6 +114,8 @@ export default function PredictionForm({
   league: UserLeagueDto
   leagues: UserLeagueDto[]
   receivedAt: number
+  resultPanel: ReactNode
+  predictionState?: ReactNode
 }) {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [now, setNow] = useState(() => Date.now())
@@ -125,7 +129,8 @@ export default function PredictionForm({
   const dnfLabel = useId()
   const menuId = useId()
   const serverNow = now + Date.parse(page.serverTime) - receivedAt
-  const accepting = page.predictionsOpen && serverNow < Date.parse(page.race.closeAt)
+  const accepting =
+    page.race.status === 'OPEN' && page.predictionsOpen && serverNow < Date.parse(page.race.closeAt)
   const current = accepting ? (draft ?? toDraft(prediction)) : toDraft(prediction)
   const roster = page.teams.flatMap((team) => team.drivers)
   const drivers = [
@@ -267,18 +272,39 @@ export default function PredictionForm({
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'repeat(2, minmax(0, 1fr))' },
+          gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'repeat(3, minmax(0, 1fr))' },
           gap: 2,
           alignItems: 'start',
         }}
       >
+        <Box sx={{ minWidth: 0 }}>
+          <StartingGrid
+            grid={page.startingGrid}
+            teams={page.teams}
+            tenthPlaceDriver={current.tenth}
+            dnfDrivers={selectedDnf}
+            positionDriver={positionDriver}
+            predictedPosition={
+              validPosition && current.position ? Number(current.position) : undefined
+            }
+          />
+        </Box>
         <Stack spacing={1.5} sx={{ minWidth: 0, width: '100%' }}>
-          {!prediction && !accepting ? (
-            <Alert severity="info">
-              {page.race.status === 'SCHEDULED'
-                ? 'Predictions have not opened yet.'
-                : 'You did not submit a prediction for this race. Predictions are closed.'}
-            </Alert>
+          {predictionState !== undefined ? (
+            predictionState
+          ) : !prediction && !accepting ? (
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 1 }}>
+              <Stack spacing={1.5}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Prediction
+                </Typography>
+                <Alert severity="info">
+                  {page.race.status === 'SCHEDULED'
+                    ? 'Predictions have not opened yet.'
+                    : 'You did not submit a prediction for this race. Predictions are closed.'}
+                </Alert>
+              </Stack>
+            </Paper>
           ) : (
             <Paper
               component="form"
@@ -287,6 +313,9 @@ export default function PredictionForm({
               sx={{ p: 2, borderRadius: 1 }}
             >
               <Stack spacing={2}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Prediction
+                </Typography>
                 {!accepting && (
                   <Typography variant="caption" color="text.secondary">
                     Your saved prediction is read-only.
@@ -502,11 +531,7 @@ export default function PredictionForm({
                 {accepting && (
                   <>
                     <Divider />
-                    <Stack
-                      direction={{ xs: 'column', sm: 'row' }}
-                      spacing={1.5}
-                      sx={{ alignItems: { sm: 'center' }, justifyContent: 'space-between' }}
-                    >
+                    <Stack direction="column" spacing={1.5} sx={{ alignItems: 'stretch' }}>
                       <Stack
                         direction="row"
                         spacing={0.75}
@@ -575,18 +600,7 @@ export default function PredictionForm({
             </Paper>
           )}
         </Stack>
-        <Box sx={{ minWidth: 0 }}>
-          <StartingGrid
-            grid={page.startingGrid}
-            teams={page.teams}
-            tenthPlaceDriver={current.tenth}
-            dnfDrivers={selectedDnf}
-            positionDriver={positionDriver}
-            predictedPosition={
-              validPosition && current.position ? Number(current.position) : undefined
-            }
-          />
-        </Box>
+        <Box sx={{ minWidth: 0 }}>{resultPanel}</Box>
       </Box>
       {report && (
         <Snackbar
