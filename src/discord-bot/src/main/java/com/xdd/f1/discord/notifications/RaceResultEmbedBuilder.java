@@ -78,8 +78,7 @@ public class RaceResultEmbedBuilder {
                 .setColor(updated ? new Color(0x006400) : new Color(0xFFD700))
                 .setTitle(title, url)
                 .setDescription(pages.get(index))
-                .setFooter("Rules: " + label(rulesVersion, 128)
-                        + (pages.size() > 1 ? " · Page " + (index + 1) + " of " + pages.size() : ""))
+                .setFooter(pages.size() > 1 ? " · Page " + (index + 1) + " of " + pages.size() : null)
                 .build()).toList();
     }
 

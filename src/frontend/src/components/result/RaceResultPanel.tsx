@@ -196,13 +196,6 @@ export default function RaceResultPanel({
                   Winner's gap: <strong>{data.result.firstPlaceLead} s</strong>
                 </Typography>
               )}
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ overflowWrap: 'anywhere' }}
-              >
-                Rules {data.rulesVersion}
-              </Typography>
             </Stack>
           </>
         )}
@@ -262,13 +255,6 @@ export default function RaceResultPanel({
                     {points.totalPoints}
                   </Typography>
                 </Stack>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ overflowWrap: 'anywhere' }}
-                >
-                  Rules {points.rulesVersion}
-                </Typography>
                 {data.race.type === 'SPRINT' && data.season >= 2025 && (
                   <Typography variant="caption" color="text.secondary">
                     Category points are shown before the 30% sprint coefficient. The total already
