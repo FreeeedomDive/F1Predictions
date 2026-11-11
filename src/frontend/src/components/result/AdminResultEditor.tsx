@@ -224,7 +224,7 @@ export default function AdminResultEditor({
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Stack spacing={1}>
           <Typography variant="overline" color="text.secondary">
-            Target race · {page.season} · Shared across all leagues
+            Target race · {page.season}
           </Typography>
           <Stack direction="row" sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
             <Typography component="h2" variant="h6">

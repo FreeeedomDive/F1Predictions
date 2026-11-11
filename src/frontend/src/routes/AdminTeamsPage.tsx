@@ -96,8 +96,7 @@ export default function AdminTeamsPage() {
               Team administration
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Race lineup{selectedSeason !== null && ` · ${selectedSeason}`} · Shared across all
-              leagues
+              Race lineup{selectedSeason !== null && ` · ${selectedSeason}`}
             </Typography>
           </Stack>
           <Tooltip title="Refresh lineup">

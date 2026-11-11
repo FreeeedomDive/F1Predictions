@@ -76,8 +76,7 @@ export default function AdminResultsPage() {
               Result administration
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              All races and sprints{selectedSeason !== null && ` · ${selectedSeason}`} · Shared
-              across all leagues
+              All races and sprints{selectedSeason !== null && ` · ${selectedSeason}`}
             </Typography>
           </Stack>
           <Tooltip title="Refresh results">
