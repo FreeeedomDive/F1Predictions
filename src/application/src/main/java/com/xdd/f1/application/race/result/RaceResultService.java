@@ -142,7 +142,7 @@ public class RaceResultService {
         if (!finished.equals(race)) {
             races.update(finished);
         }
-        podiums.saveIfLastRace(finished);
+        podiums.saveIfSeasonFinished(finished);
         if (!Objects.equals(previous.result(), values) || pointsChanged || race.status() != RaceStatus.FINISHED) {
             publishResults(race, updated, savedPredictions, calculated);
         }

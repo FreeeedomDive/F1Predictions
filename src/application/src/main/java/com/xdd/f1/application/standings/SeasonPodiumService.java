@@ -6,6 +6,7 @@ import com.xdd.f1.application.race.RaceRepository;
 import com.xdd.f1.domain.league.LeagueId;
 import com.xdd.f1.domain.league.LeagueParticipantId;
 import com.xdd.f1.domain.race.Race;
+import com.xdd.f1.domain.race.RaceStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,9 +29,9 @@ public class SeasonPodiumService {
     }
 
     @Transactional
-    public void saveIfLastRace(Race race) {
+    public void saveIfSeasonFinished(Race race) {
         var lastRace = races.findAllBySeason(race.season()).stream().max(SeasonStandingsService.EVENT_ORDER).orElse(null);
-        if (lastRace == null || !lastRace.id().equals(race.id())) {
+        if (lastRace == null || lastRace.status() != RaceStatus.FINISHED) {
             return;
         }
         leagues.findAll().forEach(league -> savePodium(league.id(), race.season()));

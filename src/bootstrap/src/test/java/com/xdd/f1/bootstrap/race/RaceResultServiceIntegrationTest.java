@@ -277,6 +277,38 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void updatesPodiumsWhenAnEarlierFinishedRaceIsCorrected() {
+        var seasonRaces = List.of(
+                openRace(2027, 1, RaceType.RACE),
+                openRace(2027, 2, RaceType.RACE),
+                openRace(2027, 3, RaceType.RACE),
+                openRace(2027, 4, RaceType.RACE)
+        );
+        var bob = participants.ensureParticipant(firstLeague.id(),
+                new UserIdentityId(UserIdentitySource.MANUAL, UUID.randomUUID().toString()), "Bob");
+        seasonRaces.forEach(race -> {
+            savePredictions(race);
+            predictionService.save(bob.userId(), firstLeague.id(), race.id(), predictionValues("Piastri"));
+            publish(race);
+        });
+        var initial = new SeasonPodiumEntry(firstLeague.id(), 2027, firstParticipant.id(), bob.id(), null);
+        transactions.executeWithoutResult(status ->
+                assertThat(podiums.findAllByLeagueBeforeSeason(firstLeague.id(), 2028)).containsExactly(initial));
+
+        seasonRaces.subList(0, 3).forEach(race -> {
+            service.saveDraft(race.id(), correctedValues());
+            service.finalizeResult(race.id());
+        });
+
+        var corrected = new SeasonPodiumEntry(firstLeague.id(), 2027, bob.id(), firstParticipant.id(), null);
+        transactions.executeWithoutResult(status -> {
+            assertThat(podiums.findAllByLeagueBeforeSeason(firstLeague.id(), 2028)).containsExactly(corrected);
+            assertThat(podiums.findAllByLeagueBeforeSeason(secondLeague.id(), 2028))
+                    .containsExactly(new SeasonPodiumEntry(secondLeague.id(), 2027, secondParticipant.id(), null, null));
+        });
+    }
+
+    @Test
     void correctsAFinishedRaceAfterPenaltyAndPreservesPredictionsAndAnotherRace() {
         var race = openRace(2027, 1, RaceType.RACE);
         var otherRace = openRace(2027, 2, RaceType.RACE);
