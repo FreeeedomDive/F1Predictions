@@ -2,13 +2,10 @@ import { Button } from '@mui/material'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 import StatusScreen from './components/StatusScreen'
 import AppLayout from './layout/AppLayout'
-import AdminRacesPage from './routes/AdminRacesPage'
-import AdminTeamsPage from './routes/AdminTeamsPage'
 import AuthPage, { AuthLoadingScreen } from './routes/AuthPage'
 import { authLoader } from './routes/authLoader'
 import CalendarPage from './routes/CalendarPage'
 import RequireAuth from './routes/RequireAuth'
-import RacePage from './routes/RacePage'
 
 const withDevPrefix = (title: string) => (import.meta.env.DEV ? `[dev] ${title}` : title)
 
@@ -36,6 +33,9 @@ const router = createBrowserRouter([
   {
     element: <RequireAuth />,
     errorElement: errorScreen,
+    hydrateFallbackElement: (
+      <StatusScreen title="Loading page" description="Preparing your workspace." loading />
+    ),
     children: [
       {
         path: '/',
@@ -52,21 +52,60 @@ const router = createBrowserRouter([
             ),
           },
           {
+            path: 'standings',
+            lazy: async () => {
+              const { default: StandingsPage } = await import('./routes/StandingsPage')
+              return {
+                element: (
+                  <>
+                    <title>{withDevPrefix('Standings')}</title>
+                    <StandingsPage />
+                  </>
+                ),
+              }
+            },
+          },
+          {
+            path: 'statistics',
+            lazy: async () => {
+              const { default: StatisticsPage } = await import('./routes/StatisticsPage')
+              return {
+                element: (
+                  <>
+                    <title>{withDevPrefix('Statistics')}</title>
+                    <StatisticsPage />
+                  </>
+                ),
+              }
+            },
+          },
+          {
             path: 'prediction',
-            element: <RacePage current />,
+            lazy: async () => {
+              const { default: RacePage } = await import('./routes/RacePage')
+              return { element: <RacePage current /> }
+            },
           },
           {
             path: 'races/:raceId',
-            element: <RacePage />,
+            lazy: async () => {
+              const { default: RacePage } = await import('./routes/RacePage')
+              return { element: <RacePage /> }
+            },
           },
           {
             path: 'admin/races',
-            element: (
-              <>
-                <title>{withDevPrefix('[Admin] Races')}</title>
-                <AdminRacesPage />
-              </>
-            ),
+            lazy: async () => {
+              const { default: AdminRacesPage } = await import('./routes/AdminRacesPage')
+              return {
+                element: (
+                  <>
+                    <title>{withDevPrefix('[Admin] Races')}</title>
+                    <AdminRacesPage />
+                  </>
+                ),
+              }
+            },
           },
           ...['admin/results', 'admin/results/:raceId'].map((path) => ({
             path,
@@ -84,12 +123,17 @@ const router = createBrowserRouter([
           })),
           {
             path: 'admin/teams',
-            element: (
-              <>
-                <title>{withDevPrefix('[Admin] Teams')}</title>
-                <AdminTeamsPage />
-              </>
-            ),
+            lazy: async () => {
+              const { default: AdminTeamsPage } = await import('./routes/AdminTeamsPage')
+              return {
+                element: (
+                  <>
+                    <title>{withDevPrefix('[Admin] Teams')}</title>
+                    <AdminTeamsPage />
+                  </>
+                ),
+              }
+            },
           },
           { path: '*', element: <Navigate to="/calendar" replace /> },
         ],

@@ -140,6 +140,14 @@ export function useFinalizeRaceResult() {
           predicate: (query) => query.queryKey[2] === variables.season,
         }),
         client.invalidateQueries({ queryKey: ['admin', 'raceLineups'] }),
+        client.invalidateQueries({
+          queryKey: ['standings'],
+          predicate: (query) => query.queryKey[3] === variables.season,
+        }),
+        client.invalidateQueries({
+          queryKey: ['statistics'],
+          predicate: (query) => query.queryKey[3] === variables.season,
+        }),
         invalidateRacePredictions(client, variables.raceId),
       ]),
   })
