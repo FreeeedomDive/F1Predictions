@@ -17,7 +17,6 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public final class PredictionPointsCalculator {
-    private static final int[] TENTH_PLACE_POINTS = {0, 1, 2, 4, 6, 8, 10, 12, 15, 18, 25, 18, 15, 12, 10, 8, 6, 4, 2, 1, 1};
     private static final int[] POSITION_POINTS = {10, 7, 5, 3, 2, 1};
     private static final List<BigDecimal> LEAD_THRESHOLDS = Stream.of("0.5", "2", "3.5", "5", "7")
             .map(BigDecimal::new).toList();
@@ -173,7 +172,7 @@ public final class PredictionPointsCalculator {
             return null;
         }
         var position = positions.getOrDefault(selected, 0);
-        return position < TENTH_PLACE_POINTS.length ? TENTH_PLACE_POINTS[position] : 0;
+        return PredictionPointsRules.tenthPlacePoints(position);
     }
 
     private static Integer firstDnfPoints(DnfPrediction prediction, List<Driver> dnfs) {

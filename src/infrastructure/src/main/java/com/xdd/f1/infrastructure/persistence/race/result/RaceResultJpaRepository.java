@@ -15,4 +15,6 @@ public interface RaceResultJpaRepository extends JpaRepository<RaceResultEntity,
           and result.result is not null
         """)
     List<UUID> findPublishedRaceIdsBySeason(@Param("season") int season);
+
+    List<RaceResultEntity> findAllByRace_SeasonAndResultIsNotNull(int season);
 }

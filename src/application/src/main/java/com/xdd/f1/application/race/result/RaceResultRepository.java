@@ -9,6 +9,7 @@ import java.util.Optional;
 public interface RaceResultRepository {
     Optional<RaceResult> findByRaceId(RaceId raceId);
     List<RaceId> findPublishedRaceIdsBySeason(int season);
+    List<RaceResult> findAllPublishedBySeason(int season);
     void create(RaceResult result);
     void update(RaceResult result);
 }
