@@ -46,6 +46,15 @@ public class LeagueRepositoryAdapter implements LeagueRepository {
         league.getSettings().setNotificationsChannelId(channelId);
     }
 
+    @Override
+    public void updateSettings(LeagueId id, LeagueSettings settings) {
+        var league = repository.findById(id.value()).orElseThrow(() -> new LeagueNotFoundException(id));
+        var entity = league.getSettings();
+        entity.setNotificationsChannelId(settings.notificationsChannelId());
+        entity.setSprintsEnabled(settings.sprintsEnabled());
+        entity.setFirstSeason(settings.firstSeason());
+    }
+
     private League toDomain(LeagueEntity entity) {
         LeagueSource source = switch (entity.getSource()) {
             case DISCORD -> new LeagueSource.Discord(Long.parseLong(entity.getSourceId()));

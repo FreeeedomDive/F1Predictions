@@ -2,6 +2,7 @@ package com.xdd.f1.application.league;
 
 import com.xdd.f1.domain.league.League;
 import com.xdd.f1.domain.league.LeagueId;
+import com.xdd.f1.domain.league.LeagueSettings;
 
 import java.util.List;
 import java.util.Optional;
@@ -12,4 +13,5 @@ public interface LeagueRepository {
     List<League> findAll();
     void create(League league);
     void updateNotificationsChannel(LeagueId id, String channelId);
+    void updateSettings(LeagueId id, LeagueSettings settings);
 }

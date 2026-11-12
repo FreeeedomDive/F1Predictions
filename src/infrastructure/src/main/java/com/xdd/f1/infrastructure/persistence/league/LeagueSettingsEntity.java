@@ -47,4 +47,12 @@ public class LeagueSettingsEntity {
     public int getFirstSeason() {
         return firstSeason;
     }
+
+    public void setSprintsEnabled(boolean sprintsEnabled) {
+        this.sprintsEnabled = sprintsEnabled;
+    }
+
+    public void setFirstSeason(int firstSeason) {
+        this.firstSeason = firstSeason;
+    }
 }
