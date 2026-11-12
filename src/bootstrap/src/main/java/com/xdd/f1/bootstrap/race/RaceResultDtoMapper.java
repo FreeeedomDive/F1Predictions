@@ -59,7 +59,7 @@ final class RaceResultDtoMapper {
         return new PredictionConditionsDto(conditions.positionPredictionDriver() == null ? null : conditions.positionPredictionDriver().name());
     }
 
-    private static PredictionPointsDto toDto(PredictionPoints points) {
+    static PredictionPointsDto toDto(PredictionPoints points) {
         if (points == null) {
             return null;
         }

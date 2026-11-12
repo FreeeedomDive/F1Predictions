@@ -50,6 +50,11 @@ public class SeasonStandingsService {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public SeasonStandings getStandings(UserId userId, LeagueId leagueId, int season) {
         access.checkAccess(userId, leagueId);
+        return getStandings(leagueId, season);
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public SeasonStandings getStandings(LeagueId leagueId, int season) {
         var league = leagues.findById(leagueId).orElseThrow(() -> new LeagueNotFoundException(leagueId));
         var firstSeason = league.settings().firstSeason();
         if (season < firstSeason) {
