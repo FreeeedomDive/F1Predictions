@@ -1,7 +1,16 @@
 import MenuRounded from '@mui/icons-material/MenuRounded'
-import { AppBar, Box, Drawer, IconButton, Toolbar, useMediaQuery, useTheme } from '@mui/material'
+import {
+  AppBar,
+  Box,
+  Drawer,
+  IconButton,
+  LinearProgress,
+  Toolbar,
+  useMediaQuery,
+  useTheme,
+} from '@mui/material'
 import { useState } from 'react'
-import { Outlet } from 'react-router'
+import { Outlet, useNavigation } from 'react-router'
 import Brand from '../components/Brand'
 import Sidebar from './Sidebar'
 
@@ -11,6 +20,7 @@ export default function AppLayout() {
   const theme = useTheme()
   const desktop = useMediaQuery(theme.breakpoints.up('md'))
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const navigation = useNavigation()
 
   return (
     <>
@@ -60,6 +70,18 @@ export default function AppLayout() {
           aria-label="Application content"
           sx={{ flexGrow: 1, minWidth: 0, pt: desktop ? 0 : 8 }}
         >
+          {navigation.state === 'loading' && (
+            <LinearProgress
+              aria-label="Loading page"
+              sx={{
+                position: 'fixed',
+                top: 0,
+                left: desktop ? SIDEBAR_WIDTH : 0,
+                right: 0,
+                zIndex: theme.zIndex.appBar + 1,
+              }}
+            />
+          )}
           <Outlet />
         </Box>
       </Box>

@@ -1,7 +1,9 @@
 import {
+  Avatar,
   Chip,
   Link,
   Paper,
+  Stack,
   Table,
   TableBody,
   TableCell,
@@ -14,6 +16,7 @@ import type { ChipProps } from '@mui/material'
 import type { ReactNode } from 'react'
 import { Link as RouterLink } from 'react-router'
 import type { RaceDto, RaceStatusDto } from '../../dto/race'
+import { raceFlag } from '../raceFlag'
 
 const statuses: Record<RaceStatusDto, { label: string; color: ChipProps['color'] }> = {
   SCHEDULED: { label: 'Scheduled', color: 'default' },
@@ -79,18 +82,28 @@ export default function RaceTable({
           {races.map((race) => (
             <TableRow key={race.id} hover>
               <TableCell component="th" scope="row" sx={{ fontWeight: 600 }}>
-                {raceLink ? (
-                  <Link
-                    component={RouterLink}
-                    to={raceLink(race)}
-                    underline="hover"
-                    color="inherit"
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                  <Avatar
+                    variant="rounded"
+                    alt=""
+                    src={raceFlag(race.name)}
+                    sx={{ width: 24, height: 24, flexShrink: 0, fontSize: '0.65rem' }}
                   >
-                    {race.name}
-                  </Link>
-                ) : (
-                  race.name
-                )}
+                    {race.name.slice(0, 1)}
+                  </Avatar>
+                  {raceLink ? (
+                    <Link
+                      component={RouterLink}
+                      to={raceLink(race)}
+                      underline="hover"
+                      color="inherit"
+                    >
+                      {race.name}
+                    </Link>
+                  ) : (
+                    race.name
+                  )}
+                </Stack>
               </TableCell>
               <TableCell>
                 <Chip

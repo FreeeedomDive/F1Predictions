@@ -8,6 +8,7 @@ import com.xdd.f1.domain.race.lineup.Driver;
 import com.xdd.f1.domain.race.result.*;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -20,10 +21,17 @@ public class RaceResultRepositoryAdapter implements RaceResultRepository {
 
     @Override
     public Optional<RaceResult> findByRaceId(RaceId raceId) {
-        return repository.findById(raceId.value()).map(entity -> new RaceResult(
-                new RaceId(entity.raceId), new RulesVersion(entity.rulesVersion),
-                toDomain(entity.result), toDomain(entity.draft)
-        ));
+        return repository.findById(raceId.value()).map(this::toDomain);
+    }
+
+    @Override
+    public List<RaceId> findPublishedRaceIdsBySeason(int season) {
+        return repository.findPublishedRaceIdsBySeason(season).stream().map(RaceId::new).toList();
+    }
+
+    @Override
+    public List<RaceResult> findAllPublishedBySeason(int season) {
+        return repository.findAllByRace_SeasonAndResultIsNotNull(season).stream().map(this::toDomain).toList();
     }
 
     @Override
@@ -39,6 +47,13 @@ public class RaceResultRepositoryAdapter implements RaceResultRepository {
         var entity = repository.findById(result.raceId().value())
                 .orElseThrow(() -> new RaceResultNotFoundException(result.raceId()));
         updateEntity(entity, result);
+    }
+
+    private RaceResult toDomain(RaceResultEntity entity) {
+        return new RaceResult(
+                new RaceId(entity.raceId), new RulesVersion(entity.rulesVersion),
+                toDomain(entity.result), toDomain(entity.draft)
+        );
     }
 
     private RaceResultValues toDomain(RaceResultValuesData values) {

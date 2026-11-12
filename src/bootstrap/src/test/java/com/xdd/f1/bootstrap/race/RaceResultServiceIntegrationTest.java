@@ -8,6 +8,8 @@ import com.xdd.f1.application.race.RaceService;
 import com.xdd.f1.application.race.RaceNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.application.race.result.*;
+import com.xdd.f1.application.standings.SeasonPodiumEntry;
+import com.xdd.f1.application.standings.SeasonPodiumRepository;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
 import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.league.*;
@@ -61,6 +63,7 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
     private final RaceLineupRepository lineups;
     private final LeagueRepository leagues;
     private final LeagueParticipantService participants;
+    private final SeasonPodiumRepository podiums;
     private final RaceJpaRepository raceJpaRepository;
     private final JdbcClient jdbc;
     private final TransactionTemplate transactions;
@@ -81,7 +84,7 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
                                      PredictionService predictionService, PredictionRepository predictions,
                                      PredictionConditionsRepository conditions, RaceLineupRepository lineups,
                                      LeagueRepository leagues, LeagueParticipantService participants,
-                                     RaceJpaRepository raceJpaRepository, JdbcClient jdbc,
+                                     SeasonPodiumRepository podiums, RaceJpaRepository raceJpaRepository, JdbcClient jdbc,
                                      PlatformTransactionManager transactionManager) {
         this.service = service;
         this.results = results;
@@ -92,6 +95,7 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
         this.lineups = lineups;
         this.leagues = leagues;
         this.participants = participants;
+        this.podiums = podiums;
         this.raceJpaRepository = raceJpaRepository;
         this.jdbc = jdbc;
         this.transactions = new TransactionTemplate(transactionManager);
@@ -238,6 +242,70 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
                 .param("id", race.id().value()).query(Long.class).single()).isEqualTo(1L);
         assertThat(jdbc.sql("SELECT version FROM prediction_points WHERE prediction_id = :id")
                 .param("id", saved.getFirst().id().value()).query(Long.class).single()).isZero();
+    }
+
+    @Test
+    void savesPodiumsForEveryLeagueWhenLastRaceIsFinalized() {
+        var firstRace = openRace(2027, 1, RaceType.RACE);
+        var lastRace = openRace(2027, 2, RaceType.RACE);
+        var bob = participants.ensureParticipant(firstLeague.id(),
+                new UserIdentityId(UserIdentitySource.MANUAL, UUID.randomUUID().toString()), "Bob");
+        savePredictions(firstRace);
+        predictionService.save(bob.userId(), firstLeague.id(), firstRace.id(), predictionValues("Piastri"));
+        savePredictions(lastRace);
+        predictionService.save(bob.userId(), firstLeague.id(), lastRace.id(), predictionValues("Piastri"));
+
+        publish(firstRace);
+
+        transactions.executeWithoutResult(status -> {
+            assertThat(podiums.findAllByLeagueBeforeSeason(firstLeague.id(), 2028)).isEmpty();
+            assertThat(podiums.findAllByLeagueBeforeSeason(secondLeague.id(), 2028)).isEmpty();
+        });
+        publish(lastRace);
+
+        var expectedFirst = new SeasonPodiumEntry(firstLeague.id(), 2027, firstParticipant.id(), bob.id(), null);
+        var expectedSecond = new SeasonPodiumEntry(secondLeague.id(), 2027, secondParticipant.id(), null, null);
+        transactions.executeWithoutResult(status -> {
+            assertThat(podiums.findAllByLeagueBeforeSeason(firstLeague.id(), 2028)).containsExactly(expectedFirst);
+            assertThat(podiums.findAllByLeagueBeforeSeason(secondLeague.id(), 2028)).containsExactly(expectedSecond);
+        });
+        service.finalizeResult(lastRace.id());
+        transactions.executeWithoutResult(status -> {
+            assertThat(podiums.findAllByLeagueBeforeSeason(firstLeague.id(), 2028)).containsExactly(expectedFirst);
+            assertThat(podiums.findAllByLeagueBeforeSeason(secondLeague.id(), 2028)).containsExactly(expectedSecond);
+        });
+    }
+
+    @Test
+    void updatesPodiumsWhenAnEarlierFinishedRaceIsCorrected() {
+        var seasonRaces = List.of(
+                openRace(2027, 1, RaceType.RACE),
+                openRace(2027, 2, RaceType.RACE),
+                openRace(2027, 3, RaceType.RACE),
+                openRace(2027, 4, RaceType.RACE)
+        );
+        var bob = participants.ensureParticipant(firstLeague.id(),
+                new UserIdentityId(UserIdentitySource.MANUAL, UUID.randomUUID().toString()), "Bob");
+        seasonRaces.forEach(race -> {
+            savePredictions(race);
+            predictionService.save(bob.userId(), firstLeague.id(), race.id(), predictionValues("Piastri"));
+            publish(race);
+        });
+        var initial = new SeasonPodiumEntry(firstLeague.id(), 2027, firstParticipant.id(), bob.id(), null);
+        transactions.executeWithoutResult(status ->
+                assertThat(podiums.findAllByLeagueBeforeSeason(firstLeague.id(), 2028)).containsExactly(initial));
+
+        seasonRaces.subList(0, 3).forEach(race -> {
+            service.saveDraft(race.id(), correctedValues());
+            service.finalizeResult(race.id());
+        });
+
+        var corrected = new SeasonPodiumEntry(firstLeague.id(), 2027, bob.id(), firstParticipant.id(), null);
+        transactions.executeWithoutResult(status -> {
+            assertThat(podiums.findAllByLeagueBeforeSeason(firstLeague.id(), 2028)).containsExactly(corrected);
+            assertThat(podiums.findAllByLeagueBeforeSeason(secondLeague.id(), 2028))
+                    .containsExactly(new SeasonPodiumEntry(secondLeague.id(), 2027, secondParticipant.id(), null, null));
+        });
     }
 
     @Test

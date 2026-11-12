@@ -2,6 +2,8 @@ import CloseRounded from '@mui/icons-material/CloseRounded'
 import CalendarMonthRounded from '@mui/icons-material/CalendarMonthRounded'
 import EditCalendarRounded from '@mui/icons-material/EditCalendarRounded'
 import GroupsRounded from '@mui/icons-material/GroupsRounded'
+import LeaderboardRounded from '@mui/icons-material/LeaderboardRounded'
+import InsightsRounded from '@mui/icons-material/InsightsRounded'
 import EditNoteRounded from '@mui/icons-material/EditNoteRounded'
 import SportsScoreRounded from '@mui/icons-material/SportsScoreRounded'
 import {
@@ -82,6 +84,40 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
           </ListItemIcon>
           <ListItemText
             primary="Current prediction"
+            slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
+          />
+        </ListItemButton>
+        <ListItemButton
+          component={NavLink}
+          to="/standings"
+          onClick={onClose}
+          sx={{
+            borderRadius: 1,
+            '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+            <LeaderboardRounded fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="Standings"
+            slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
+          />
+        </ListItemButton>
+        <ListItemButton
+          component={NavLink}
+          to="/statistics"
+          onClick={onClose}
+          sx={{
+            borderRadius: 1,
+            '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+            <InsightsRounded fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="Statistics"
             slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
           />
         </ListItemButton>

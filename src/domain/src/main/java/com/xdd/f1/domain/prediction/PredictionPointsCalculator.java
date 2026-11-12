@@ -3,7 +3,6 @@ package com.xdd.f1.domain.prediction;
 import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.league.LeagueId;
 import com.xdd.f1.domain.race.Race;
-import com.xdd.f1.domain.race.RaceType;
 import com.xdd.f1.domain.race.lineup.Driver;
 import com.xdd.f1.domain.race.lineup.RaceLineup;
 import com.xdd.f1.domain.race.result.RaceClassificationEntry;
@@ -18,7 +17,6 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 public final class PredictionPointsCalculator {
-    private static final int[] TENTH_PLACE_POINTS = {0, 1, 2, 4, 6, 8, 10, 12, 15, 18, 25, 18, 15, 12, 10, 8, 6, 4, 2, 1, 1};
     private static final int[] POSITION_POINTS = {10, 7, 5, 3, 2, 1};
     private static final List<BigDecimal> LEAD_THRESHOLDS = Stream.of("0.5", "2", "3.5", "5", "7")
             .map(BigDecimal::new).toList();
@@ -30,8 +28,8 @@ public final class PredictionPointsCalculator {
                                                   RaceLineup lineup, List<Prediction> predictions) {
         validate(race, result, conditions, lineup, predictions);
         return switch (result.rulesVersion().value()) {
-            case "2023" -> calculate2023(result, predictions);
-            case "2024" -> calculate2024(result, lineup, predictions);
+            case "2023" -> calculate2023(race, result, predictions);
+            case "2024" -> calculate2024(race, result, lineup, predictions);
             case "2025" -> calculate2025(race, result, lineup, predictions);
             case "2026" -> calculate2026(race, result, conditions, predictions);
             case "2027-v1" -> calculate2027(race, result, conditions, predictions);
@@ -39,18 +37,18 @@ public final class PredictionPointsCalculator {
         };
     }
 
-    private static List<PredictionPoints> calculate2023(RaceResult result, List<Prediction> predictions) {
+    private static List<PredictionPoints> calculate2023(Race race, RaceResult result, List<Prediction> predictions) {
         var positions = positions(result.result());
         var dnfs = dnfs(result.result());
         return predictions.stream().map(prediction -> {
             var picks = prediction.values();
             var tenth = tenthPlacePoints(picks.tenthPlacePickedDriver(), positions);
             var dnf = firstDnfPoints(picks.dnfPrediction(), dnfs);
-            return points(prediction, result.rulesVersion(), false, tenth, dnf, null, null, null, null);
+            return points(prediction, result.rulesVersion(), race, tenth, dnf, null, null, null, null);
         }).toList();
     }
 
-    private static List<PredictionPoints> calculate2024(RaceResult result, RaceLineup lineup, List<Prediction> predictions) {
+    private static List<PredictionPoints> calculate2024(Race race, RaceResult result, RaceLineup lineup, List<Prediction> predictions) {
         var values = result.result();
         var positions = positions(values);
         var dnfs = dnfs(values);
@@ -63,7 +61,7 @@ public final class PredictionPointsCalculator {
             var safety = safetyCarsPoints(picks.safetyCarsPrediction(), values.safetyCars());
             var lead = relativeLeadPoints(picks.firstPlaceLeadPrediction(), values.firstPlaceLead(), closestLeads.get(prediction.leagueId()));
             var team = teamMatesPoints(prediction.teamsPickedDrivers(), winners);
-            return points(prediction, result.rulesVersion(), false, tenth, dnf, safety, lead, null, team);
+            return points(prediction, result.rulesVersion(), race, tenth, dnf, safety, lead, null, team);
         }).toList();
     }
 
@@ -80,7 +78,7 @@ public final class PredictionPointsCalculator {
             var safety = safetyCarsPoints(picks.safetyCarsPrediction(), values.safetyCars());
             var lead = relativeLeadPoints(picks.firstPlaceLeadPrediction(), values.firstPlaceLead(), closestLeads.get(prediction.leagueId()));
             var team = teamMatesPoints(prediction.teamsPickedDrivers(), winners);
-            return points(prediction, result.rulesVersion(), race.type() == RaceType.SPRINT, tenth, dnf, safety, lead, null, team);
+            return points(prediction, result.rulesVersion(), race, tenth, dnf, safety, lead, null, team);
         }).toList();
     }
 
@@ -96,7 +94,7 @@ public final class PredictionPointsCalculator {
             var safety = safetyCarsPoints(picks.safetyCarsPrediction(), values.safetyCars());
             var lead = relativeLeadPoints(picks.firstPlaceLeadPrediction(), values.firstPlaceLead(), closestLeads.get(prediction.leagueId()));
             var position = positionPoints(picks.driverPositionPrediction(), conditions, positions);
-            return points(prediction, result.rulesVersion(), race.type() == RaceType.SPRINT, tenth, dnf, safety, lead, position, null);
+            return points(prediction, result.rulesVersion(), race, tenth, dnf, safety, lead, position, null);
         }).toList();
     }
 
@@ -111,16 +109,14 @@ public final class PredictionPointsCalculator {
             var safety = safetyCarsPoints(picks.safetyCarsPrediction(), values.safetyCars());
             var lead = absoluteLeadPoints(picks.firstPlaceLeadPrediction(), values.firstPlaceLead());
             var position = positionPoints(picks.driverPositionPrediction(), conditions, positions);
-            return points(prediction, result.rulesVersion(), race.type() == RaceType.SPRINT, tenth, dnf, safety, lead, position, null);
+            return points(prediction, result.rulesVersion(), race, tenth, dnf, safety, lead, position, null);
         }).toList();
     }
 
-    private static PredictionPoints points(Prediction prediction, RulesVersion version, boolean reducedSprint,
+    private static PredictionPoints points(Prediction prediction, RulesVersion version, Race race,
                                             Integer tenth, Integer dnf, Integer safety, Integer lead, Integer position, Integer team) {
         var total = Stream.of(tenth, dnf, safety, lead, position, team).filter(Objects::nonNull).mapToInt(Integer::intValue).sum();
-        if (reducedSprint) {
-            total = total * 3 / 10;
-        }
+        total = PredictionPointsRules.applySprintCoefficient(race.season(), race.type(), total);
         return new PredictionPoints(prediction.id(), version, total, tenth, dnf, safety, lead, position, team);
     }
 
@@ -176,7 +172,7 @@ public final class PredictionPointsCalculator {
             return null;
         }
         var position = positions.getOrDefault(selected, 0);
-        return position < TENTH_PLACE_POINTS.length ? TENTH_PLACE_POINTS[position] : 0;
+        return PredictionPointsRules.tenthPlacePoints(position);
     }
 
     private static Integer firstDnfPoints(DnfPrediction prediction, List<Driver> dnfs) {

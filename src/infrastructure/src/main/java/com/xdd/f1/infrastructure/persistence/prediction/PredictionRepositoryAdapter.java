@@ -2,6 +2,7 @@ package com.xdd.f1.infrastructure.persistence.prediction;
 
 import com.xdd.f1.application.prediction.PredictionNotFoundException;
 import com.xdd.f1.application.prediction.PredictionRepository;
+import com.xdd.f1.application.statistics.SeasonStatsPrediction;
 import com.xdd.f1.domain.league.LeagueId;
 import com.xdd.f1.domain.league.LeagueParticipantId;
 import com.xdd.f1.domain.prediction.*;
@@ -30,6 +31,13 @@ public class PredictionRepositoryAdapter implements PredictionRepository {
     @Override
     public List<Prediction> findAllByRaceId(RaceId raceId) {
         return repository.findAllByRaceId(raceId.value()).stream().map(this::toDomain).toList();
+    }
+
+    @Override
+    public List<SeasonStatsPrediction> findSeasonStatistics(LeagueId leagueId, int season) {
+        return repository.findSeasonStatistics(leagueId.value(), season).stream()
+                .map(row -> new SeasonStatsPrediction(toDomain(row.getPrediction()), row.getParticipantName(), row.getTenthPlacePoints()))
+                .toList();
     }
 
     @Override

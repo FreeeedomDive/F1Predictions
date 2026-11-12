@@ -13,6 +13,7 @@ import com.xdd.f1.application.race.RaceNotFoundException;
 import com.xdd.f1.application.race.RaceRepository;
 import com.xdd.f1.application.race.lineup.RaceLineupNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
+import com.xdd.f1.application.standings.SeasonPodiumService;
 import com.xdd.f1.contract.race.RaceFinishedEvent;
 import com.xdd.f1.contract.race.RaceResultUpdatedEvent;
 import com.xdd.f1.contract.race.result.*;
@@ -46,11 +47,12 @@ public class RaceResultService {
     private final ApplicationEventPublisher events;
     private final LeagueAccessGuard access;
     private final LeagueRepository leagues;
+    private final SeasonPodiumService podiums;
 
     public RaceResultService(RaceResultRepository results, PredictionPointsRepository points, PredictionRepository predictions,
                              PredictionConditionsRepository conditions, RaceRepository races, RaceLineupRepository lineups,
                              LeagueParticipantRepository participants, TransactionLock lock, ApplicationEventPublisher events,
-                             LeagueAccessGuard access, LeagueRepository leagues) {
+                             LeagueAccessGuard access, LeagueRepository leagues, SeasonPodiumService podiums) {
         this.results = results;
         this.points = points;
         this.predictions = predictions;
@@ -62,6 +64,7 @@ public class RaceResultService {
         this.events = events;
         this.access = access;
         this.leagues = leagues;
+        this.podiums = podiums;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -139,6 +142,7 @@ public class RaceResultService {
         if (!finished.equals(race)) {
             races.update(finished);
         }
+        podiums.saveIfSeasonFinished(finished);
         if (!Objects.equals(previous.result(), values) || pointsChanged || race.status() != RaceStatus.FINISHED) {
             publishResults(race, updated, savedPredictions, calculated);
         }
