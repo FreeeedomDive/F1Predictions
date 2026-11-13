@@ -13,6 +13,7 @@ public record RaceDetailsDto(
         boolean lineupPrepared,
         PredictionConditionsDto conditions,
         boolean predictionsOpen,
-        Instant serverTime
+        Instant serverTime,
+        List<String> startingGrid
 ) {
 }

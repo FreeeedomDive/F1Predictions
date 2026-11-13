@@ -44,5 +44,5 @@ export interface RaceDetailsDto {
   conditions: { positionPredictionDriver: string | null } | null
   predictionsOpen: boolean
   serverTime: string
-  startingGrid?: string[] | null
+  startingGrid: string[]
 }

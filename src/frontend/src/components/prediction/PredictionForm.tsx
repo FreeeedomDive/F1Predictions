@@ -134,7 +134,7 @@ export default function PredictionForm({
   const current = accepting ? (draft ?? toDraft(prediction)) : toDraft(prediction)
   const roster = page.teams.flatMap((team) => team.drivers)
   const drivers = [
-    ...new Set([...(page.startingGrid ?? []).filter((name) => roster.includes(name)), ...roster]),
+    ...new Set([...page.startingGrid.filter((name) => roster.includes(name)), ...roster]),
   ]
   const positionDriver = page.conditions?.positionPredictionDriver
   const positionTeam = page.teams.find((team) => team.drivers.includes(positionDriver ?? ''))

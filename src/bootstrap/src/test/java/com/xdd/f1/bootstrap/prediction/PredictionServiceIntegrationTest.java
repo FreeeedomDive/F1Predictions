@@ -109,6 +109,7 @@ class PredictionServiceIntegrationTest extends AbstractIntegrationTest {
         var details = predictions.getDetails(member.userId(), selectedLeague.id(), race.id());
         assertThat(details.predictionsOpen()).isTrue();
         assertThat(details.teams()).hasSize(3);
+        assertThat(details.startingGrid()).isEmpty();
         assertThat(predictions.findOwn(member.userId(), selectedLeague.id(), race.id())).isEmpty();
         var saved = predictions.save(member.userId(), selectedLeague.id(), race.id(), values("Lando Norris"));
         var unchanged = predictions.save(member.userId(), selectedLeague.id(), race.id(), values("Lando Norris"));
@@ -179,11 +180,51 @@ class PredictionServiceIntegrationTest extends AbstractIntegrationTest {
                 .isEqualTo(sprint.id());
         assertThat(predictions.findCurrentDetails(participant.userId(), league.id(), Optional.of(2022))).isEmpty();
 
+        races.closeRacePredictions(sprint.id());
+        var earlyClosed = predictions.findCurrentDetails(participant.userId(), sprintLeague.id(), Optional.of(2027)).orElseThrow();
+        assertThat(earlyClosed.race().id()).isEqualTo(sprint.id());
+        assertThat(earlyClosed.predictionsOpen()).isFalse();
+
         when(clock.instant()).thenReturn(main.closeAt());
         assertThat(predictions.findCurrentDetails(participant.userId(), league.id(), Optional.of(2027)).orElseThrow().race().id())
                 .isEqualTo(upcoming.id());
         when(clock.instant()).thenReturn(upcoming.closeAt());
         assertThat(predictions.findCurrentDetails(participant.userId(), league.id(), Optional.of(2027))).isEmpty();
+    }
+
+    @Test
+    void readsTheSharedStartingGridAndKeepsAnEarlyClosedRaceCurrentUntilItsStart() {
+        var race = createRace(1, RaceType.RACE, 3600);
+        var upcoming = createRace(2, RaceType.RACE, 7200);
+        lineups.updateTeam(race.id(), "Haas", team("Haas", "Camara", "Oliver Bearman"));
+        races.openRacePredictions(race.id());
+        transactions.executeWithoutResult(status -> conditions.update(new PredictionConditions(race.id(), new Driver("Camara"))));
+        var grid = List.of(new Driver("Camara"), new Driver("Oscar Piastri"), new Driver("Lando Norris"));
+        assertThat(results.applyStartingGrid(race, grid)).isTrue();
+
+        var details = predictions.getDetails(participant.userId(), league.id(), race.id());
+        assertThat(details.startingGrid()).containsExactly("Camara", "Oscar Piastri", "Lando Norris");
+        assertThat(details.teams().stream().filter(team -> team.branding().name().equals("Haas")).findFirst().orElseThrow().drivers())
+                .contains(new Driver("Camara"));
+        assertThat(details.conditions().positionPredictionDriver()).isEqualTo(new Driver("Camara"));
+        assertThat(predictions.findOwn(participant.userId(), league.id(), race.id())).isEmpty();
+        var secondLeague = createLeague(false, false);
+        participants.ensureParticipant(secondLeague.id(), identity, "Alice elsewhere");
+        assertThat(predictions.getDetails(participant.userId(), secondLeague.id(), race.id()).startingGrid())
+                .containsExactlyElementsOf(details.startingGrid());
+
+        races.closeRacePredictions(race.id());
+        var current = predictions.findCurrentDetails(participant.userId(), league.id(), Optional.of(2027)).orElseThrow();
+        assertThat(current.race().id()).isEqualTo(race.id());
+        assertThat(current.startingGrid()).containsExactlyElementsOf(details.startingGrid());
+        assertThat(current.predictionsOpen()).isFalse();
+
+        when(clock.instant()).thenReturn(race.closeAt());
+        var next = predictions.findCurrentDetails(participant.userId(), league.id(), Optional.of(2027)).orElseThrow();
+        assertThat(next.race().id()).isEqualTo(upcoming.id());
+        assertThat(next.startingGrid()).isEmpty();
+        assertThat(predictions.getDetails(participant.userId(), league.id(), race.id()).startingGrid())
+                .containsExactlyElementsOf(details.startingGrid());
     }
 
     @Test

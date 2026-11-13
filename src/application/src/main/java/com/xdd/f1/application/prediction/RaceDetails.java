@@ -13,9 +13,11 @@ public record RaceDetails(
         boolean lineupPrepared,
         PredictionConditions conditions,
         boolean predictionsOpen,
-        Instant serverTime
+        Instant serverTime,
+        List<String> startingGrid
 ) {
     public RaceDetails {
         teams = List.copyOf(teams);
+        startingGrid = List.copyOf(startingGrid);
     }
 }

@@ -28,7 +28,7 @@ export default function StartingGrid({
   positionDriver,
   predictedPosition,
 }: {
-  grid?: string[] | null
+  grid: string[]
   teams: RaceLineupTeamDto[]
   tenthPlaceDriver: string
   dnfDrivers: string[]
@@ -37,11 +37,10 @@ export default function StartingGrid({
 }) {
   const theme = useTheme()
   const collapsible = useMediaQuery(theme.breakpoints.down('lg'))
-  const drivers = grid ?? []
   const driverCount = teams.reduce((count, team) => count + team.drivers.length, 0)
   const marker = { height: 19, fontSize: '0.6rem', '& .MuiChip-label': { px: 0.6 } }
   const content =
-    drivers.length > 0 ? (
+    grid.length > 0 ? (
       <TableContainer>
         <Table
           size="small"
@@ -52,7 +51,7 @@ export default function StartingGrid({
           }}
         >
           <TableBody>
-            {drivers.map((name, index) => (
+            {grid.map((name, index) => (
               <TableRow
                 key={`${index}:${name}`}
                 sx={{
