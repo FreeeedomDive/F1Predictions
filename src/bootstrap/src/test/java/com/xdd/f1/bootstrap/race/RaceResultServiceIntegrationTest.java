@@ -333,7 +333,7 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void manuallySyncsAFinishedRaceGridWhilePreservingPublishedResultDraftAndPoints(ApplicationEvents events) {
+    void manualStartingGridChangesPreservePublishedResultDraftAndPoints(ApplicationEvents events) {
         var race = openRace(2027, 1, RaceType.RACE);
         savePredictions(race);
         publish(race);
@@ -347,11 +347,49 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
 
         assertThat(saved).isEqualTo(previous.withStartingGrid(grid));
         assertThat(service.applyStartingGridManually(race, grid)).isEqualTo(saved);
+        var reordered = service.saveStartingGridForAdmin(race.id(), grid.reversed());
+        assertThat(reordered).isEqualTo(previous.withStartingGrid(grid.reversed()));
+        assertThat(service.saveStartingGridForAdmin(race.id(), grid.reversed())).isEqualTo(reordered);
         transactions.executeWithoutResult(status -> {
-            assertThat(results.findByRaceId(race.id())).contains(saved);
+            assertThat(results.findByRaceId(race.id())).contains(reordered);
             assertThat(points.findAllByRaceId(race.id())).containsExactlyInAnyOrderElementsOf(previousPoints);
             assertThat(races.getById(race.id()).status()).isEqualTo(RaceStatus.FINISHED);
         });
+        assertThat(events.stream(RaceStartingGridUpdatedEvent.class).count()).isEqualTo(2);
+    }
+
+    @Test
+    void automaticUpdatesCanReplaceAnEditorSavedGridAndIdenticalSavesDoNotRepublish(ApplicationEvents events) {
+        var race = openRace(2027, 1, RaceType.RACE);
+        var grid = List.of(new Driver("Piastri"), new Driver("Norris"));
+
+        var saved = service.saveStartingGridForAdmin(race.id(), grid);
+
+        assertThat(service.saveStartingGridForAdmin(race.id(), grid)).isEqualTo(saved);
+        assertThat(service.applyStartingGrid(race, grid.reversed())).isTrue();
+        assertThat(service.applyStartingGrid(race, grid.reversed())).isFalse();
+        transactions.executeWithoutResult(status ->
+                assertThat(results.findByRaceId(race.id())).contains(saved.withStartingGrid(grid.reversed())));
+        assertThat(events.stream(RaceStartingGridUpdatedEvent.class).toList()).containsExactly(
+                new RaceStartingGridUpdatedEvent(race.id().value(), race.name(), "RACE", 2027, List.of("Piastri", "Norris"), true),
+                new RaceStartingGridUpdatedEvent(race.id().value(), race.name(), "RACE", 2027, List.of("Norris", "Piastri"), false)
+        );
+    }
+
+    @Test
+    void rejectsEmptyDuplicateAndForeignDriverGridsWithoutChangingTheSavedGrid(ApplicationEvents events) {
+        var race = openRace(2027, 1, RaceType.RACE);
+        var grid = List.of(new Driver("Piastri"), new Driver("Norris"));
+        var saved = service.saveStartingGridForAdmin(race.id(), grid);
+
+        assertThatThrownBy(() -> service.saveStartingGridForAdmin(race.id(), List.of()))
+                .isInstanceOf(DomainValidationException.class).hasMessageContaining("must not be empty");
+        assertThatThrownBy(() -> service.saveStartingGridForAdmin(race.id(), List.of(new Driver("Norris"), new Driver("Norris"))))
+                .isInstanceOf(DomainValidationException.class).hasMessageContaining("duplicate drivers");
+        assertThatThrownBy(() -> service.saveStartingGridForAdmin(race.id(), List.of(new Driver("Unknown"))))
+                .isInstanceOf(DomainValidationException.class).hasMessageContaining("missing from this race's lineup");
+
+        transactions.executeWithoutResult(status -> assertThat(results.findByRaceId(race.id())).contains(saved));
         assertThat(events.stream(RaceStartingGridUpdatedEvent.class).count()).isEqualTo(1);
     }
 

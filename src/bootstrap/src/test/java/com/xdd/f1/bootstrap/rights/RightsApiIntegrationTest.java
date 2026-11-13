@@ -74,21 +74,32 @@ class RightsApiIntegrationTest extends AbstractIntegrationTest {
         var actor = createUser();
         var cookie = cookie(actor);
         var url = "/adminApi/v1/races?season=2027";
-        var syncGridUrl = "/adminApi/v1/races/" + UUID.randomUUID() + "/result/starting-grid/sync";
+        var gridUrl = "/adminApi/v1/races/" + UUID.randomUUID() + "/result/starting-grid";
+        var syncGridUrl = gridUrl + "/sync";
+        var gridBody = "{\"startingGrid\":[\"Norris\"]}";
         mvc.perform(get(url)).andExpect(status().isUnauthorized());
         mvc.perform(get(url).cookie(cookie)).andExpect(status().isForbidden());
         mvc.perform(post(syncGridUrl)).andExpect(status().isUnauthorized());
         mvc.perform(post(syncGridUrl).cookie(cookie)).andExpect(status().isForbidden());
+        mvc.perform(put(gridUrl).contentType("application/json").content(gridBody)).andExpect(status().isUnauthorized());
+        mvc.perform(put(gridUrl).cookie(cookie).contentType("application/json").content(gridBody))
+                .andExpect(status().isForbidden());
 
         rights.grant(actor, Right.EDIT_RIGHTS);
         mvc.perform(get(url).cookie(cookie)).andExpect(status().isForbidden());
         mvc.perform(post(syncGridUrl).cookie(cookie)).andExpect(status().isForbidden());
+        mvc.perform(put(gridUrl).cookie(cookie).contentType("application/json").content(gridBody))
+                .andExpect(status().isForbidden());
         rights.grant(actor, Right.EDIT_RACE_RESULTS);
         mvc.perform(get(url).cookie(cookie)).andExpect(status().isOk());
         mvc.perform(post(syncGridUrl).cookie(cookie)).andExpect(status().isNotFound());
+        mvc.perform(put(gridUrl).cookie(cookie).contentType("application/json").content(gridBody))
+                .andExpect(status().isNotFound());
         rights.revoke(actor, Right.EDIT_RACE_RESULTS);
         mvc.perform(get(url).cookie(cookie)).andExpect(status().isForbidden());
         mvc.perform(post(syncGridUrl).cookie(cookie)).andExpect(status().isForbidden());
+        mvc.perform(put(gridUrl).cookie(cookie).contentType("application/json").content(gridBody))
+                .andExpect(status().isForbidden());
         mvc.perform(get("/api/v1/me").cookie(cookie)).andExpect(status().isOk());
     }
 

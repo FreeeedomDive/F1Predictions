@@ -29,12 +29,14 @@ import type { RaceResultEditorDto } from '../../dto/raceResult'
 import {
   useFinalizeRaceResult,
   useSaveRaceResultDraft,
+  useSaveStartingGrid,
   useSyncStartingGrid,
 } from '../../queries/raceResults'
 import { useChangeRacePredictionsStatus } from '../../queries/races'
 import AdminPredictionsPanel from '../prediction/AdminPredictionsPanel'
 import RightsWrapper from '../RightsWrapper'
 import ResultClassificationTable from './ResultClassificationTable'
+import StartingGridEditor from './StartingGridEditor'
 import { resultDraft, resultSignature, resultValues } from './resultDraft'
 import type { ResultDraft } from './resultDraft'
 
@@ -76,9 +78,11 @@ export default function AdminResultEditor({
   const finalize = useFinalizeRaceResult()
   const transition = useChangeRacePredictionsStatus()
   const syncGrid = useSyncStartingGrid()
-  const [operation, setOperation] = useState<'save' | 'finalize' | 'close' | 'sync-grid' | null>(
-    null,
-  )
+  const saveGrid = useSaveStartingGrid()
+  const [operation, setOperation] = useState<
+    'save' | 'finalize' | 'close' | 'sync-grid' | 'save-grid' | null
+  >(null)
+  const [gridDraft, setGridDraft] = useState<string[] | undefined>()
   const [dragging, setDragging] = useState(false)
   const [tab, setTab] = useState(0)
   const [savingPrediction, setSavingPrediction] = useState(false)
@@ -107,6 +111,8 @@ export default function AdminResultEditor({
       Number.isInteger(incidents) &&
       incidents <= 2147483647)
   const roster = page.teams.flatMap((team) => team.drivers)
+  const savedGrid = page.result?.startingGrid ?? []
+  const startingGrid = gridDraft ?? (savedGrid.length > 0 ? savedGrid : roster)
   const rosterMatches =
     current.classification.length === roster.length &&
     roster.length > 0 &&
@@ -240,6 +246,27 @@ export default function AdminResultEditor({
     }
   }
 
+  async function persistStartingGrid() {
+    if (pending || dragging || inFlight.current) return
+    inFlight.current = true
+    setOperation('save-grid')
+    onBusyChange(true)
+    try {
+      await saveGrid.mutateAsync({ ...variables, startingGrid })
+      setGridDraft(undefined)
+      setNotice({ severity: 'success', message: 'Starting grid saved.' })
+    } catch (error) {
+      setNotice({
+        severity: 'error',
+        message: raceResultErrorMessage(error, 'Could not save the starting grid.'),
+      })
+    } finally {
+      inFlight.current = false
+      setOperation(null)
+      onBusyChange(false)
+    }
+  }
+
   const autosave = useEffectEvent(() => {
     if (canSave && dirty) void persistDraft(true)
   })
@@ -249,7 +276,11 @@ export default function AdminResultEditor({
     return () => window.clearInterval(timer)
   }, [])
 
-  if ([save.error, finalize.error, transition.error, syncGrid.error].some(isUnauthorized))
+  if (
+    [save.error, finalize.error, transition.error, syncGrid.error, saveGrid.error].some(
+      isUnauthorized,
+    )
+  )
     return <Navigate to="/auth" replace />
 
   function syncClassification() {
@@ -400,12 +431,27 @@ export default function AdminResultEditor({
             display: 'grid',
             gridTemplateColumns: {
               xs: 'minmax(0, 1fr)',
-              lg: 'minmax(0, 2fr) minmax(280px, 1fr)',
+              md: 'repeat(2, minmax(0, 1fr))',
+              xl: 'minmax(0, 1fr) minmax(0, 1fr) 320px',
             },
             gap: 2,
             alignItems: 'start',
           }}
         >
+          <StartingGridEditor
+            grid={startingGrid}
+            savedGrid={savedGrid}
+            teams={page.teams}
+            positionDriver={page.conditions?.positionPredictionDriver}
+            hasDraft={gridDraft !== undefined}
+            disabled={pending || !page.lineupPrepared}
+            saving={operation === 'save-grid'}
+            dragging={dragging}
+            onChange={setGridDraft}
+            onSave={() => void persistStartingGrid()}
+            onDiscard={() => setGridDraft(undefined)}
+            onDraggingChange={setDragging}
+          />
           <Paper variant="outlined" sx={{ minWidth: 0, borderRadius: 2 }}>
             <Stack
               direction="row"

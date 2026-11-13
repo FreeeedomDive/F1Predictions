@@ -123,15 +123,18 @@ public class RaceResultService {
         if (grid.isEmpty()) {
             throw new DomainValidationException("OpenF1 has no published starting grid available for this race.");
         }
-        var race = getLockedRace(sourceRace.id());
-        if (!startingGridMatchesLineup(race.id(), grid)) {
-            throw new DomainValidationException("The OpenF1 starting grid contains drivers missing from this race's lineup.");
+        return saveStartingGridForRace(sourceRace.id(), grid);
+    }
+
+    @Transactional
+    public RaceResult saveStartingGridForAdmin(RaceId raceId, List<Driver> grid) {
+        if (grid.isEmpty()) {
+            throw new DomainValidationException("Starting grid must not be empty");
         }
-        var previous = results.findByRaceId(race.id());
-        var updated = previous.map(saved -> saved.withStartingGrid(grid))
-                .orElseGet(() -> new RaceResult(race.id(), rulesFor(race, previous), null, null, grid));
-        saveStartingGrid(race, previous, updated);
-        return updated;
+        if (grid.stream().distinct().count() != grid.size()) {
+            throw new DomainValidationException("Starting grid must not include duplicate drivers");
+        }
+        return saveStartingGridForRace(raceId, grid);
     }
 
     @Transactional
@@ -219,6 +222,18 @@ public class RaceResultService {
                 updated.startingGrid().stream().map(Driver::name).toList(), oldGrid == null || oldGrid.isEmpty()
         ));
         return true;
+    }
+
+    private RaceResult saveStartingGridForRace(RaceId raceId, List<Driver> grid) {
+        var race = getLockedRace(raceId);
+        if (!startingGridMatchesLineup(raceId, grid)) {
+            throw new DomainValidationException("Starting grid contains drivers missing from this race's lineup.");
+        }
+        var previous = results.findByRaceId(raceId);
+        var updated = previous.map(saved -> saved.withStartingGrid(grid))
+                .orElseGet(() -> new RaceResult(raceId, rulesFor(race, previous), null, null, grid));
+        saveStartingGrid(race, previous, updated);
+        return updated;
     }
 
     private RaceLineup getLineup(RaceId raceId) {

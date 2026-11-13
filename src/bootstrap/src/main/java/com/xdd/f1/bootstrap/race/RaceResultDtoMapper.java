@@ -46,6 +46,18 @@ final class RaceResultDtoMapper {
         return new RaceResultValues(classification, request.safetyCars(), request.firstPlaceLead());
     }
 
+    static List<Driver> toDomain(SaveStartingGridRequestDto request) {
+        if (request == null || request.startingGrid() == null) {
+            throw new DomainValidationException("Starting grid is required");
+        }
+        return request.startingGrid().stream().map(name -> {
+            if (name == null) {
+                throw new DomainValidationException("Driver name is required for each starting grid entry");
+            }
+            return new Driver(name);
+        }).toList();
+    }
+
     private static RaceResultValuesDto toDto(RaceResultValues values) {
         if (values == null) {
             return null;

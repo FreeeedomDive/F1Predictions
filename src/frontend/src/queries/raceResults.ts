@@ -5,6 +5,7 @@ import {
   getOwnRaceResult,
   getRaceResultEditor,
   saveRaceResultDraft,
+  saveStartingGrid,
   syncStartingGrid,
 } from '../api/raceResults'
 import type { RaceDetailsDto } from '../dto/prediction'
@@ -20,6 +21,10 @@ interface ResultVariables {
 
 interface SaveDraftVariables extends ResultVariables {
   values: RaceResultValuesDto
+}
+
+interface SaveStartingGridVariables extends ResultVariables {
+  startingGrid: string[]
 }
 
 export const adminRaceResultKey = (userId: string, raceId: string | undefined) =>
@@ -85,6 +90,23 @@ export function useSyncStartingGrid() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: ({ raceId }: ResultVariables) => syncStartingGrid(raceId),
+    retry: false,
+    onSuccess: async (result, variables) => {
+      const key = adminRaceResultKey(variables.userId, variables.raceId)
+      await client.cancelQueries({ queryKey: key })
+      client.setQueryData<RaceResultEditorDto>(key, (page) =>
+        page?.race.id === variables.raceId ? { ...page, result } : page,
+      )
+    },
+    onSettled: (_result, _error, variables) => invalidateRacePredictions(client, variables.raceId),
+  })
+}
+
+export function useSaveStartingGrid() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ raceId, startingGrid }: SaveStartingGridVariables) =>
+      saveStartingGrid(raceId, startingGrid),
     retry: false,
     onSuccess: async (result, variables) => {
       const key = adminRaceResultKey(variables.userId, variables.raceId)

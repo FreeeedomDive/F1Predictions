@@ -9,6 +9,7 @@ import com.xdd.f1.domain.rights.Right;
 import com.xdd.f1.contract.race.result.RaceResultDto;
 import com.xdd.f1.contract.race.result.RaceResultEditorDto;
 import com.xdd.f1.contract.race.result.RaceResultValuesDto;
+import com.xdd.f1.contract.race.result.SaveStartingGridRequestDto;
 import com.xdd.f1.domain.race.RaceId;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -50,6 +51,13 @@ public class AdminRaceResultController {
     @PostMapping("/starting-grid/sync")
     public ResponseEntity<RaceResultDto> syncStartingGrid(@CurrentUser AuthenticatedUser user, @PathVariable UUID raceId) {
         var saved = startingGridSync.syncStartingGrid(new RaceId(raceId));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(RaceResultDtoMapper.toDto(saved));
+    }
+
+    @PutMapping("/starting-grid")
+    public ResponseEntity<RaceResultDto> saveStartingGrid(@CurrentUser AuthenticatedUser user, @PathVariable UUID raceId,
+                                                         @RequestBody SaveStartingGridRequestDto request) {
+        var saved = service.saveStartingGridForAdmin(new RaceId(raceId), RaceResultDtoMapper.toDomain(request));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(RaceResultDtoMapper.toDto(saved));
     }
 }
