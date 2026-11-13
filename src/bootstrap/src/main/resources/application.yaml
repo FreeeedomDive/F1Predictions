@@ -42,6 +42,11 @@ jolpica:
   connect-timeout: PT3S
   read-timeout: PT10S
 
+openf1:
+  base-url: https://api.openf1.org/v1
+  connect-timeout: PT3S
+  read-timeout: PT10S
+
 management:
   endpoints:
     web:
