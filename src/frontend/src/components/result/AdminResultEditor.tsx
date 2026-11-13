@@ -28,6 +28,7 @@ import type { RaceResultEditorDto } from '../../dto/raceResult'
 import { useFinalizeRaceResult, useSaveRaceResultDraft } from '../../queries/raceResults'
 import { useChangeRacePredictionsStatus } from '../../queries/races'
 import AdminPredictionsPanel from '../prediction/AdminPredictionsPanel'
+import RightsWrapper from '../RightsWrapper'
 import ResultClassificationTable from './ResultClassificationTable'
 import { resultDraft, resultSignature, resultValues } from './resultDraft'
 import type { ResultDraft } from './resultDraft'
@@ -46,6 +47,7 @@ export default function AdminResultEditor({
   userId,
   draft,
   busy,
+  canEditPredictions,
   predictions,
   predictionsLoading,
   predictionsError,
@@ -57,6 +59,7 @@ export default function AdminResultEditor({
   userId: string
   draft: ResultDraft | undefined
   busy: boolean
+  canEditPredictions: boolean
   predictions: AdminPredictionDto[] | undefined
   predictionsLoading: boolean
   predictionsError: Error | null
@@ -304,7 +307,11 @@ export default function AdminResultEditor({
       </Paper>
       {!page.lineupPrepared && (
         <Alert severity="info">
-          Prepare the race lineup in <Link to="/admin/teams">Teams</Link> before entering a result.
+          Prepare the race lineup in{' '}
+          <RightsWrapper requiredRights={['EDIT_RACE_LINEUPS']} fallback="Teams">
+            <Link to="/admin/teams">Teams</Link>
+          </RightsWrapper>{' '}
+          before entering a result.
         </Alert>
       )}
       {page.race.status === 'SCHEDULED' && (
@@ -334,16 +341,18 @@ export default function AdminResultEditor({
           The classification does not match this race's lineup. Update it before saving.
         </Alert>
       )}
-      <Tabs
-        value={tab}
-        onChange={(_, value) => setTab(value)}
-        variant="scrollable"
-        scrollButtons="auto"
-        sx={{ minHeight: 40, borderBottom: 1, borderColor: 'divider' }}
-      >
-        <Tab label="Race result" sx={{ minHeight: 40 }} />
-        <Tab label={`Predictions · ${predictions?.length ?? '…'}`} sx={{ minHeight: 40 }} />
-      </Tabs>
+      {canEditPredictions && (
+        <Tabs
+          value={tab}
+          onChange={(_, value) => setTab(value)}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{ minHeight: 40, borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab label="Race result" sx={{ minHeight: 40 }} />
+          <Tab label={`Predictions · ${predictions?.length ?? '…'}`} sx={{ minHeight: 40 }} />
+        </Tabs>
+      )}
       <Box hidden={tab !== 0}>
         <Box
           sx={{
@@ -510,24 +519,26 @@ export default function AdminResultEditor({
           </Paper>
         </Box>
       </Box>
-      <Box hidden={tab !== 1}>
-        <AdminPredictionsPanel
-          data={predictions}
-          loading={predictionsLoading}
-          error={predictionsError}
-          userId={userId}
-          season={page.season}
-          teams={page.teams}
-          positionDriver={page.conditions?.positionPredictionDriver ?? null}
-          disabled={pending}
-          onRefresh={onPredictionsRefresh}
-          onSavingChange={setSavingPrediction}
-          onDirtyChange={predictionDirtyChanged}
-          onSaved={() => {
-            if (page.race.status === 'FINISHED') setNeedsRecalculation(true)
-          }}
-        />
-      </Box>
+      {canEditPredictions && (
+        <Box hidden={tab !== 1}>
+          <AdminPredictionsPanel
+            data={predictions}
+            loading={predictionsLoading}
+            error={predictionsError}
+            userId={userId}
+            season={page.season}
+            teams={page.teams}
+            positionDriver={page.conditions?.positionPredictionDriver ?? null}
+            disabled={pending}
+            onRefresh={onPredictionsRefresh}
+            onSavingChange={setSavingPrediction}
+            onDirtyChange={predictionDirtyChanged}
+            onSaved={() => {
+              if (page.race.status === 'FINISHED') setNeedsRecalculation(true)
+            }}
+          />
+        </Box>
+      )}
       <Snackbar open={notice !== null} autoHideDuration={6000} onClose={() => setNotice(null)}>
         <Alert severity={notice?.severity} variant="filled" onClose={() => setNotice(null)}>
           {notice?.message}

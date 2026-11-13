@@ -1,7 +1,9 @@
 package com.xdd.f1.contract.user;
 
+import com.xdd.f1.contract.rights.RightDto;
+
 import java.util.UUID;
 import java.util.List;
 
-public record MeResponseDto(UUID userId, List<UserLeagueDto> leagues) {
+public record MeResponseDto(UUID userId, List<UserLeagueDto> leagues, List<RightDto> rights) {
 }

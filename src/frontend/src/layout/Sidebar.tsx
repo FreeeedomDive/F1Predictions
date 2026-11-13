@@ -6,6 +6,7 @@ import LeaderboardRounded from '@mui/icons-material/LeaderboardRounded'
 import InsightsRounded from '@mui/icons-material/InsightsRounded'
 import EditNoteRounded from '@mui/icons-material/EditNoteRounded'
 import SportsScoreRounded from '@mui/icons-material/SportsScoreRounded'
+import AdminPanelSettingsRounded from '@mui/icons-material/AdminPanelSettingsRounded'
 import {
   Avatar,
   Box,
@@ -21,6 +22,8 @@ import {
 } from '@mui/material'
 import { NavLink } from 'react-router'
 import Brand from '../components/Brand'
+import RightsWrapper from '../components/RightsWrapper'
+import { allRights } from '../dto/rights'
 import { useLeague } from '../context/league'
 import LeagueSelector from './LeagueSelector'
 import SeasonSelector from './SeasonSelector'
@@ -121,61 +124,90 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
           />
         </ListItemButton>
-        <Divider sx={{ my: 2 }} />
-        <Typography variant="overline" color="text.secondary" sx={{ px: 2 }}>
-          Administration
-        </Typography>
-        <ListItemButton
-          component={NavLink}
-          to="/admin/races"
-          onClick={onClose}
-          sx={{
-            borderRadius: 1,
-            '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
-          }}
-        >
-          <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
-            <EditCalendarRounded fontSize="small" />
-          </ListItemIcon>
-          <ListItemText
-            primary="Calendar"
-            slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
-          />
-        </ListItemButton>
-        <ListItemButton
-          component={NavLink}
-          to="/admin/results"
-          onClick={onClose}
-          sx={{
-            borderRadius: 1,
-            '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
-          }}
-        >
-          <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
-            <SportsScoreRounded fontSize="small" />
-          </ListItemIcon>
-          <ListItemText
-            primary="Results"
-            slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
-          />
-        </ListItemButton>
-        <ListItemButton
-          component={NavLink}
-          to="/admin/teams"
-          onClick={onClose}
-          sx={{
-            borderRadius: 1,
-            '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
-          }}
-        >
-          <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
-            <GroupsRounded fontSize="small" />
-          </ListItemIcon>
-          <ListItemText
-            primary="Teams"
-            slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
-          />
-        </ListItemButton>
+        <RightsWrapper requiredRights={allRights}>
+          <>
+            <Divider sx={{ my: 2 }} />
+            <Typography variant="overline" color="text.secondary" sx={{ px: 2 }}>
+              Administration
+            </Typography>
+            <RightsWrapper requiredRights={['EDIT_RACE_RESULTS']}>
+              <>
+                <ListItemButton
+                  component={NavLink}
+                  to="/admin/races"
+                  onClick={onClose}
+                  sx={{
+                    borderRadius: 1,
+                    '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+                    <EditCalendarRounded fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Calendar"
+                    slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
+                  />
+                </ListItemButton>
+                <ListItemButton
+                  component={NavLink}
+                  to="/admin/results"
+                  onClick={onClose}
+                  sx={{
+                    borderRadius: 1,
+                    '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
+                  }}
+                >
+                  <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+                    <SportsScoreRounded fontSize="small" />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary="Results"
+                    slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
+                  />
+                </ListItemButton>
+              </>
+            </RightsWrapper>
+            <RightsWrapper requiredRights={['EDIT_RACE_LINEUPS']}>
+              <ListItemButton
+                component={NavLink}
+                to="/admin/teams"
+                onClick={onClose}
+                sx={{
+                  borderRadius: 1,
+                  '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+                  <GroupsRounded fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Teams"
+                  slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
+                />
+              </ListItemButton>
+            </RightsWrapper>
+            <RightsWrapper requiredRights={['EDIT_RIGHTS']}>
+              <ListItemButton
+                component={NavLink}
+                to="/admin/rights"
+                onClick={onClose}
+                sx={{
+                  borderRadius: 1,
+                  '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+                  <AdminPanelSettingsRounded fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Rights"
+                  slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
+                />
+              </ListItemButton>
+            </RightsWrapper>
+          </>
+        </RightsWrapper>
       </List>
       <Stack
         direction="row"

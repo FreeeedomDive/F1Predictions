@@ -12,14 +12,20 @@ import java.util.List;
 public class WebAuthenticationConfiguration implements WebMvcConfigurer {
 
     private final SessionAuthenticationInterceptor authentication;
+    private final RightsAuthorizationInterceptor authorization;
 
-    public WebAuthenticationConfiguration(SessionAuthenticationInterceptor authentication) {
+    public WebAuthenticationConfiguration(
+            SessionAuthenticationInterceptor authentication,
+            RightsAuthorizationInterceptor authorization
+    ) {
         this.authentication = authentication;
+        this.authorization = authorization;
     }
 
     @Override
     public void addInterceptors(@NonNull InterceptorRegistry registry) {
-        registry.addInterceptor(authentication).addPathPatterns("/api/v1/**", "/adminApi/v1/**");
+        registry.addInterceptor(authentication).addPathPatterns("/api/v1/**", "/adminApi/**").order(0);
+        registry.addInterceptor(authorization).addPathPatterns("/adminApi/**").order(1);
     }
 
     @Override

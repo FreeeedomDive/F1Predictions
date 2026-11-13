@@ -3,6 +3,8 @@ package com.xdd.f1.bootstrap.race;
 import com.xdd.f1.application.race.lineup.RaceLineupService;
 import com.xdd.f1.bootstrap.auth.AuthenticatedUser;
 import com.xdd.f1.bootstrap.auth.CurrentUser;
+import com.xdd.f1.bootstrap.auth.RequireRights;
+import com.xdd.f1.domain.rights.Right;
 import com.xdd.f1.contract.race.lineup.RaceLineupDto;
 import com.xdd.f1.contract.race.lineup.RaceLineupTeamDto;
 import com.xdd.f1.contract.race.lineup.SwapRaceDriversRequestDto;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 @RestController
+@RequireRights(Right.EDIT_RACE_LINEUPS)
 @RequestMapping("/adminApi/v1")
 public class AdminRaceLineupController {
 

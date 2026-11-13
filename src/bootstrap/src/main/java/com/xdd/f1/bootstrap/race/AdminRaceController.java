@@ -3,6 +3,8 @@ package com.xdd.f1.bootstrap.race;
 import com.xdd.f1.application.race.RaceService;
 import com.xdd.f1.bootstrap.auth.AuthenticatedUser;
 import com.xdd.f1.bootstrap.auth.CurrentUser;
+import com.xdd.f1.bootstrap.auth.RequireRights;
+import com.xdd.f1.domain.rights.Right;
 import com.xdd.f1.contract.common.ListResponseDto;
 import com.xdd.f1.contract.race.RaceDto;
 import com.xdd.f1.domain.race.RaceId;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 @RestController
+@RequireRights(Right.EDIT_RACE_RESULTS)
 @RequestMapping("/adminApi/v1/races")
 public class AdminRaceController {
 

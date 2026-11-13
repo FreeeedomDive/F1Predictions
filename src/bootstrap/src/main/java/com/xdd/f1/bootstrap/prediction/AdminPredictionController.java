@@ -1,6 +1,8 @@
 package com.xdd.f1.bootstrap.prediction;
 
 import com.xdd.f1.application.prediction.PredictionService;
+import com.xdd.f1.bootstrap.auth.RequireRights;
+import com.xdd.f1.domain.rights.Right;
 import com.xdd.f1.contract.common.ListResponseDto;
 import com.xdd.f1.contract.prediction.AdminPredictionDto;
 import com.xdd.f1.contract.prediction.PredictionDto;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
+@RequireRights(Right.EDIT_PREDICTIONS)
 @RequestMapping("/adminApi/v1/races/{raceId}/predictions")
 public class AdminPredictionController {
     private final PredictionService service;

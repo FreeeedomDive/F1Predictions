@@ -9,6 +9,8 @@ import com.xdd.f1.application.race.RaceNotFoundException;
 import com.xdd.f1.application.race.RaceService;
 import com.xdd.f1.application.race.lineup.RaceLineupService;
 import com.xdd.f1.application.session.SessionService;
+import com.xdd.f1.application.rights.RightsService;
+import com.xdd.f1.domain.rights.Right;
 import com.xdd.f1.application.user.UserRepository;
 import com.xdd.f1.bootstrap.auth.SessionCookie;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
@@ -75,6 +77,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
     private final MockMvc mvc;
     private final SessionService sessions;
     private final UserRepository users;
+    private final RightsService rights;
     private final RaceLineupService lineupService;
 
     private LeagueId createdLeagueId;
@@ -98,6 +101,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
             MockMvc mvc,
             SessionService sessions,
             UserRepository users,
+            RightsService rights,
             RaceLineupService lineupService
     ) {
         this.service = service;
@@ -110,6 +114,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         this.mvc = mvc;
         this.sessions = sessions;
         this.users = users;
+        this.rights = rights;
         this.lineupService = lineupService;
     }
 
@@ -440,6 +445,7 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
         createdUserId = new UserId(UUID.randomUUID());
         var identity = new UserIdentityId(UserIdentitySource.MANUAL, UUID.randomUUID().toString());
         users.create(new User(createdUserId, NOW), identity);
+        rights.grant(createdUserId, Right.EDIT_RACE_RESULTS);
         return new Cookie(SessionCookie.NAME, sessions.create(createdUserId));
     }
 

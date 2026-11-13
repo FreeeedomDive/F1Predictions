@@ -19,14 +19,19 @@ import type { ResultDraft } from '../components/result/resultDraft'
 import { useLeague } from '../context/league'
 import { useAdminRacePredictions } from '../queries/predictions'
 import { useAdminRaceResult } from '../queries/raceResults'
+import { useRights } from '../queries/rights'
 
 export default function AdminResultsPage() {
   const { profile } = useLeague()
   const { raceId } = useParams()
+  const canEditPredictions = useRights().includes('EDIT_PREDICTIONS')
   const [drafts, setDrafts] = useState<Record<string, ResultDraft | undefined>>({})
   const [busy, setBusy] = useState(false)
   const editor = useAdminRaceResult(profile.userId, raceId)
-  const predictions = useAdminRacePredictions(profile.userId, raceId)
+  const predictions = useAdminRacePredictions(
+    profile.userId,
+    canEditPredictions ? raceId : undefined,
+  )
   const page = editor.data
   const changeDraft = useCallback((id: string, draft: ResultDraft | undefined) => {
     setDrafts((current) => ({ ...current, [id]: draft }))
@@ -34,14 +39,14 @@ export default function AdminResultsPage() {
 
   if (
     (editor.isError && isUnauthorized(editor.error)) ||
-    (predictions.isError && isUnauthorized(predictions.error))
+    (canEditPredictions && predictions.isError && isUnauthorized(predictions.error))
   )
     return <Navigate to="/auth" replace />
 
   function refresh() {
     if (raceId) {
       void editor.refetch()
-      void predictions.refetch()
+      if (canEditPredictions) void predictions.refetch()
     }
   }
 
@@ -71,7 +76,8 @@ export default function AdminResultsPage() {
               Result administration
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Race results and predictions{page ? ` · ${page.season}` : ''}
+              Race results{canEditPredictions ? ' and predictions' : ''}
+              {page ? ` · ${page.season}` : ''}
             </Typography>
           </Stack>
           <Tooltip title="Refresh results">
@@ -88,8 +94,8 @@ export default function AdminResultsPage() {
         </Stack>
         {!raceId ? (
           <Alert severity="info">
-            Select a race in the admin calendar to enter its result, correct a finished race or edit
-            predictions.
+            Select a race in the admin calendar to enter its result or correct a finished race
+            {canEditPredictions ? ', or edit predictions' : ''}.
           </Alert>
         ) : editor.isPending ? (
           <Stack spacing={1} role="status" aria-label="Loading result editor">
@@ -115,17 +121,20 @@ export default function AdminResultsPage() {
               </Alert>
             )}
             <AdminResultEditor
-              key={`${profile.userId}:${page.race.id}`}
+              key={`${profile.userId}:${page.race.id}:${canEditPredictions}`}
               page={page}
               userId={profile.userId}
               draft={drafts[page.race.id]}
               busy={busy}
+              canEditPredictions={canEditPredictions}
               predictions={predictions.data}
               predictionsLoading={predictions.isPending}
               predictionsError={predictions.error}
               onDraftChange={changeDraft}
               onBusyChange={setBusy}
-              onPredictionsRefresh={() => void predictions.refetch()}
+              onPredictionsRefresh={() => {
+                if (canEditPredictions) void predictions.refetch()
+              }}
             />
           </>
         )}
