@@ -52,7 +52,8 @@ public class RaceResultRepositoryAdapter implements RaceResultRepository {
     private RaceResult toDomain(RaceResultEntity entity) {
         return new RaceResult(
                 new RaceId(entity.raceId), new RulesVersion(entity.rulesVersion),
-                toDomain(entity.result), toDomain(entity.draft)
+                toDomain(entity.result), toDomain(entity.draft),
+                entity.startingGrid == null ? null : entity.startingGrid.stream().map(Driver::new).toList()
         );
     }
 
@@ -80,5 +81,6 @@ public class RaceResultRepositoryAdapter implements RaceResultRepository {
         entity.rulesVersion = result.rulesVersion().value();
         entity.result = toData(result.result());
         entity.draft = toData(result.draft());
+        entity.startingGrid = result.startingGrid() == null ? null : result.startingGrid().stream().map(Driver::name).toList();
     }
 }

@@ -108,7 +108,8 @@ public class RaceResultService {
                 || previous.get().draft() == null && Objects.equals(previous.get().result(), values))) {
             return previous.get();
         }
-        var updated = new RaceResult(raceId, rules, previous.map(RaceResult::result).orElse(null), values);
+        var updated = new RaceResult(raceId, rules, previous.map(RaceResult::result).orElse(null), values,
+                previous.map(RaceResult::startingGrid).orElse(null));
         if (previous.isEmpty()) {
             results.create(updated);
         } else {
@@ -132,7 +133,7 @@ public class RaceResultService {
         var raceConditions = conditions.findByRaceId(raceId).orElse(null);
         var lineup = getLineup(raceId);
         validateFinalResult(raceId, values, lineup, raceConditions, savedPredictions);
-        var updated = new RaceResult(raceId, rules, values, null);
+        var updated = new RaceResult(raceId, rules, values, null, previous.startingGrid());
         var calculated = PredictionPointsCalculator.calculate(race, updated, raceConditions, lineup, savedPredictions);
         if (!updated.equals(previous)) {
             results.update(updated);

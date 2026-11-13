@@ -72,6 +72,37 @@ class RaceResultRepositoryIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void storesIndependentStartingGridsBeforeResultsAndKeepsDriverOrder() {
+        var race = createRace(2027, 1);
+        var sprint = races.create(2027, 1, RaceType.SPRINT, "Grand Prix", race.openAt().minusSeconds(86400), race.openAt());
+        var raceGrid = new RaceResult(race.id(), RULES_2027, null, null,
+                List.of(new Driver("Camara"), new Driver("Norris"), new Driver("Piastri")));
+        var sprintGrid = new RaceResult(sprint.id(), RULES_2027, null, null,
+                List.of(new Driver("Piastri"), new Driver("Camara")));
+        transactions.executeWithoutResult(status -> {
+            results.create(raceGrid);
+            results.create(sprintGrid);
+        });
+
+        transactions.executeWithoutResult(status -> {
+            assertThat(results.findByRaceId(race.id())).contains(raceGrid);
+            assertThat(results.findByRaceId(sprint.id())).contains(sprintGrid);
+            assertThat(results.findPublishedRaceIdsBySeason(2027)).isEmpty();
+            assertThat(results.findAllPublishedBySeason(2027)).isEmpty();
+        });
+        assertThat(jdbc.sql("SELECT starting_grid ->> 0 FROM race_results WHERE race_id = :id")
+                .param("id", race.id().value()).query(String.class).single()).isEqualTo("Camara");
+
+        var updated = new RaceResult(race.id(), RULES_2027, null, null,
+                List.of(new Driver("Norris"), new Driver("Camara"), new Driver("Piastri")));
+        transactions.executeWithoutResult(status -> results.update(updated));
+        transactions.executeWithoutResult(status -> {
+            assertThat(results.findByRaceId(race.id())).contains(updated);
+            assertThat(results.findByRaceId(sprint.id())).contains(sprintGrid);
+        });
+    }
+
+    @Test
     void storesOrderedDriverStatusesAndKeepsDraftChangesSeparateFromPublishedResultAndPoints() {
         var race = createRace(2027, 1);
         var prediction = createPrediction(race, identity());

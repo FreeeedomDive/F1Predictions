@@ -245,6 +245,30 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void preservesStartingGridThroughDraftFinalizationAndCorrection() {
+        var race = openRace(2027, 1, RaceType.RACE);
+        savePredictions(race);
+        var grid = List.of("Norris", "Leclerc", "Piastri", "Hamilton", "Bearman", "Ocon").stream()
+                .map(Driver::new).toList();
+        var gridOnly = new RaceResult(race.id(), RULES_2027, null, null, grid);
+        transactions.executeWithoutResult(status -> results.create(gridOnly));
+        assertThat(service.findOwnResult(firstParticipant.userId(), firstLeague.id(), race.id())).isEmpty();
+
+        races.closeRacePredictions(race.id());
+        assertThatThrownBy(() -> service.finalizeResult(race.id())).isInstanceOf(RaceResultIncompleteException.class);
+        assertThat(service.saveDraft(race.id(), resultValues()).startingGrid()).containsExactlyElementsOf(grid);
+        var published = service.finalizeResult(race.id());
+        assertThat(published.startingGrid()).containsExactlyElementsOf(grid);
+        assertThat(service.finalizeResult(race.id())).isEqualTo(published);
+
+        assertThat(service.saveDraft(race.id(), correctedValues()).startingGrid()).containsExactlyElementsOf(grid);
+        service.finalizeResult(race.id());
+        transactions.executeWithoutResult(status ->
+                assertThat(results.findByRaceId(race.id()))
+                        .contains(new RaceResult(race.id(), RULES_2027, correctedValues(), null, grid)));
+    }
+
+    @Test
     void savesPodiumsForEveryLeagueWhenLastRaceIsFinalized() {
         var firstRace = openRace(2027, 1, RaceType.RACE);
         var lastRace = openRace(2027, 2, RaceType.RACE);

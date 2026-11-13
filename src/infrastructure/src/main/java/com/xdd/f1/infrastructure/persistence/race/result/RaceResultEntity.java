@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -32,6 +33,10 @@ public class RaceResultEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "draft", columnDefinition = "jsonb")
     RaceResultValuesData draft;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "starting_grid", columnDefinition = "jsonb")
+    List<String> startingGrid;
 
     protected RaceResultEntity() {
     }
