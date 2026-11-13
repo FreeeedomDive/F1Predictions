@@ -1,6 +1,7 @@
 import { Button } from '@mui/material'
 import { createBrowserRouter, Navigate, RouterProvider } from 'react-router'
 import StatusScreen from './components/StatusScreen'
+import RightsWrapper from './components/RightsWrapper'
 import AppLayout from './layout/AppLayout'
 import AuthPage, { AuthLoadingScreen } from './routes/AuthPage'
 import { authLoader } from './routes/authLoader'
@@ -8,6 +9,13 @@ import CalendarPage from './routes/CalendarPage'
 import RequireAuth from './routes/RequireAuth'
 
 const withDevPrefix = (title: string) => (import.meta.env.DEV ? `[dev] ${title}` : title)
+
+const accessDeniedScreen = (
+  <StatusScreen
+    title="Access denied"
+    description="You do not have permission to access this page."
+  />
+)
 
 const errorScreen = (
   <StatusScreen
@@ -101,7 +109,12 @@ const router = createBrowserRouter([
                 element: (
                   <>
                     <title>{withDevPrefix('[Admin] Races')}</title>
-                    <AdminRacesPage />
+                    <RightsWrapper
+                      requiredRights={['EDIT_RACE_RESULTS']}
+                      fallback={accessDeniedScreen}
+                    >
+                      <AdminRacesPage />
+                    </RightsWrapper>
                   </>
                 ),
               }
@@ -115,7 +128,12 @@ const router = createBrowserRouter([
                 element: (
                   <>
                     <title>{withDevPrefix('[Admin] Results')}</title>
-                    <AdminResultsPage />
+                    <RightsWrapper
+                      requiredRights={['EDIT_RACE_RESULTS']}
+                      fallback={accessDeniedScreen}
+                    >
+                      <AdminResultsPage />
+                    </RightsWrapper>
                   </>
                 ),
               }
@@ -129,7 +147,28 @@ const router = createBrowserRouter([
                 element: (
                   <>
                     <title>{withDevPrefix('[Admin] Teams')}</title>
-                    <AdminTeamsPage />
+                    <RightsWrapper
+                      requiredRights={['EDIT_RACE_LINEUPS']}
+                      fallback={accessDeniedScreen}
+                    >
+                      <AdminTeamsPage />
+                    </RightsWrapper>
+                  </>
+                ),
+              }
+            },
+          },
+          {
+            path: 'admin/rights',
+            lazy: async () => {
+              const { default: AdminRightsPage } = await import('./routes/AdminRightsPage')
+              return {
+                element: (
+                  <>
+                    <title>{withDevPrefix('[Admin] Rights')}</title>
+                    <RightsWrapper requiredRights={['EDIT_RIGHTS']} fallback={accessDeniedScreen}>
+                      <AdminRightsPage />
+                    </RightsWrapper>
                   </>
                 ),
               }

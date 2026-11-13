@@ -1,3 +1,5 @@
+import type { RightDto } from './rights'
+
 export interface UserLeagueDto {
   leagueId: string
   participantId: string
@@ -10,4 +12,5 @@ export interface UserLeagueDto {
 export interface MeResponseDto {
   userId: string
   leagues: UserLeagueDto[]
+  rights: RightDto[]
 }
