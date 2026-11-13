@@ -34,6 +34,14 @@ public class RaceNotificationSender {
         }
     }
 
+    public void sendToLeagues(int season, String raceType, MessageEmbed embed) {
+        for (var league : leagueApi.findDiscordLeagues()) {
+            if (season >= league.settings().firstSeason()) {
+                send(league, raceType, List.of(embed));
+            }
+        }
+    }
+
     public void sendToLeague(UUID leagueId, String raceType, MessageEmbed embed) {
         sendToLeague(leagueId, raceType, List.of(embed));
     }
