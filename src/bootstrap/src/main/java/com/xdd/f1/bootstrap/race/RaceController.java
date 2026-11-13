@@ -79,7 +79,8 @@ public class RaceController {
                 details.lineupPrepared(),
                 conditions,
                 details.predictionsOpen(),
-                details.serverTime()
+                details.serverTime(),
+                details.startingGrid()
         );
     }
 

@@ -20,6 +20,7 @@ export interface RaceResultDto {
   rulesVersion: string
   result: RaceResultValuesDto | null
   draft: RaceResultValuesDto | null
+  startingGrid: string[]
 }
 
 export interface RaceResultEditorDto {

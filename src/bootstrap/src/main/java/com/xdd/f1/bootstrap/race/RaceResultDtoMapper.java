@@ -11,6 +11,8 @@ import com.xdd.f1.domain.prediction.PredictionPoints;
 import com.xdd.f1.domain.race.lineup.Driver;
 import com.xdd.f1.domain.race.result.*;
 
+import java.util.List;
+
 final class RaceResultDtoMapper {
     private RaceResultDtoMapper() {
     }
@@ -22,7 +24,8 @@ final class RaceResultDtoMapper {
     }
 
     static RaceResultDto toDto(RaceResult result) {
-        return new RaceResultDto(result.raceId().value(), result.rulesVersion().value(), toDto(result.result()), toDto(result.draft()));
+        return new RaceResultDto(result.raceId().value(), result.rulesVersion().value(), toDto(result.result()), toDto(result.draft()),
+                result.startingGrid() == null ? List.of() : result.startingGrid().stream().map(Driver::name).toList());
     }
 
     static RaceResultDetailsDto toDto(RaceResultDetails details) {
@@ -41,6 +44,18 @@ final class RaceResultDtoMapper {
             return new RaceClassificationEntry(new Driver(entry.driverName()), RaceDriverStatus.valueOf(entry.status().name()));
         }).toList();
         return new RaceResultValues(classification, request.safetyCars(), request.firstPlaceLead());
+    }
+
+    static List<Driver> toDomain(SaveStartingGridRequestDto request) {
+        if (request == null || request.startingGrid() == null) {
+            throw new DomainValidationException("Starting grid is required");
+        }
+        return request.startingGrid().stream().map(name -> {
+            if (name == null) {
+                throw new DomainValidationException("Driver name is required for each starting grid entry");
+            }
+            return new Driver(name);
+        }).toList();
     }
 
     private static RaceResultValuesDto toDto(RaceResultValues values) {

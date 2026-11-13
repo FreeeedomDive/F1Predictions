@@ -10,6 +10,7 @@ import com.xdd.f1.application.race.RaceNotFoundException;
 import com.xdd.f1.application.race.RaceRepository;
 import com.xdd.f1.application.race.lineup.RaceLineupNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
+import com.xdd.f1.application.race.result.RaceResultRepository;
 import com.xdd.f1.contract.prediction.PredictionChangedEvent;
 import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.league.League;
@@ -19,6 +20,7 @@ import com.xdd.f1.domain.prediction.*;
 import com.xdd.f1.domain.race.*;
 import com.xdd.f1.domain.race.lineup.Driver;
 import com.xdd.f1.domain.race.lineup.RaceLineup;
+import com.xdd.f1.domain.race.result.RaceResult;
 import com.xdd.f1.domain.user.UserId;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -35,6 +37,7 @@ public class PredictionService {
     private final PredictionConditionsRepository conditions;
     private final RaceRepository races;
     private final RaceLineupRepository lineups;
+    private final RaceResultRepository results;
     private final LeagueRepository leagues;
     private final LeagueParticipantRepository participants;
     private final LeagueAccessGuard access;
@@ -45,11 +48,12 @@ public class PredictionService {
     public PredictionService(PredictionRepository predictions, PredictionConditionsRepository conditions,
                              RaceRepository races, RaceLineupRepository lineups, LeagueRepository leagues,
                              LeagueParticipantRepository participants, LeagueAccessGuard access, TransactionLock lock,
-                             ApplicationEventPublisher events, Clock clock) {
+                             ApplicationEventPublisher events, Clock clock, RaceResultRepository results) {
         this.predictions = predictions;
         this.conditions = conditions;
         this.races = races;
         this.lineups = lineups;
+        this.results = results;
         this.leagues = leagues;
         this.participants = participants;
         this.access = access;
@@ -71,7 +75,8 @@ public class PredictionService {
                 .filter(race -> race.type() != RaceType.SPRINT || league.settings().sprintsEnabled()).toList();
         var chronological = Comparator.comparing(Race::closeAt);
         var current = calendar.stream()
-                .filter(race -> race.status() == RaceStatus.OPEN && now.isBefore(race.closeAt()))
+                .filter(race -> (race.status() == RaceStatus.OPEN || race.status() == RaceStatus.CLOSED)
+                        && now.isBefore(race.closeAt()))
                 .min(chronological)
                 .or(() -> calendar.stream()
                         .filter(race -> race.status() == RaceStatus.SCHEDULED && now.isBefore(race.closeAt()))
@@ -92,9 +97,11 @@ public class PredictionService {
         var lineup = saved.or(() -> race.status() == RaceStatus.SCHEDULED
                 ? lineups.findLatestBefore(race.closeAt()) : Optional.empty());
         var now = clock.instant();
+        var startingGrid = results.findByRaceId(raceId).map(RaceResult::startingGrid).orElse(List.of()).stream()
+                .map(Driver::name).toList();
         return new RaceDetails(race, lineup.map(RaceLineup::teams).orElse(List.of()), saved.isPresent(),
                 conditions.findByRaceId(raceId).orElse(null),
-                race.status() == RaceStatus.OPEN && now.isBefore(race.closeAt()) && saved.isPresent(), now);
+                race.status() == RaceStatus.OPEN && now.isBefore(race.closeAt()) && saved.isPresent(), now, startingGrid);
     }
 
     @Transactional(readOnly = true)

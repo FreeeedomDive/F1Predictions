@@ -36,9 +36,17 @@ races:
     enabled: true
     season: 2026
     interval: P1D
+  starting-grid-sync:
+    enabled: true
+    interval: PT5M
 
 jolpica:
   base-url: https://api.jolpi.ca/ergast/f1
+  connect-timeout: PT3S
+  read-timeout: PT10S
+
+openf1:
+  base-url: https://api.openf1.org/v1
   connect-timeout: PT3S
   read-timeout: PT10S
 

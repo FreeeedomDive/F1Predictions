@@ -17,4 +17,7 @@ public interface RaceJpaRepository extends JpaRepository<RaceEntity, UUID> {
     List<RaceProjection> findAllByStatusAndOpenAtLessThanEqualOrderByOpenAtAsc(String status, Instant now);
 
     List<RaceProjection> findAllByStatusAndCloseAtLessThanEqualOrderByCloseAtAsc(String status, Instant now);
+
+    List<RaceProjection> findAllByStatusInAndOpenAtLessThanEqualAndCloseAtGreaterThanOrderByCloseAtAsc(
+            List<String> statuses, Instant openAt, Instant closeAt);
 }

@@ -14,6 +14,8 @@ races:
     enabled: false
   calendar-sync:
     enabled: false
+  starting-grid-sync:
+    enabled: false
 
 management:
   otlp:

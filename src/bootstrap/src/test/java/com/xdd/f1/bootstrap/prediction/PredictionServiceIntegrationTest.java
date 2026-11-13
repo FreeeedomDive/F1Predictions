@@ -7,7 +7,9 @@ import com.xdd.f1.application.prediction.*;
 import com.xdd.f1.application.race.RaceService;
 import com.xdd.f1.application.race.lineup.RaceLineupService;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
+import com.xdd.f1.application.race.result.RaceResultService;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
+import com.xdd.f1.contract.race.RaceStartingGridUpdatedEvent;
 import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.league.*;
 import com.xdd.f1.domain.prediction.*;
@@ -22,6 +24,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -41,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
+@RecordApplicationEvents
 class PredictionServiceIntegrationTest extends AbstractIntegrationTest {
     private static final Instant NOW = Instant.parse("2027-03-01T12:00:00Z");
 
@@ -49,6 +54,7 @@ class PredictionServiceIntegrationTest extends AbstractIntegrationTest {
     private final RaceService races;
     private final RaceLineupService lineups;
     private final RaceLineupRepository lineupRepository;
+    private final RaceResultService results;
     private final LeagueRepository leagues;
     private final LeagueParticipantService participants;
     private final RaceJpaRepository raceJpaRepository;
@@ -65,12 +71,13 @@ class PredictionServiceIntegrationTest extends AbstractIntegrationTest {
     PredictionServiceIntegrationTest(PredictionService predictions, PredictionConditionsRepository conditions,
                                      RaceService races, RaceLineupService lineups, RaceLineupRepository lineupRepository, LeagueRepository leagues,
                                      LeagueParticipantService participants, RaceJpaRepository raceJpaRepository,
-                                     PlatformTransactionManager transactionManager) {
+                                     PlatformTransactionManager transactionManager, RaceResultService results) {
         this.predictions = predictions;
         this.conditions = conditions;
         this.races = races;
         this.lineups = lineups;
         this.lineupRepository = lineupRepository;
+        this.results = results;
         this.leagues = leagues;
         this.participants = participants;
         this.raceJpaRepository = raceJpaRepository;
@@ -102,6 +109,7 @@ class PredictionServiceIntegrationTest extends AbstractIntegrationTest {
         var details = predictions.getDetails(member.userId(), selectedLeague.id(), race.id());
         assertThat(details.predictionsOpen()).isTrue();
         assertThat(details.teams()).hasSize(3);
+        assertThat(details.startingGrid()).isEmpty();
         assertThat(predictions.findOwn(member.userId(), selectedLeague.id(), race.id())).isEmpty();
         var saved = predictions.save(member.userId(), selectedLeague.id(), race.id(), values("Lando Norris"));
         var unchanged = predictions.save(member.userId(), selectedLeague.id(), race.id(), values("Lando Norris"));
@@ -172,11 +180,51 @@ class PredictionServiceIntegrationTest extends AbstractIntegrationTest {
                 .isEqualTo(sprint.id());
         assertThat(predictions.findCurrentDetails(participant.userId(), league.id(), Optional.of(2022))).isEmpty();
 
+        races.closeRacePredictions(sprint.id());
+        var earlyClosed = predictions.findCurrentDetails(participant.userId(), sprintLeague.id(), Optional.of(2027)).orElseThrow();
+        assertThat(earlyClosed.race().id()).isEqualTo(sprint.id());
+        assertThat(earlyClosed.predictionsOpen()).isFalse();
+
         when(clock.instant()).thenReturn(main.closeAt());
         assertThat(predictions.findCurrentDetails(participant.userId(), league.id(), Optional.of(2027)).orElseThrow().race().id())
                 .isEqualTo(upcoming.id());
         when(clock.instant()).thenReturn(upcoming.closeAt());
         assertThat(predictions.findCurrentDetails(participant.userId(), league.id(), Optional.of(2027))).isEmpty();
+    }
+
+    @Test
+    void readsTheSharedStartingGridAndKeepsAnEarlyClosedRaceCurrentUntilItsStart() {
+        var race = createRace(1, RaceType.RACE, 3600);
+        var upcoming = createRace(2, RaceType.RACE, 7200);
+        lineups.updateTeam(race.id(), "Haas", team("Haas", "Camara", "Oliver Bearman"));
+        races.openRacePredictions(race.id());
+        transactions.executeWithoutResult(status -> conditions.update(new PredictionConditions(race.id(), new Driver("Camara"))));
+        var grid = List.of(new Driver("Camara"), new Driver("Oscar Piastri"), new Driver("Lando Norris"));
+        assertThat(results.applyStartingGrid(race, grid)).isTrue();
+
+        var details = predictions.getDetails(participant.userId(), league.id(), race.id());
+        assertThat(details.startingGrid()).containsExactly("Camara", "Oscar Piastri", "Lando Norris");
+        assertThat(details.teams().stream().filter(team -> team.branding().name().equals("Haas")).findFirst().orElseThrow().drivers())
+                .contains(new Driver("Camara"));
+        assertThat(details.conditions().positionPredictionDriver()).isEqualTo(new Driver("Camara"));
+        assertThat(predictions.findOwn(participant.userId(), league.id(), race.id())).isEmpty();
+        var secondLeague = createLeague(false, false);
+        participants.ensureParticipant(secondLeague.id(), identity, "Alice elsewhere");
+        assertThat(predictions.getDetails(participant.userId(), secondLeague.id(), race.id()).startingGrid())
+                .containsExactlyElementsOf(details.startingGrid());
+
+        races.closeRacePredictions(race.id());
+        var current = predictions.findCurrentDetails(participant.userId(), league.id(), Optional.of(2027)).orElseThrow();
+        assertThat(current.race().id()).isEqualTo(race.id());
+        assertThat(current.startingGrid()).containsExactlyElementsOf(details.startingGrid());
+        assertThat(current.predictionsOpen()).isFalse();
+
+        when(clock.instant()).thenReturn(race.closeAt());
+        var next = predictions.findCurrentDetails(participant.userId(), league.id(), Optional.of(2027)).orElseThrow();
+        assertThat(next.race().id()).isEqualTo(upcoming.id());
+        assertThat(next.startingGrid()).isEmpty();
+        assertThat(predictions.getDetails(participant.userId(), league.id(), race.id()).startingGrid())
+                .containsExactlyElementsOf(details.startingGrid());
     }
 
     @Test
@@ -198,7 +246,7 @@ class PredictionServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void preservesConditionsAndMovesSelectionsForReplacementButNotSwapOrAnotherRace() {
+    void preservesConditionsAndMovesSelectionsForReplacementButNotSwapOrAnotherRace(ApplicationEvents events) {
         var race = createRace(1, RaceType.RACE, 3600);
         var otherRace = createRace(2, RaceType.RACE, 7200);
         races.openRacePredictions(race.id());
@@ -212,6 +260,9 @@ class PredictionServiceIntegrationTest extends AbstractIntegrationTest {
         var otherPrediction = predictions.save(participant.userId(), league.id(), otherRace.id(), values("Lando Norris"));
         predictions.save(participant.userId(), league.id(), race.id(), values("Lando Norris"));
         predictions.save(participant.userId(), secondLeague.id(), race.id(), values("Lando Norris"));
+        var grid = List.of(new Driver("Oscar Piastri"), new Driver("Lando Norris"), new Driver("Charles Leclerc"));
+        assertThat(results.applyStartingGrid(race, grid)).isTrue();
+        assertThat(results.applyStartingGrid(otherRace, grid)).isTrue();
 
         lineups.updateTeam(race.id(), "McLaren", team("McLaren", "Replacement Driver", "Oscar Piastri"));
         var moved = predictions.findOwn(participant.userId(), league.id(), race.id()).orElseThrow();
@@ -225,11 +276,20 @@ class PredictionServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(predictions.getDetails(participant.userId(), league.id(), race.id()).conditions().positionPredictionDriver())
                 .isEqualTo(new Driver("Replacement Driver"));
         assertThat(predictions.findOwn(participant.userId(), league.id(), otherRace.id())).contains(otherPrediction);
+        var replacedGrid = List.of(new Driver("Oscar Piastri"), new Driver("Replacement Driver"), new Driver("Charles Leclerc"));
+        assertThat(results.getForEditing(race.id()).result().startingGrid()).containsExactlyElementsOf(replacedGrid);
+        assertThat(results.getForEditing(otherRace.id()).result().startingGrid()).containsExactlyElementsOf(grid);
+        assertThat(results.applyStartingGrid(race, grid)).isFalse();
 
         lineups.swapDrivers(race.id(), new Driver("Replacement Driver"), new Driver("Charles Leclerc"));
         assertThat(predictions.findOwn(participant.userId(), league.id(), race.id())).contains(moved);
         assertThat(predictions.getDetails(participant.userId(), league.id(), race.id()).conditions().positionPredictionDriver())
                 .isEqualTo(new Driver("Replacement Driver"));
+        assertThat(results.getForEditing(race.id()).result().startingGrid()).containsExactlyElementsOf(replacedGrid);
+        assertThat(events.stream(RaceStartingGridUpdatedEvent.class).toList()).hasSize(3).last().isEqualTo(
+                new RaceStartingGridUpdatedEvent(race.id().value(), race.name(), "RACE", 2027,
+                        List.of("Oscar Piastri", "Replacement Driver", "Charles Leclerc"), false)
+        );
     }
 
     @Test
@@ -238,6 +298,8 @@ class PredictionServiceIntegrationTest extends AbstractIntegrationTest {
         races.openRacePredictions(race.id());
         transactions.executeWithoutResult(status -> conditions.update(new PredictionConditions(race.id(), new Driver("Lando Norris"))));
         var saved = predictions.save(participant.userId(), league.id(), race.id(), values("Lando Norris"));
+        var grid = List.of(new Driver("Lando Norris"), new Driver("Oscar Piastri"));
+        assertThat(results.applyStartingGrid(race, grid)).isTrue();
         assertThatThrownBy(() -> transactions.executeWithoutResult(status -> {
             lineups.updateTeam(race.id(), "McLaren", team("McLaren", "Replacement Driver", "Oscar Piastri"));
             throw new IllegalStateException("Abort replacement");
@@ -246,6 +308,7 @@ class PredictionServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(predictions.getDetails(participant.userId(), league.id(), race.id()).conditions().positionPredictionDriver())
                 .isEqualTo(new Driver("Lando Norris"));
         assertThat(lineups.getForEditing(race.id()).teams().getFirst().drivers()).contains(new Driver("Lando Norris"));
+        assertThat(results.getForEditing(race.id()).result().startingGrid()).containsExactlyElementsOf(grid);
     }
 
     @Test

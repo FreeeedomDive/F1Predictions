@@ -16,11 +16,14 @@ import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.application.standings.SeasonPodiumService;
 import com.xdd.f1.contract.race.RaceFinishedEvent;
 import com.xdd.f1.contract.race.RaceResultUpdatedEvent;
+import com.xdd.f1.contract.race.RaceStartingGridUpdatedEvent;
 import com.xdd.f1.contract.race.result.*;
 import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.league.LeagueId;
 import com.xdd.f1.domain.prediction.*;
 import com.xdd.f1.domain.race.*;
+import com.xdd.f1.domain.race.lineup.Driver;
+import com.xdd.f1.domain.race.lineup.DriverReplacement;
 import com.xdd.f1.domain.race.lineup.RaceLineup;
 import com.xdd.f1.domain.race.result.RaceClassificationEntry;
 import com.xdd.f1.domain.race.result.RaceResult;
@@ -31,6 +34,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -48,11 +52,12 @@ public class RaceResultService {
     private final LeagueAccessGuard access;
     private final LeagueRepository leagues;
     private final SeasonPodiumService podiums;
+    private final Clock clock;
 
     public RaceResultService(RaceResultRepository results, PredictionPointsRepository points, PredictionRepository predictions,
                              PredictionConditionsRepository conditions, RaceRepository races, RaceLineupRepository lineups,
                              LeagueParticipantRepository participants, TransactionLock lock, ApplicationEventPublisher events,
-                             LeagueAccessGuard access, LeagueRepository leagues, SeasonPodiumService podiums) {
+                             LeagueAccessGuard access, LeagueRepository leagues, SeasonPodiumService podiums, Clock clock) {
         this.results = results;
         this.points = points;
         this.predictions = predictions;
@@ -65,6 +70,7 @@ public class RaceResultService {
         this.access = access;
         this.leagues = leagues;
         this.podiums = podiums;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -93,6 +99,52 @@ public class RaceResultService {
     }
 
     @Transactional
+    public boolean applyStartingGrid(Race sourceRace, List<Driver> grid) {
+        if (grid.isEmpty()) {
+            return false;
+        }
+        var race = getLockedRace(sourceRace.id());
+        if (race.status() != RaceStatus.OPEN && race.status() != RaceStatus.CLOSED
+                || !clock.instant().isBefore(race.closeAt())
+                || !race.openAt().equals(sourceRace.openAt()) || !race.closeAt().equals(sourceRace.closeAt())) {
+            return false;
+        }
+        if (!startingGridMatchesLineup(race.id(), grid)) {
+            return false;
+        }
+        var previous = results.findByRaceId(race.id());
+        var updated = previous.map(saved -> saved.withStartingGrid(grid))
+                .orElseGet(() -> new RaceResult(race.id(), rulesFor(race, previous), null, null, grid));
+        return saveStartingGrid(race, previous, updated);
+    }
+
+    @Transactional
+    public RaceResult applyStartingGridManually(Race sourceRace, List<Driver> grid) {
+        if (grid.isEmpty()) {
+            throw new DomainValidationException("OpenF1 has no published starting grid available for this race.");
+        }
+        return saveStartingGridForRace(sourceRace.id(), grid);
+    }
+
+    @Transactional
+    public RaceResult saveStartingGridForAdmin(RaceId raceId, List<Driver> grid) {
+        if (grid.isEmpty()) {
+            throw new DomainValidationException("Starting grid must not be empty");
+        }
+        if (grid.stream().distinct().count() != grid.size()) {
+            throw new DomainValidationException("Starting grid must not include duplicate drivers");
+        }
+        return saveStartingGridForRace(raceId, grid);
+    }
+
+    @Transactional
+    public void replaceStartingGridDrivers(RaceId raceId, List<DriverReplacement> replacements) {
+        var race = getLockedRace(raceId);
+        results.findByRaceId(raceId).ifPresent(previous ->
+                saveStartingGrid(race, Optional.of(previous), previous.replaceStartingGridDrivers(replacements)));
+    }
+
+    @Transactional
     public RaceResult saveDraft(RaceId raceId, RaceResultValues values) {
         Objects.requireNonNull(values, "Race result values must not be null");
         var race = getLockedRace(raceId);
@@ -108,7 +160,8 @@ public class RaceResultService {
                 || previous.get().draft() == null && Objects.equals(previous.get().result(), values))) {
             return previous.get();
         }
-        var updated = new RaceResult(raceId, rules, previous.map(RaceResult::result).orElse(null), values);
+        var updated = new RaceResult(raceId, rules, previous.map(RaceResult::result).orElse(null), values,
+                previous.map(RaceResult::startingGrid).orElse(null));
         if (previous.isEmpty()) {
             results.create(updated);
         } else {
@@ -132,7 +185,7 @@ public class RaceResultService {
         var raceConditions = conditions.findByRaceId(raceId).orElse(null);
         var lineup = getLineup(raceId);
         validateFinalResult(raceId, values, lineup, raceConditions, savedPredictions);
-        var updated = new RaceResult(raceId, rules, values, null);
+        var updated = new RaceResult(raceId, rules, values, null, previous.startingGrid());
         var calculated = PredictionPointsCalculator.calculate(race, updated, raceConditions, lineup, savedPredictions);
         if (!updated.equals(previous)) {
             results.update(updated);
@@ -154,8 +207,42 @@ public class RaceResultService {
         return races.findById(raceId).orElseThrow(() -> new RaceNotFoundException(raceId));
     }
 
+    private boolean saveStartingGrid(Race race, Optional<RaceResult> previous, RaceResult updated) {
+        var oldGrid = previous.map(RaceResult::startingGrid).orElse(null);
+        if (Objects.equals(oldGrid, updated.startingGrid())) {
+            return false;
+        }
+        if (previous.isEmpty()) {
+            results.create(updated);
+        } else {
+            results.update(updated);
+        }
+        events.publishEvent(new RaceStartingGridUpdatedEvent(
+                race.id().value(), race.name(), race.type().name(), race.season(),
+                updated.startingGrid().stream().map(Driver::name).toList(), oldGrid == null || oldGrid.isEmpty()
+        ));
+        return true;
+    }
+
+    private RaceResult saveStartingGridForRace(RaceId raceId, List<Driver> grid) {
+        var race = getLockedRace(raceId);
+        if (!startingGridMatchesLineup(raceId, grid)) {
+            throw new DomainValidationException("Starting grid contains drivers missing from this race's lineup.");
+        }
+        var previous = results.findByRaceId(raceId);
+        var updated = previous.map(saved -> saved.withStartingGrid(grid))
+                .orElseGet(() -> new RaceResult(raceId, rulesFor(race, previous), null, null, grid));
+        saveStartingGrid(race, previous, updated);
+        return updated;
+    }
+
     private RaceLineup getLineup(RaceId raceId) {
         return lineups.findByRaceId(raceId).orElseThrow(() -> new RaceLineupNotFoundException(raceId));
+    }
+
+    private boolean startingGridMatchesLineup(RaceId raceId, List<Driver> grid) {
+        var drivers = getLineup(raceId).teams().stream().flatMap(team -> team.drivers().stream()).collect(Collectors.toSet());
+        return drivers.containsAll(grid);
     }
 
     private RulesVersion rulesFor(Race race, Optional<RaceResult> previous) {

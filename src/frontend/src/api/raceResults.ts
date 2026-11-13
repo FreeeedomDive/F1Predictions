@@ -34,6 +34,22 @@ export async function finalizeRaceResult(raceId: string) {
   return response.data
 }
 
+export async function syncStartingGrid(raceId: string) {
+  const response = await api.post<RaceResultDto>(
+    `${resultPath(raceId)}/starting-grid/sync`,
+    undefined,
+    { timeout: 45_000 },
+  )
+  return response.data
+}
+
+export async function saveStartingGrid(raceId: string, startingGrid: string[]) {
+  const response = await api.put<RaceResultDto>(`${resultPath(raceId)}/starting-grid`, {
+    startingGrid,
+  })
+  return response.data
+}
+
 export function raceResultErrorMessage(error: unknown, fallback: string) {
   if (isAxiosError<{ detail?: string }>(error)) {
     const detail = error.response?.data?.detail

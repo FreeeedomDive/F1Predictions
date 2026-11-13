@@ -29,6 +29,7 @@ export default function ResultClassificationTable({
   teams,
   positionDriver,
   disabled,
+  showStatus = true,
   onChange,
   onDraggingChange,
 }: {
@@ -36,6 +37,7 @@ export default function ResultClassificationTable({
   teams: RaceLineupTeamDto[]
   positionDriver?: string | null
   disabled: boolean
+  showStatus?: boolean
   onChange: (entries: RaceClassificationEntryDto[]) => void
   onDraggingChange: (dragging: boolean) => void
 }) {
@@ -59,9 +61,9 @@ export default function ResultClassificationTable({
       <TableContainer>
         <Table
           size="small"
-          aria-label="Race result classification"
+          aria-label={showStatus ? 'Race result classification' : 'Starting grid'}
           sx={{
-            minWidth: 400,
+            minWidth: showStatus ? 400 : 280,
             tableLayout: 'fixed',
             '& .MuiTableCell-root': { borderColor: 'divider', boxSizing: 'border-box' },
           }}
@@ -70,19 +72,21 @@ export default function ResultClassificationTable({
             <col style={{ width: 40 }} />
             <col style={{ width: 40 }} />
             <col />
-            <col style={{ width: 116 }} />
+            {showStatus && <col style={{ width: 116 }} />}
           </colgroup>
           <TableHead>
             <TableRow>
               <TableCell sx={{ width: 40, px: 0.5 }} />
               <TableCell sx={{ width: 40, px: 0.5, fontSize: '0.75rem' }}>Pos.</TableCell>
               <TableCell sx={{ fontSize: '0.75rem' }}>Driver</TableCell>
-              <TableCell align="right" sx={{ fontSize: '0.75rem', width: 116 }}>
-                Status
-              </TableCell>
+              {showStatus && (
+                <TableCell align="right" sx={{ fontSize: '0.75rem', width: 116 }}>
+                  Status
+                </TableCell>
+              )}
             </TableRow>
           </TableHead>
-          <Droppable droppableId="race-result-classification">
+          <Droppable droppableId={showStatus ? 'race-result-classification' : 'starting-grid'}>
             {(provided) => (
               <TableBody ref={provided.innerRef} {...provided.droppableProps}>
                 {entries.map((entry, index) => (
@@ -146,38 +150,40 @@ export default function ResultClassificationTable({
                             highlighted={entry.driverName === positionDriver}
                           />
                         </TableCell>
-                        <TableCell align="right" sx={{ py: 0.25, px: 1, width: 116 }}>
-                          <Select<RaceDriverStatusDto>
-                            size="small"
-                            value={entry.status}
-                            disabled={disabled}
-                            renderValue={(status) => statusLabels[status]}
-                            inputProps={{ 'aria-label': `Status for ${entry.driverName}` }}
-                            onChange={(event) =>
-                              changeStatus(
-                                entry.driverName,
-                                event.target.value as RaceDriverStatusDto,
-                              )
-                            }
-                            sx={{
-                              height: 28,
-                              minWidth: 100,
-                              fontSize: '0.75rem',
-                              color:
-                                entry.status === 'DNF'
-                                  ? 'warning.main'
-                                  : entry.status === 'DQ'
-                                    ? 'error.main'
-                                    : 'text.secondary',
-                            }}
-                          >
-                            {Object.entries(statusLabels).map(([status, label]) => (
-                              <MenuItem key={status} value={status} sx={{ fontSize: '0.8rem' }}>
-                                {label}
-                              </MenuItem>
-                            ))}
-                          </Select>
-                        </TableCell>
+                        {showStatus && (
+                          <TableCell align="right" sx={{ py: 0.25, px: 1, width: 116 }}>
+                            <Select<RaceDriverStatusDto>
+                              size="small"
+                              value={entry.status}
+                              disabled={disabled}
+                              renderValue={(status) => statusLabels[status]}
+                              inputProps={{ 'aria-label': `Status for ${entry.driverName}` }}
+                              onChange={(event) =>
+                                changeStatus(
+                                  entry.driverName,
+                                  event.target.value as RaceDriverStatusDto,
+                                )
+                              }
+                              sx={{
+                                height: 28,
+                                minWidth: 100,
+                                fontSize: '0.75rem',
+                                color:
+                                  entry.status === 'DNF'
+                                    ? 'warning.main'
+                                    : entry.status === 'DQ'
+                                      ? 'error.main'
+                                      : 'text.secondary',
+                              }}
+                            >
+                              {Object.entries(statusLabels).map(([status, label]) => (
+                                <MenuItem key={status} value={status} sx={{ fontSize: '0.8rem' }}>
+                                  {label}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </TableCell>
+                        )}
                       </TableRow>
                     )}
                   </Draggable>
