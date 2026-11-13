@@ -26,11 +26,6 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
-    public Optional<User> findById(UserId id) {
-        return Optional.ofNullable(entityManager.find(UserEntity.class, id.value())).map(this::toModel);
-    }
-
-    @Override
     public Optional<User> findByIdentity(UserIdentityId identityId) {
         var identity = userIdentityJpaRepository.findById(new UserIdentityEntityId(identityId.source().name(), identityId.sourceId()));
         return identity.map(userIdentityEntity -> toModel(userIdentityEntity.user));

@@ -23,11 +23,6 @@ public class PredictionRepositoryAdapter implements PredictionRepository {
     }
 
     @Override
-    public Optional<Prediction> findById(PredictionId id) {
-        return repository.findById(id.value()).map(this::toDomain);
-    }
-
-    @Override
     public Optional<Prediction> findByLeagueAndRaceAndParticipant(LeagueId leagueId, RaceId raceId, LeagueParticipantId participantId) {
         return repository.findByLeagueIdAndRaceIdAndParticipantId(leagueId.value(), raceId.value(), participantId.value())
                 .map(this::toDomain);
