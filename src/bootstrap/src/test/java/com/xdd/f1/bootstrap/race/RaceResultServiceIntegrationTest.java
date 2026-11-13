@@ -333,6 +333,29 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
+    void manuallySyncsAFinishedRaceGridWhilePreservingPublishedResultDraftAndPoints(ApplicationEvents events) {
+        var race = openRace(2027, 1, RaceType.RACE);
+        savePredictions(race);
+        publish(race);
+        var previous = service.saveDraft(race.id(), correctedValues());
+        var previousPoints = transactions.execute(status -> points.findAllByRaceId(race.id()));
+        when(clock.instant()).thenReturn(race.closeAt().plusSeconds(86400));
+        var grid = List.of(new Driver("Norris"), new Driver("Piastri"));
+
+        assertThat(service.applyStartingGrid(race, grid)).isFalse();
+        var saved = service.applyStartingGridManually(race, grid);
+
+        assertThat(saved).isEqualTo(previous.withStartingGrid(grid));
+        assertThat(service.applyStartingGridManually(race, grid)).isEqualTo(saved);
+        transactions.executeWithoutResult(status -> {
+            assertThat(results.findByRaceId(race.id())).contains(saved);
+            assertThat(points.findAllByRaceId(race.id())).containsExactlyInAnyOrderElementsOf(previousPoints);
+            assertThat(races.getById(race.id()).status()).isEqualTo(RaceStatus.FINISHED);
+        });
+        assertThat(events.stream(RaceStartingGridUpdatedEvent.class).count()).isEqualTo(1);
+    }
+
+    @Test
     void savesPodiumsForEveryLeagueWhenLastRaceIsFinalized() {
         var firstRace = openRace(2027, 1, RaceType.RACE);
         var lastRace = openRace(2027, 2, RaceType.RACE);

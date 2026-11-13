@@ -7,6 +7,7 @@ import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.application.race.result.RaceResultService;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
 import com.xdd.f1.contract.race.RaceStartingGridUpdatedEvent;
+import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceStatus;
 import com.xdd.f1.domain.race.RaceType;
@@ -34,6 +35,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -133,6 +135,34 @@ class RaceStartingGridSyncServiceIntegrationTest extends AbstractIntegrationTest
 
         assertThat(results.getForEditing(sprint.id()).result().startingGrid()).containsExactlyElementsOf(GRID.reversed());
         assertThat(events.stream(RaceStartingGridUpdatedEvent.class).count()).isEqualTo(4);
+    }
+
+    @Test
+    void manuallySyncsAFinishedPastRaceAndKeepsItsGridOnEmptyResponsesAndErrors(ApplicationEvents events) {
+        var race = createRace(2026, 20, RaceType.RACE, NOW.minusSeconds(172800), NOW.minusSeconds(86400), RaceStatus.FINISHED);
+        when(provider.loadStartingGrid(race)).thenAnswer(invocation -> {
+            assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+            return GRID;
+        });
+
+        var saved = sync.syncStartingGrid(race.id());
+
+        assertThat(saved.startingGrid()).containsExactlyElementsOf(GRID);
+        assertThat(races.getById(race.id()).status()).isEqualTo(RaceStatus.FINISHED);
+        assertThat(sync.syncStartingGrid(race.id())).isEqualTo(saved);
+        assertThat(events.stream(RaceStartingGridUpdatedEvent.class).count()).isEqualTo(1);
+
+        when(provider.loadStartingGrid(race)).thenReturn(List.of());
+        assertThatThrownBy(() -> sync.syncStartingGrid(race.id())).isInstanceOf(DomainValidationException.class)
+                .hasMessageContaining("no published starting grid");
+        when(provider.loadStartingGrid(race)).thenReturn(List.of(new Driver("Unknown")));
+        assertThatThrownBy(() -> sync.syncStartingGrid(race.id())).isInstanceOf(DomainValidationException.class)
+                .hasMessageContaining("missing from this race's lineup");
+        when(provider.loadStartingGrid(race)).thenThrow(new ResourceAccessException("OpenF1 timed out"));
+        assertThatThrownBy(() -> sync.syncStartingGrid(race.id())).isInstanceOf(ResourceAccessException.class);
+
+        assertThat(results.getForEditing(race.id()).result()).isEqualTo(saved);
+        assertThat(events.stream(RaceStartingGridUpdatedEvent.class).count()).isEqualTo(1);
     }
 
     @Test

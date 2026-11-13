@@ -5,6 +5,7 @@ import {
   getOwnRaceResult,
   getRaceResultEditor,
   saveRaceResultDraft,
+  syncStartingGrid,
 } from '../api/raceResults'
 import type { RaceDetailsDto } from '../dto/prediction'
 import type { RaceDto } from '../dto/race'
@@ -77,6 +78,22 @@ export function useSaveRaceResultDraft() {
       client.invalidateQueries({
         queryKey: adminRaceResultKey(variables.userId, variables.raceId),
       }),
+  })
+}
+
+export function useSyncStartingGrid() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ raceId }: ResultVariables) => syncStartingGrid(raceId),
+    retry: false,
+    onSuccess: async (result, variables) => {
+      const key = adminRaceResultKey(variables.userId, variables.raceId)
+      await client.cancelQueries({ queryKey: key })
+      client.setQueryData<RaceResultEditorDto>(key, (page) =>
+        page?.race.id === variables.raceId ? { ...page, result } : page,
+      )
+    },
+    onSettled: (_result, _error, variables) => invalidateRacePredictions(client, variables.raceId),
   })
 }
 

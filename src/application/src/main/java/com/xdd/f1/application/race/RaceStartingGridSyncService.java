@@ -1,6 +1,8 @@
 package com.xdd.f1.application.race;
 
 import com.xdd.f1.application.race.result.RaceResultService;
+import com.xdd.f1.domain.race.RaceId;
+import com.xdd.f1.domain.race.result.RaceResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -34,5 +36,11 @@ public class RaceStartingGridSyncService {
                 LOGGER.warn("Could not synchronize starting grid for race {}", race.id().value(), exception);
             }
         }
+    }
+
+    public RaceResult syncStartingGrid(RaceId raceId) {
+        var race = races.findById(raceId).orElseThrow(() -> new RaceNotFoundException(raceId));
+        var grid = provider.loadStartingGrid(race);
+        return results.applyStartingGridManually(race, grid);
     }
 }

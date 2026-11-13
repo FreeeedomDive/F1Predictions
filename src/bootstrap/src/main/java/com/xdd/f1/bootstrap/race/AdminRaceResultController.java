@@ -1,6 +1,7 @@
 package com.xdd.f1.bootstrap.race;
 
 import com.xdd.f1.application.race.result.RaceResultService;
+import com.xdd.f1.application.race.RaceStartingGridSyncService;
 import com.xdd.f1.bootstrap.auth.AuthenticatedUser;
 import com.xdd.f1.bootstrap.auth.CurrentUser;
 import com.xdd.f1.bootstrap.auth.RequireRights;
@@ -20,9 +21,11 @@ import java.util.UUID;
 @RequestMapping("/adminApi/v1/races/{raceId}/result")
 public class AdminRaceResultController {
     private final RaceResultService service;
+    private final RaceStartingGridSyncService startingGridSync;
 
-    public AdminRaceResultController(RaceResultService service) {
+    public AdminRaceResultController(RaceResultService service, RaceStartingGridSyncService startingGridSync) {
         this.service = service;
+        this.startingGridSync = startingGridSync;
     }
 
     @GetMapping
@@ -41,6 +44,12 @@ public class AdminRaceResultController {
     @PostMapping("/finalize")
     public ResponseEntity<RaceResultDto> finalizeResult(@CurrentUser AuthenticatedUser user, @PathVariable UUID raceId) {
         var saved = service.finalizeResult(new RaceId(raceId));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(RaceResultDtoMapper.toDto(saved));
+    }
+
+    @PostMapping("/starting-grid/sync")
+    public ResponseEntity<RaceResultDto> syncStartingGrid(@CurrentUser AuthenticatedUser user, @PathVariable UUID raceId) {
+        var saved = startingGridSync.syncStartingGrid(new RaceId(raceId));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(RaceResultDtoMapper.toDto(saved));
     }
 }

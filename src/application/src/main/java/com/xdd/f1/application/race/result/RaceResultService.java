@@ -109,15 +109,29 @@ public class RaceResultService {
                 || !race.openAt().equals(sourceRace.openAt()) || !race.closeAt().equals(sourceRace.closeAt())) {
             return false;
         }
-        var lineup = getLineup(race.id());
-        var drivers = lineup.teams().stream().flatMap(team -> team.drivers().stream()).collect(Collectors.toSet());
-        if (!drivers.containsAll(grid)) {
+        if (!startingGridMatchesLineup(race.id(), grid)) {
             return false;
         }
         var previous = results.findByRaceId(race.id());
         var updated = previous.map(saved -> saved.withStartingGrid(grid))
                 .orElseGet(() -> new RaceResult(race.id(), rulesFor(race, previous), null, null, grid));
         return saveStartingGrid(race, previous, updated);
+    }
+
+    @Transactional
+    public RaceResult applyStartingGridManually(Race sourceRace, List<Driver> grid) {
+        if (grid.isEmpty()) {
+            throw new DomainValidationException("OpenF1 has no published starting grid available for this race.");
+        }
+        var race = getLockedRace(sourceRace.id());
+        if (!startingGridMatchesLineup(race.id(), grid)) {
+            throw new DomainValidationException("The OpenF1 starting grid contains drivers missing from this race's lineup.");
+        }
+        var previous = results.findByRaceId(race.id());
+        var updated = previous.map(saved -> saved.withStartingGrid(grid))
+                .orElseGet(() -> new RaceResult(race.id(), rulesFor(race, previous), null, null, grid));
+        saveStartingGrid(race, previous, updated);
+        return updated;
     }
 
     @Transactional
@@ -209,6 +223,11 @@ public class RaceResultService {
 
     private RaceLineup getLineup(RaceId raceId) {
         return lineups.findByRaceId(raceId).orElseThrow(() -> new RaceLineupNotFoundException(raceId));
+    }
+
+    private boolean startingGridMatchesLineup(RaceId raceId, List<Driver> grid) {
+        var drivers = getLineup(raceId).teams().stream().flatMap(team -> team.drivers().stream()).collect(Collectors.toSet());
+        return drivers.containsAll(grid);
     }
 
     private RulesVersion rulesFor(Race race, Optional<RaceResult> previous) {

@@ -11,6 +11,8 @@ import com.xdd.f1.domain.prediction.PredictionPoints;
 import com.xdd.f1.domain.race.lineup.Driver;
 import com.xdd.f1.domain.race.result.*;
 
+import java.util.List;
+
 final class RaceResultDtoMapper {
     private RaceResultDtoMapper() {
     }
@@ -22,7 +24,8 @@ final class RaceResultDtoMapper {
     }
 
     static RaceResultDto toDto(RaceResult result) {
-        return new RaceResultDto(result.raceId().value(), result.rulesVersion().value(), toDto(result.result()), toDto(result.draft()));
+        return new RaceResultDto(result.raceId().value(), result.rulesVersion().value(), toDto(result.result()), toDto(result.draft()),
+                result.startingGrid() == null ? List.of() : result.startingGrid().stream().map(Driver::name).toList());
     }
 
     static RaceResultDetailsDto toDto(RaceResultDetails details) {

@@ -3,6 +3,7 @@ import BlockRounded from '@mui/icons-material/BlockRounded'
 import DoneRounded from '@mui/icons-material/DoneRounded'
 import RemoveRounded from '@mui/icons-material/RemoveRounded'
 import SaveRounded from '@mui/icons-material/SaveRounded'
+import SyncRounded from '@mui/icons-material/SyncRounded'
 import {
   Alert,
   Box,
@@ -25,7 +26,11 @@ import { raceResultErrorMessage } from '../../api/raceResults'
 import { isUnauthorized } from '../../api/session'
 import type { AdminPredictionDto } from '../../dto/prediction'
 import type { RaceResultEditorDto } from '../../dto/raceResult'
-import { useFinalizeRaceResult, useSaveRaceResultDraft } from '../../queries/raceResults'
+import {
+  useFinalizeRaceResult,
+  useSaveRaceResultDraft,
+  useSyncStartingGrid,
+} from '../../queries/raceResults'
 import { useChangeRacePredictionsStatus } from '../../queries/races'
 import AdminPredictionsPanel from '../prediction/AdminPredictionsPanel'
 import RightsWrapper from '../RightsWrapper'
@@ -70,7 +75,10 @@ export default function AdminResultEditor({
   const save = useSaveRaceResultDraft()
   const finalize = useFinalizeRaceResult()
   const transition = useChangeRacePredictionsStatus()
-  const [operation, setOperation] = useState<'save' | 'finalize' | 'close' | null>(null)
+  const syncGrid = useSyncStartingGrid()
+  const [operation, setOperation] = useState<'save' | 'finalize' | 'close' | 'sync-grid' | null>(
+    null,
+  )
   const [dragging, setDragging] = useState(false)
   const [tab, setTab] = useState(0)
   const [savingPrediction, setSavingPrediction] = useState(false)
@@ -209,6 +217,29 @@ export default function AdminResultEditor({
     }
   }
 
+  async function syncStartingGrid() {
+    if (pending || dragging || inFlight.current) return
+    inFlight.current = true
+    setOperation('sync-grid')
+    onBusyChange(true)
+    try {
+      const result = await syncGrid.mutateAsync(variables)
+      setNotice({
+        severity: 'success',
+        message: `Starting grid synced (${result.startingGrid.length} drivers).`,
+      })
+    } catch (error) {
+      setNotice({
+        severity: 'error',
+        message: raceResultErrorMessage(error, 'Could not sync the starting grid.'),
+      })
+    } finally {
+      inFlight.current = false
+      setOperation(null)
+      onBusyChange(false)
+    }
+  }
+
   const autosave = useEffectEvent(() => {
     if (canSave && dirty) void persistDraft(true)
   })
@@ -218,7 +249,7 @@ export default function AdminResultEditor({
     return () => window.clearInterval(timer)
   }, [])
 
-  if ([save.error, finalize.error, transition.error].some(isUnauthorized))
+  if ([save.error, finalize.error, transition.error, syncGrid.error].some(isUnauthorized))
     return <Navigate to="/auth" replace />
 
   function syncClassification() {
@@ -285,6 +316,17 @@ export default function AdminResultEditor({
             {needsRecalculation && page.race.status === 'FINISHED' && (
               <Chip size="small" variant="outlined" color="warning" label="Recalculation needed" />
             )}
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<SyncRounded />}
+              loading={operation === 'sync-grid'}
+              disabled={pending || dragging || !page.lineupPrepared}
+              onClick={() => void syncStartingGrid()}
+              sx={{ ml: { sm: 'auto' } }}
+            >
+              Sync starting grid
+            </Button>
             {page.race.status === 'OPEN' && (
               <Button
                 size="small"
@@ -294,7 +336,6 @@ export default function AdminResultEditor({
                 loading={operation === 'close'}
                 disabled={pending || dragging}
                 onClick={() => void closePredictions()}
-                sx={{ ml: { sm: 'auto' } }}
               >
                 Close predictions
               </Button>
