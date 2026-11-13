@@ -114,7 +114,7 @@ export default function ResultClassificationTable({
                             ? 'background.paper'
                             : entry.status === 'DNF'
                               ? 'rgba(255, 167, 38, 0.07)'
-                              : index === 9
+                              : showStatus && index === 9
                                 ? 'rgba(165, 180, 252, 0.08)'
                                 : 'transparent',
                           '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.05)' },
@@ -136,8 +136,8 @@ export default function ResultClassificationTable({
                             variant="body2"
                             sx={{
                               fontVariantNumeric: 'tabular-nums',
-                              color: index === 9 ? 'primary.main' : 'text.secondary',
-                              fontWeight: index === 9 ? 700 : 400,
+                              color: showStatus && index === 9 ? 'primary.main' : 'text.secondary',
+                              fontWeight: showStatus && index === 9 ? 700 : 400,
                             }}
                           >
                             {index + 1}

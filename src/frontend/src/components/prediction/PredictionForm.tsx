@@ -516,18 +516,20 @@ export default function PredictionForm({
                     </TextField>
                   </Stack>
                 )}
-                {prediction?.teamsPickedDrivers && (
-                  <Stack spacing={1}>
-                    <Typography variant="caption" color="text.secondary">
-                      Team selections · legacy
-                    </Typography>
-                    <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 0.5 }}>
-                      {prediction.teamsPickedDrivers.map((name, index) => (
-                        <Chip key={`${index}:${name}`} label={name} size="small" />
-                      ))}
+                {(page.season === 2024 || page.season === 2025) &&
+                  prediction?.teamsPickedDrivers &&
+                  prediction.teamsPickedDrivers.length > 0 && (
+                    <Stack spacing={1}>
+                      <Typography variant="caption" color="text.secondary">
+                        Team selections · legacy
+                      </Typography>
+                      <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                        {prediction.teamsPickedDrivers.map((name, index) => (
+                          <Chip key={`${index}:${name}`} label={name} size="small" />
+                        ))}
+                      </Stack>
                     </Stack>
-                  </Stack>
-                )}
+                  )}
                 {accepting && (
                   <>
                     <Divider />

@@ -138,11 +138,9 @@ export default function StandingsRow({
             <Avatar sx={{ width: 24, height: 24, flexShrink: 0, fontSize: '0.75rem' }}>
               {initial}
             </Avatar>
-            <Tooltip title={results.participantName}>
-              <Typography noWrap sx={{ flex: 1, minWidth: 0, fontWeight: isMe ? 600 : 400 }}>
-                {results.participantName}
-              </Typography>
-            </Tooltip>
+            <Typography noWrap sx={{ minWidth: 0, fontWeight: isMe ? 600 : 400 }}>
+              {results.participantName}
+            </Typography>
             <Stack direction="row" spacing={0.25} sx={{ flexShrink: 0 }}>
               {results.previousPodiums.map((podium) => {
                 const label = `${podium.season}: ${podium.place}${podium.place === 1 ? 'st' : podium.place === 2 ? 'nd' : 'rd'} place`
@@ -212,8 +210,10 @@ export default function StandingsRow({
             }}
           >
             <Typography
-              sx={{ fontWeight: 'bold' }}
-              color={position === 1 && pointsLeft === 0 ? 'gold' : 'inherit'}
+              sx={{
+                fontWeight: 'bold',
+                color: position === 1 && pointsLeft === 0 ? PODIUM_COLORS[0] : 'inherit',
+              }}
             >
               {results.totalPoints}
             </Typography>
@@ -226,14 +226,14 @@ export default function StandingsRow({
               >
                 <Typography
                   variant="caption"
-                  color={stillInChampionship ? 'error' : 'text.disabled'}
+                  sx={{ color: stillInChampionship ? 'error.main' : 'text.disabled' }}
                 >
                   {results.totalPoints - leaderPoints}
                 </Typography>
               </Tooltip>
             )}
             {position > 1 && pointsLeft === 0 && (
-              <Typography variant="caption" color="text.disabled">
+              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
                 {results.totalPoints - leaderPoints}
               </Typography>
             )}

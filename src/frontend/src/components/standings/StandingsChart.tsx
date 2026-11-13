@@ -132,6 +132,7 @@ export default function StandingsChart({
     curve: 'linear',
     area: false,
     showMark: mode === 'race',
+    shape: 'circle',
     connectNulls: false,
     data:
       mode === 'race'
@@ -150,6 +151,7 @@ export default function StandingsChart({
       curve: 'linear',
       area: false,
       showMark: false,
+      shape: 'circle',
       data: stages.map((index) => {
         const threshold = standings.championChart[index] ?? 0
         if (threshold <= 0 && index !== firstThresholdStage - 1) return null
@@ -436,7 +438,6 @@ export default function StandingsChart({
                       </Avatar>
                       <Typography
                         variant="body2"
-                        title={participant.participantName}
                         sx={{
                           flex: 1,
                           minWidth: 0,
