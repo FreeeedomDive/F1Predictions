@@ -6,11 +6,13 @@ import com.xdd.f1.application.league.LeagueRepository;
 import com.xdd.f1.application.prediction.*;
 import com.xdd.f1.application.race.RaceService;
 import com.xdd.f1.application.race.RaceNotFoundException;
+import com.xdd.f1.application.race.RaceCalendarEntry;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.application.race.result.*;
 import com.xdd.f1.application.standings.SeasonPodiumEntry;
 import com.xdd.f1.application.standings.SeasonPodiumRepository;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
+import com.xdd.f1.contract.race.RaceStartingGridUpdatedEvent;
 import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.league.*;
 import com.xdd.f1.domain.prediction.*;
@@ -30,6 +32,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -50,6 +54,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.when;
 
+@RecordApplicationEvents
 class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
     private static final Instant NOW = Instant.parse("2027-03-01T12:00:00Z");
     private static final RulesVersion RULES_2027 = new RulesVersion("2027-v1");
@@ -115,6 +120,66 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
     @AfterEach
     void cleanUp() {
         raceJpaRepository.deleteAll();
+    }
+
+    @Test
+    void appliesStartingGridOnlyOnRealChangesAndKeepsTheDraftAfterEarlyClosure(ApplicationEvents events) {
+        var race = openRace(2027, 1, RaceType.RACE);
+        var draft = service.saveDraft(race.id(), resultValues());
+        var grid = List.of(new Driver("Norris"), new Driver("Piastri"), new Driver("Leclerc"));
+
+        assertThat(service.applyStartingGrid(race, grid)).isTrue();
+        assertThat(service.applyStartingGrid(race, grid)).isFalse();
+        assertThat(service.applyStartingGrid(race, List.of())).isFalse();
+        races.closeRacePredictions(race.id());
+        assertThat(service.applyStartingGrid(race, grid.reversed())).isTrue();
+        assertThat(service.applyStartingGrid(race, grid.reversed())).isFalse();
+
+        transactions.executeWithoutResult(status ->
+                assertThat(results.findByRaceId(race.id())).contains(draft.withStartingGrid(grid.reversed())));
+        assertThat(events.stream(RaceStartingGridUpdatedEvent.class).toList()).containsExactly(
+                new RaceStartingGridUpdatedEvent(race.id().value(), race.name(), "RACE", 2027,
+                        List.of("Norris", "Piastri", "Leclerc"), true),
+                new RaceStartingGridUpdatedEvent(race.id().value(), race.name(), "RACE", 2027,
+                        List.of("Leclerc", "Piastri", "Norris"), false)
+        );
+        assertThat(jdbc.sql("SELECT version FROM race_results WHERE race_id = :id")
+                .param("id", race.id().value()).query(Long.class).single()).isEqualTo(2L);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void ignoresStartingGridAfterTheStartOrFinishingDuringTheExternalRequest(boolean finished, ApplicationEvents events) {
+        var race = openRace(2027, 1, RaceType.SPRINT);
+        var grid = List.of(new Driver("Norris"), new Driver("Piastri"));
+        assertThat(service.applyStartingGrid(race, grid)).isTrue();
+        if (finished) {
+            races.closeRacePredictions(race.id());
+            races.finishRace(race.id());
+        } else {
+            when(clock.instant()).thenReturn(race.closeAt());
+        }
+
+        assertThat(service.applyStartingGrid(race, grid.reversed())).isFalse();
+        transactions.executeWithoutResult(status -> assertThat(results.findByRaceId(race.id()))
+                .contains(new RaceResult(race.id(), RULES_2027, null, null, grid)));
+        assertThat(events.stream(RaceStartingGridUpdatedEvent.class).count()).isEqualTo(1);
+    }
+
+    @Test
+    void ignoresStartingGridLoadedForTheOldCalendarUntilTheNextRequest(ApplicationEvents events) {
+        var race = openRace(2027, 1, RaceType.RACE);
+        var grid = List.of(new Driver("Norris"), new Driver("Piastri"));
+        assertThat(service.applyStartingGrid(race, grid)).isTrue();
+        races.applyCalendar(race.season(), List.of(new RaceCalendarEntry(
+                race.season(), race.round(), race.type(), race.name(), race.openAt().plusSeconds(60), race.closeAt().plusSeconds(60)
+        )));
+
+        assertThat(service.applyStartingGrid(race, grid.reversed())).isFalse();
+        transactions.executeWithoutResult(status -> assertThat(results.findByRaceId(race.id()))
+                .contains(new RaceResult(race.id(), RULES_2027, null, null, grid)));
+        assertThat(events.stream(RaceStartingGridUpdatedEvent.class).count()).isEqualTo(1);
+        assertThat(service.applyStartingGrid(races.getById(race.id()), grid.reversed())).isTrue();
     }
 
     @Test
@@ -250,8 +315,7 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
         savePredictions(race);
         var grid = List.of("Norris", "Leclerc", "Piastri", "Hamilton", "Bearman", "Ocon").stream()
                 .map(Driver::new).toList();
-        var gridOnly = new RaceResult(race.id(), RULES_2027, null, null, grid);
-        transactions.executeWithoutResult(status -> results.create(gridOnly));
+        assertThat(service.applyStartingGrid(race, grid)).isTrue();
         assertThat(service.findOwnResult(firstParticipant.userId(), firstLeague.id(), race.id())).isEmpty();
 
         races.closeRacePredictions(race.id());

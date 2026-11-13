@@ -2,6 +2,7 @@ package com.xdd.f1.application.race.lineup;
 
 import com.xdd.f1.application.race.RaceNotFoundException;
 import com.xdd.f1.application.race.RaceRepository;
+import com.xdd.f1.application.race.result.RaceResultService;
 import com.xdd.f1.application.locking.TransactionLock;
 import com.xdd.f1.application.prediction.PredictionRepository;
 import com.xdd.f1.application.prediction.PredictionConditionsRepository;
@@ -33,6 +34,7 @@ public class RaceLineupService {
     private final TransactionLock lock;
     private final PredictionRepository predictions;
     private final PredictionConditionsRepository conditions;
+    private final RaceResultService results;
 
     public RaceLineupService(
             RaceRepository raceRepository,
@@ -41,7 +43,8 @@ public class RaceLineupService {
             Clock clock,
             TransactionLock lock,
             PredictionRepository predictions,
-            PredictionConditionsRepository conditions
+            PredictionConditionsRepository conditions,
+            RaceResultService results
     ) {
         this.raceRepository = raceRepository;
         this.lineupRepository = lineupRepository;
@@ -50,6 +53,7 @@ public class RaceLineupService {
         this.lock = lock;
         this.predictions = predictions;
         this.conditions = conditions;
+        this.results = results;
     }
 
     @Transactional(readOnly = true)
@@ -165,6 +169,7 @@ public class RaceLineupService {
                 conditions.update(updated);
             }
         });
+        results.replaceStartingGridDrivers(race.id(), replacements);
         publishReplacements(race, team, replacements);
     }
 
