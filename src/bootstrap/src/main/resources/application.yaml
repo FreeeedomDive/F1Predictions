@@ -36,6 +36,9 @@ races:
     enabled: true
     season: 2026
     interval: P1D
+  starting-grid-sync:
+    enabled: true
+    interval: PT5M
 
 jolpica:
   base-url: https://api.jolpi.ca/ergast/f1

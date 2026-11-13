@@ -13,6 +13,7 @@ public interface RaceRepository {
     List<Race> findFinishedBySeason(int season);
     List<Race> findRacesToOpen(Instant now);
     List<Race> findRacesToClose(Instant now);
+    List<Race> findRacesToSyncStartingGrid(Instant now);
     void create(Race race);
     void update(Race race);
 }

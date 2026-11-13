@@ -57,6 +57,15 @@ public class RaceRepositoryAdapter implements RaceRepository {
     }
 
     @Override
+    public List<Race> findRacesToSyncStartingGrid(Instant now) {
+        return repository.findAllByStatusInAndOpenAtLessThanEqualAndCloseAtGreaterThanOrderByCloseAtAsc(
+                        List.of(RaceStatus.OPEN.name(), RaceStatus.CLOSED.name()), now, now)
+                .stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
     public void create(Race race) {
         repository.save(toEntity(race));
     }
