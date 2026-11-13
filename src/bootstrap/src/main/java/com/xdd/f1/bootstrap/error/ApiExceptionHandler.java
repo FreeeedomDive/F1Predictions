@@ -11,6 +11,7 @@ import com.xdd.f1.application.race.result.RaceResultNotFoundException;
 import com.xdd.f1.application.race.result.RaceResultOperationNotAllowedException;
 import com.xdd.f1.application.race.result.RaceResultRulesException;
 import com.xdd.f1.application.session.SessionNotFoundException;
+import com.xdd.f1.application.user.UserNotFoundException;
 import com.xdd.f1.application.prediction.PredictionNotFoundException;
 import com.xdd.f1.application.prediction.PredictionConditionsNotFoundException;
 import com.xdd.f1.application.prediction.PredictionsClosedException;
@@ -37,6 +38,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler({
             LeagueNotFoundException.class,
+            UserNotFoundException.class,
             LeagueParticipantNotFoundException.class,
             RaceNotFoundException.class,
             RaceLineupNotFoundException.class,

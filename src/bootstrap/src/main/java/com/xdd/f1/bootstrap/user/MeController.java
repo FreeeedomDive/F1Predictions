@@ -2,10 +2,12 @@ package com.xdd.f1.bootstrap.user;
 
 import com.xdd.f1.application.league.LeagueService;
 import com.xdd.f1.application.league.UserLeague;
+import com.xdd.f1.application.rights.RightsService;
 import com.xdd.f1.bootstrap.auth.AuthenticatedUser;
 import com.xdd.f1.bootstrap.auth.CurrentUser;
 import com.xdd.f1.contract.user.MeResponseDto;
 import com.xdd.f1.contract.user.UserLeagueDto;
+import com.xdd.f1.contract.rights.RightDto;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,15 +17,19 @@ import org.springframework.web.bind.annotation.RestController;
 public class MeController {
 
     private final LeagueService leagueService;
+    private final RightsService rightsService;
 
-    public MeController(LeagueService leagueService) {
+    public MeController(LeagueService leagueService, RightsService rightsService) {
         this.leagueService = leagueService;
+        this.rightsService = rightsService;
     }
 
     @GetMapping
     public MeResponseDto me(@CurrentUser AuthenticatedUser user) {
         var leagues = leagueService.findLeaguesByUserId(user.id()).stream().map(this::toDto).toList();
-        return new MeResponseDto(user.id().value(), leagues);
+        var rights = rightsService.findByUserId(user.id()).stream()
+                .map(right -> RightDto.valueOf(right.name())).toList();
+        return new MeResponseDto(user.id().value(), leagues, rights);
     }
 
     private UserLeagueDto toDto(UserLeague userLeague) {

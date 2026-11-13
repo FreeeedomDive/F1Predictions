@@ -3,6 +3,8 @@ package com.xdd.f1.bootstrap.user;
 import com.xdd.f1.application.league.LeagueParticipantService;
 import com.xdd.f1.application.league.LeagueRepository;
 import com.xdd.f1.application.session.SessionService;
+import com.xdd.f1.application.rights.RightsService;
+import com.xdd.f1.domain.rights.Right;
 import com.xdd.f1.application.user.UserRepository;
 import com.xdd.f1.bootstrap.auth.SessionCookie;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
@@ -47,6 +49,7 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
 
     private final MockMvc mvc;
     private final SessionService sessions;
+    private final RightsService rights;
     private final UserRepository users;
     private final UserJpaRepository userJpaRepository;
     private final LeagueRepository leagues;
@@ -66,6 +69,7 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
     UserProfileIntegrationTest(
             MockMvc mvc,
             SessionService sessions,
+            RightsService rights,
             UserRepository users,
             UserJpaRepository userJpaRepository,
             LeagueRepository leagues,
@@ -75,6 +79,7 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
     ) {
         this.mvc = mvc;
         this.sessions = sessions;
+        this.rights = rights;
         this.users = users;
         this.userJpaRepository = userJpaRepository;
         this.leagues = leagues;
@@ -175,7 +180,25 @@ class UserProfileIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.userId").value(userId.value().toString()))
                 .andExpect(jsonPath("$.leagues").isArray())
-                .andExpect(jsonPath("$.leagues").isEmpty());
+                .andExpect(jsonPath("$.leagues").isEmpty())
+                .andExpect(jsonPath("$.rights").isArray())
+                .andExpect(jsonPath("$.rights").isEmpty());
+    }
+
+    @Test
+    void returnsCurrentRightsWithoutReplacingTheSession() throws Exception {
+        var cookie = new Cookie(SessionCookie.NAME, sessions.create(userId));
+        rights.grant(userId, Right.EDIT_PREDICTIONS);
+
+        mvc.perform(get("/api/v1/me").cookie(cookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rights[0]").value("EDIT_PREDICTIONS"))
+                .andExpect(jsonPath("$.rights.length()").value(1));
+
+        rights.revoke(userId, Right.EDIT_PREDICTIONS);
+        mvc.perform(get("/api/v1/me").cookie(cookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rights").isEmpty());
     }
 
     private League createLeague(String name) {

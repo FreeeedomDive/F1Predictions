@@ -15,14 +15,22 @@ import java.util.Optional;
 public class UserRepositoryAdapter implements UserRepository {
 
     private final UserIdentityJpaRepository userIdentityJpaRepository;
+    private final UserJpaRepository userJpaRepository;
     private final EntityManager entityManager;
 
     public UserRepositoryAdapter(
             UserIdentityJpaRepository userIdentityJpaRepository,
+            UserJpaRepository userJpaRepository,
             EntityManager entityManager
     ) {
         this.userIdentityJpaRepository = userIdentityJpaRepository;
+        this.userJpaRepository = userJpaRepository;
         this.entityManager = entityManager;
+    }
+
+    @Override
+    public boolean existsById(UserId userId) {
+        return userJpaRepository.existsById(userId.value());
     }
 
     @Override
