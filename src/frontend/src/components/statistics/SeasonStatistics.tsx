@@ -55,30 +55,30 @@ export default function SeasonStatistics({
       <StatsSection title="10th place">
         <StatsCard
           title="Prediction points by driver"
-          description="Total 10th-place category points earned by participants."
+          description="Total points each driver earned for all participants through 10th-place predictions."
           items={driverItems(stats.tenthPlacePointsRating)}
           unit="point"
         />
         <StatsCard
           title="Most popular picks"
-          description="Number of times each driver was picked for 10th place."
+          description="Number of times each driver was selected in a 10th-place prediction."
           items={driverItems(stats.mostPickedForTenthPlace)}
           unit="pick"
         />
         <StatsCard
           title="10th-place picks that retired"
-          description="Number of picks whose driver finished with a DNF."
+          description="Number of 10th-place picks where the selected driver did not finish the race (DNF)."
           items={driverItems(stats.tenthPickedButDnfed)}
         />
         <StatsCard
           title="Points from actual finishes"
-          description="10th-place category points a driver’s actual finishes would earn."
+          description="Points you would have earned by picking the same driver for 10th place throughout the season."
           items={driverItems(stats.driverOwnTenthPlacePoints)}
           unit="point"
         />
         <StatsCard
           title="Average points per pick"
-          description="Average 10th-place category points per driver pick, rounded down."
+          description="Average points each driver earned per 10th-place prediction, rounded down."
           items={driverItems(stats.tenthPlacePredictionEfficiency)}
           unit="point"
         />
@@ -101,7 +101,7 @@ export default function SeasonStatistics({
         />
         <StatsCard
           title="Most popular DNF picks"
-          description="Number of times each driver was picked to retire."
+          description="Number of times each driver was picked to DNF."
           items={driverItems(stats.mostPickedForDnf)}
           unit="pick"
         />
