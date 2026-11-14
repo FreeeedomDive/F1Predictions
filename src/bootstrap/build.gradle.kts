@@ -22,6 +22,7 @@ dependencies {
     implementation(libs.springdoc.openapi.webmvc.ui)
 
     implementation(libs.spring.boot.starter.actuator)
+    implementation(libs.spring.boot.starter.aspectj)
     implementation(libs.spring.boot.starter.opentelemetry)
     implementation(libs.opentelemetry.logback.appender)
 
