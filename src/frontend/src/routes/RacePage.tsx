@@ -15,6 +15,7 @@ import { useEffect, useRef } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router'
 import { isUnauthorized } from '../api/session'
 import PredictionForm from '../components/prediction/PredictionForm'
+import PredictionFormSkeleton from '../components/prediction/PredictionFormSkeleton'
 import RaceResultPanel from '../components/result/RaceResultPanel'
 import PredictionPointsPanel from '../components/result/PredictionPointsPanel'
 import { useLeague } from '../context/league'
@@ -82,8 +83,7 @@ export default function RacePage({ current = false }: { current?: boolean }) {
           </Typography>
           {own.isPending ? (
             <Stack spacing={1} role="status" aria-label="Loading your prediction">
-              <Skeleton variant="rounded" height={40} />
-              <Skeleton variant="rounded" height={240} />
+              <PredictionFormSkeleton season={season} />
             </Stack>
           ) : (
             <Alert

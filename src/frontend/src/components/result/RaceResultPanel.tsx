@@ -3,7 +3,6 @@ import {
   Button,
   Chip,
   Paper,
-  Skeleton,
   Stack,
   Table,
   TableBody,
@@ -16,6 +15,7 @@ import { raceResultErrorMessage } from '../../api/raceResults'
 import type { PredictionDto } from '../../dto/prediction'
 import type { RaceLineupTeamDto } from '../../dto/raceLineup'
 import type { RaceResultDetailsDto } from '../../dto/raceResult'
+import DriverListSkeleton from '../DriverListSkeleton'
 import { DriverLabel } from '../prediction/DriverSelect'
 
 export default function RaceResultPanel({
@@ -35,6 +35,8 @@ export default function RaceResultPanel({
   positionDriver?: string | null
   onRefresh: () => void
 }) {
+  const driverCount = teams.reduce((count, team) => count + team.drivers.length, 0)
+
   return (
     <Stack spacing={1.5} sx={{ minWidth: 0 }}>
       <Paper variant="outlined" sx={{ minWidth: 0, borderRadius: 1 }}>
@@ -48,8 +50,7 @@ export default function RaceResultPanel({
             role="status"
             aria-label="Loading race results"
           >
-            <Skeleton variant="rounded" height={28} />
-            <Skeleton variant="rounded" height={180} />
+            <DriverListSkeleton count={driverCount} />
           </Stack>
         ) : error && !data ? (
           <Alert
@@ -64,10 +65,10 @@ export default function RaceResultPanel({
             {raceResultErrorMessage(error, 'Could not load the race result and your points.')}
           </Alert>
         ) : !data ? (
-          <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, pb: 1.5 }}>
-            Race results have not been published yet. They will appear here after the result is
-            finalized.
-          </Typography>
+          <Stack spacing={1.5} sx={{ px: 1.5, pb: 1.5 }}>
+            <Alert severity="info">Race results have not been published yet.</Alert>
+            <DriverListSkeleton count={driverCount} />
+          </Stack>
         ) : (
           <>
             {error && (

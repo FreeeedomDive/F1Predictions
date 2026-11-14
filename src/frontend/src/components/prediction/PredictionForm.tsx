@@ -40,6 +40,7 @@ import { useSavePredictions } from '../../queries/predictions'
 import type { PredictionSaveResult } from '../../queries/predictions'
 import DriverSelect, { DriverLabel } from './DriverSelect'
 import StartingGrid from './StartingGrid'
+import PredictionFormSkeleton from './PredictionFormSkeleton'
 
 interface Draft {
   tenth: string
@@ -305,6 +306,7 @@ export default function PredictionForm({
                     ? 'Predictions have not opened yet.'
                     : 'You did not submit a prediction for this race. Predictions are closed.'}
                 </Alert>
+                <PredictionFormSkeleton season={page.season} />
               </Stack>
             </Paper>
           ) : (
