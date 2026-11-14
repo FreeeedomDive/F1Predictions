@@ -14,6 +14,8 @@ import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
 import com.xdd.f1.domain.race.RaceType;
 import com.xdd.f1.domain.user.UserId;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -42,6 +44,9 @@ public class RaceService {
     private final TransactionLock lock;
     private final PredictionConditionsService conditionsService;
     private final TransactionTemplate transitionTransactions;
+    private final Counter changedTransitions;
+    private final Counter unchangedTransitions;
+    private final Counter transitionErrors;
 
     public RaceService(
             RaceRepository raceRepository,
@@ -52,7 +57,8 @@ public class RaceService {
             Clock clock,
             TransactionLock lock,
             PredictionConditionsService conditionsService,
-            PlatformTransactionManager transactionManager
+            PlatformTransactionManager transactionManager,
+            MeterRegistry registry
     ) {
         this.raceRepository = raceRepository;
         this.leagueAccessGuard = leagueAccessGuard;
@@ -64,6 +70,9 @@ public class RaceService {
         this.conditionsService = conditionsService;
         this.transitionTransactions = new TransactionTemplate(transactionManager);
         this.transitionTransactions.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        this.changedTransitions = registry.counter("f1.race.transitions", "outcome", "changed");
+        this.unchangedTransitions = registry.counter("f1.race.transitions", "outcome", "unchanged");
+        this.transitionErrors = registry.counter("f1.race.transitions", "outcome", "error");
     }
 
     @Transactional(readOnly = true)
@@ -127,8 +136,12 @@ public class RaceService {
                 var updatedStatus = transitionTransactions.execute(status -> processScheduledTransition(raceId));
                 if (updatedStatus != null) {
                     result.put(raceId, updatedStatus);
+                    changedTransitions.increment();
+                } else {
+                    unchangedTransitions.increment();
                 }
             } catch (RuntimeException exception) {
+                transitionErrors.increment();
                 LOGGER.error("Could not process scheduled transitions for race {}", raceId.value(), exception);
             }
         }

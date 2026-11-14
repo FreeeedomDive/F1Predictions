@@ -42,6 +42,7 @@ springdoc-openapi-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starte
 jda = { module = "net.dv8tion:JDA", version.ref = "jda" }
 
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-aspectj = { module = "org.springframework.boot:spring-boot-starter-aspectj" }
 spring-boot-starter-opentelemetry = { module = "org.springframework.boot:spring-boot-starter-opentelemetry" }
 opentelemetry-logback-appender = { module = "io.opentelemetry.instrumentation:opentelemetry-logback-appender-1.0", version.ref = "otel-logback-appender" }
 micrometer-core = { module = "io.micrometer:micrometer-core" }
