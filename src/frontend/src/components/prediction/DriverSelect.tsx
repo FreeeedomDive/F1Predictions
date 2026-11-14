@@ -72,7 +72,7 @@ export function DriverLabel({
         noWrap
         sx={{
           minWidth: 0,
-          fontSize: '0.8rem',
+          fontSize: 'inherit',
           color: highlighted ? 'primary.main' : 'text.primary',
           fontWeight: highlighted ? 600 : 400,
         }}

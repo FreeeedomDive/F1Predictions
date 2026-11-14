@@ -69,6 +69,13 @@ public class LeagueParticipantRepositoryAdapter implements LeagueParticipantRepo
     }
 
     @Override
+    public Map<LeagueParticipantId, String> findDiscordIdsByLeague(LeagueId leagueId) {
+        return leagueParticipantJpaRepository.findDiscordIdsByLeague(leagueId.value()).stream()
+                .collect(Collectors.toMap(row -> new LeagueParticipantId(row.getParticipantId()),
+                        ParticipantDiscordIdentityProjection::getDiscordId));
+    }
+
+    @Override
     public void create(LeagueParticipant participant) {
         leagueParticipantJpaRepository.save(toEntity(participant));
     }

@@ -18,6 +18,8 @@ public interface LeagueParticipantRepository {
 
     Map<LeagueParticipantId, String> findNamesByIds(List<LeagueParticipantId> ids);
 
+    Map<LeagueParticipantId, String> findDiscordIdsByLeague(LeagueId leagueId);
+
     void create(LeagueParticipant participant);
 
     LeagueParticipant updateDisplayName(LeagueParticipantId id, String newDisplayName);

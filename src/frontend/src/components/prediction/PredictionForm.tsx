@@ -40,6 +40,7 @@ import { useSavePredictions } from '../../queries/predictions'
 import type { PredictionSaveResult } from '../../queries/predictions'
 import DriverSelect, { DriverLabel } from './DriverSelect'
 import StartingGrid from './StartingGrid'
+import PredictionFormSkeleton from './PredictionFormSkeleton'
 
 interface Draft {
   tenth: string
@@ -106,6 +107,7 @@ export default function PredictionForm({
   leagues,
   receivedAt,
   resultPanel,
+  pointsPanel,
   predictionState,
 }: {
   page: RaceDetailsDto
@@ -115,6 +117,7 @@ export default function PredictionForm({
   leagues: UserLeagueDto[]
   receivedAt: number
   resultPanel: ReactNode
+  pointsPanel: ReactNode
   predictionState?: ReactNode
 }) {
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -303,6 +306,7 @@ export default function PredictionForm({
                     ? 'Predictions have not opened yet.'
                     : 'You did not submit a prediction for this race. Predictions are closed.'}
                 </Alert>
+                <PredictionFormSkeleton season={page.season} />
               </Stack>
             </Paper>
           ) : (
@@ -601,6 +605,7 @@ export default function PredictionForm({
               </Stack>
             </Paper>
           )}
+          {pointsPanel}
         </Stack>
         <Box sx={{ minWidth: 0 }}>{resultPanel}</Box>
       </Box>

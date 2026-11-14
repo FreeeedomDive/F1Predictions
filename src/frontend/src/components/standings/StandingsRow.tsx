@@ -89,6 +89,7 @@ function pointsDetails(result: SeasonRacePointsDto, race: RaceDto, season: numbe
 
 export default function StandingsRow({
   results,
+  avatarUrl,
   isMe,
   races,
   season,
@@ -97,6 +98,7 @@ export default function StandingsRow({
   leaderPoints,
 }: {
   results: SeasonStandingsRowDto
+  avatarUrl?: string | null
   isMe: boolean
   races: RaceDto[]
   season: number
@@ -135,7 +137,11 @@ export default function StandingsRow({
             >
               {isOpen ? <KeyboardArrowUpRounded /> : <KeyboardArrowDownRounded />}
             </IconButton>
-            <Avatar sx={{ width: 24, height: 24, flexShrink: 0, fontSize: '0.75rem' }}>
+            <Avatar
+              src={avatarUrl ?? undefined}
+              alt={results.participantName}
+              sx={{ width: 24, height: 24, flexShrink: 0, fontSize: '0.75rem' }}
+            >
               {initial}
             </Avatar>
             <Typography noWrap sx={{ minWidth: 0, fontWeight: isMe ? 600 : 400 }}>

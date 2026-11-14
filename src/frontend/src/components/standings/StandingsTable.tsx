@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material'
 import type { SeasonStandingsDto } from '../../dto/standings'
+import type { ParticipantAvatarUrls } from '../../dto/participant'
 import { raceFlag } from '../raceFlag'
 import StandingsRow from './StandingsRow'
 import { STICKY_BG } from './standingsStyles'
@@ -23,9 +24,11 @@ const RIGHT_COL_WIDTH = 80
 export default function StandingsTable({
   standings,
   currentParticipantId,
+  avatars = {},
 }: {
   standings: SeasonStandingsDto
   currentParticipantId: string
+  avatars?: ParticipantAvatarUrls
 }) {
   const races = standings.events
 
@@ -133,6 +136,7 @@ export default function StandingsTable({
               <StandingsRow
                 key={row.participantId}
                 results={row}
+                avatarUrl={avatars[row.participantId]}
                 isMe={row.participantId === currentParticipantId}
                 races={races}
                 season={standings.season}

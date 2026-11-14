@@ -88,6 +88,20 @@ const router = createBrowserRouter([
             },
           },
           {
+            path: 'rulebook',
+            lazy: async () => {
+              const { default: RulebookPage } = await import('./routes/RulebookPage')
+              return {
+                element: (
+                  <>
+                    <title>{withDevPrefix('Rulebook')}</title>
+                    <RulebookPage />
+                  </>
+                ),
+              }
+            },
+          },
+          {
             path: 'prediction',
             lazy: async () => {
               const { default: RacePage } = await import('./routes/RacePage')

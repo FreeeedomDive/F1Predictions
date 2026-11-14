@@ -56,9 +56,10 @@ public class WebCommand extends AbstractCommand {
         );
         var token = sessions.create(participant.userId());
         var url = webAppProperties.appBaseUrl();
-        return UriComponentsBuilder.fromUriString(url)
+        var loginUrl = UriComponentsBuilder.fromUriString(url)
                 .path("/auth")
                 .queryParam("token", "{token}").encode().buildAndExpand(token)
                 .toUriString();
+        return "[Open web application](<" + loginUrl + ">)";
     }
 }

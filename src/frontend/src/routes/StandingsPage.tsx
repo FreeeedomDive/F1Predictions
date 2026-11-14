@@ -19,6 +19,7 @@ import StandingsChart from '../components/standings/StandingsChart'
 import StandingsTable from '../components/standings/StandingsTable'
 import { useLeague } from '../context/league'
 import { useSeasonStandings } from '../queries/standings'
+import { useParticipantAvatars } from '../queries/participants'
 
 function EmptyStandings({ title, description }: { title: string; description: string }) {
   return (
@@ -37,6 +38,10 @@ function EmptyStandings({ title, description }: { title: string; description: st
 export default function StandingsPage() {
   const { profile, selectedLeague, selectedSeason } = useLeague()
   const standings = useSeasonStandings(profile.userId, selectedLeague?.leagueId, selectedSeason)
+  const avatars = useParticipantAvatars(
+    profile.userId,
+    standings.data?.rows.length ? selectedLeague?.leagueId : undefined,
+  )
 
   if (standings.isError && isUnauthorized(standings.error)) {
     return <Navigate to="/auth" replace />
@@ -119,10 +124,12 @@ export default function StandingsPage() {
             <SeasonSummary standings={standings.data} />
             <StandingsTable
               standings={standings.data}
+              avatars={avatars.data}
               currentParticipantId={selectedLeague.participantId}
             />
             <StandingsChart
               key={`${selectedLeague.leagueId}_${selectedSeason}`}
+              avatars={avatars.data}
               standings={standings.data}
               races={standings.data.events}
               currentParticipantId={selectedLeague.participantId}

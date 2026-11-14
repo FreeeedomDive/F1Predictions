@@ -3,10 +3,9 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
-  Box,
+  Alert,
   Chip,
   Paper,
-  Skeleton,
   Stack,
   Table,
   TableBody,
@@ -18,6 +17,7 @@ import {
   useTheme,
 } from '@mui/material'
 import type { RaceLineupTeamDto } from '../../dto/raceLineup'
+import DriverListSkeleton from '../DriverListSkeleton'
 import { DriverLabel } from './DriverSelect'
 
 export default function StartingGrid({
@@ -113,26 +113,9 @@ export default function StartingGrid({
         </Table>
       </TableContainer>
     ) : (
-      <Stack spacing={0.5} sx={{ px: 1.5, pb: 1.5 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ pb: 0.5 }}>
-          The starting grid will appear after qualifying.
-        </Typography>
-        <Box aria-hidden="true" sx={{ opacity: 0.35 }}>
-          {Array.from({ length: driverCount || 22 }, (_, index) => (
-            <Stack
-              key={index}
-              direction="row"
-              spacing={1}
-              sx={{ height: 27, alignItems: 'center' }}
-            >
-              <Typography variant="caption" color="text.secondary" sx={{ minWidth: 18 }}>
-                {index + 1}
-              </Typography>
-              <Skeleton variant="rounded" animation={false} width={40} height={17} />
-              <Skeleton animation={false} width={index % 2 === 0 ? '50%' : '65%'} height={22} />
-            </Stack>
-          ))}
-        </Box>
+      <Stack spacing={1.5} sx={{ px: 1.5, pb: 1.5 }}>
+        <Alert severity="info">The starting grid will appear after qualifying.</Alert>
+        <DriverListSkeleton count={driverCount} />
       </Stack>
     )
 

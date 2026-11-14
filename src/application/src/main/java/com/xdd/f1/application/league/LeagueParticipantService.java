@@ -1,5 +1,6 @@
 package com.xdd.f1.application.league;
 
+import com.xdd.f1.application.locking.TransactionLock;
 import com.xdd.f1.application.user.UserRepository;
 import com.xdd.f1.domain.league.LeagueId;
 import com.xdd.f1.domain.league.LeagueParticipant;
@@ -19,17 +20,21 @@ public class LeagueParticipantService {
 
     private final UserRepository userRepository;
     private final LeagueParticipantRepository leagueParticipantRepository;
+    private final TransactionLock lock;
 
     public LeagueParticipantService(
             UserRepository userRepository,
-            LeagueParticipantRepository leagueParticipantRepository
+            LeagueParticipantRepository leagueParticipantRepository,
+            TransactionLock lock
     ) {
         this.userRepository = userRepository;
         this.leagueParticipantRepository = leagueParticipantRepository;
+        this.lock = lock;
     }
 
     @Transactional
     public LeagueParticipant ensureParticipant(LeagueId leagueId, UserIdentityId identityId, String displayName) {
+        lock.acquire("user-identity:" + identityId.source().name() + ":" + identityId.sourceId());
         var user = userRepository.findByIdentity(identityId)
                 .orElseGet(() -> {
                     var created = new User(
