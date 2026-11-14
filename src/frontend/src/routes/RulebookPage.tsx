@@ -9,7 +9,7 @@ export default function RulebookPage() {
   return (
     <Container
       component="section"
-      maxWidth={false}
+      maxWidth="xl"
       sx={{ py: { xs: 3, md: 4 }, px: { xs: 2, md: 4 } }}
     >
       <Stack spacing={3}>
