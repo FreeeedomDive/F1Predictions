@@ -39,4 +39,12 @@ public interface LeagueParticipantJpaRepository extends JpaRepository<LeaguePart
         where p.id in :ids
         """)
     List<LeagueParticipantNameProjection> findNamesByIds(@Param("ids") List<UUID> ids);
+
+    @Query("""
+        select p.id as participantId, i.id.sourceId as discordId
+        from LeagueParticipantEntity p
+        join UserIdentityEntity i on i.user.id = p.user.id
+        where p.league.id = :leagueId and i.id.source = 'DISCORD'
+        """)
+    List<ParticipantDiscordIdentityProjection> findDiscordIdsByLeague(@Param("leagueId") UUID leagueId);
 }
