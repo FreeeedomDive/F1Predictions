@@ -54,6 +54,11 @@ openf1:
   read-timeout: PT10S
 
 management:
+  metrics:
+    distribution:
+      slo:
+        "[http.server.requests]": 25ms,50ms,100ms,250ms,500ms,1s,2s,5s
+        "[f1.background.task.execution]": 10ms,50ms,100ms,500ms,1s,5s,10s,30s,1m
   endpoints:
     web:
       exposure:
