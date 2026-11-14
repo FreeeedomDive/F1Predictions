@@ -5,11 +5,11 @@ import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.prediction.*;
 import com.xdd.f1.domain.race.lineup.Driver;
 
-final class PredictionDtoMapper {
+public final class PredictionDtoMapper {
     private PredictionDtoMapper() {
     }
 
-    static PredictionDto toDto(Prediction prediction) {
+    public static PredictionDto toDto(Prediction prediction) {
         var values = prediction.values();
         var dnf = values.dnfPrediction();
         return new PredictionDto(prediction.id().value(), prediction.leagueId().value(), prediction.participantId().value(),
@@ -19,7 +19,7 @@ final class PredictionDtoMapper {
                 values.driverPositionPrediction(), values.firstPlaceLeadPrediction(), prediction.teamsPickedDrivers());
     }
 
-    static PredictionValues toDomain(SavePredictionRequestDto request) {
+    public static PredictionValues toDomain(SavePredictionRequestDto request) {
         if (request == null) {
             throw new DomainValidationException("Prediction is required");
         }

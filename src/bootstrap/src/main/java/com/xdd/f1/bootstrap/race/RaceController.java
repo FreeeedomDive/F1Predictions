@@ -2,15 +2,12 @@ package com.xdd.f1.bootstrap.race;
 
 import com.xdd.f1.application.race.RaceService;
 import com.xdd.f1.application.prediction.PredictionService;
-import com.xdd.f1.application.prediction.RaceDetails;
 import com.xdd.f1.bootstrap.auth.AuthenticatedUser;
 import com.xdd.f1.bootstrap.auth.CurrentUser;
 import com.xdd.f1.contract.common.ListResponseDto;
 import com.xdd.f1.contract.race.RaceDto;
 import com.xdd.f1.contract.race.RaceDetailsDto;
-import com.xdd.f1.contract.prediction.PredictionConditionsDto;
 import com.xdd.f1.domain.league.LeagueId;
-import com.xdd.f1.domain.prediction.PredictionConditions;
 import com.xdd.f1.domain.race.RaceId;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -53,7 +50,7 @@ public class RaceController {
         var details = predictions.getDetails(user.id(), new LeagueId(leagueId), new RaceId(raceId));
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore().cachePrivate())
-                .body(toDto(details));
+                .body(RaceDtoMapper.toDto(details));
     }
 
     @GetMapping("/current")
@@ -65,30 +62,8 @@ public class RaceController {
         return predictions.findCurrentDetails(user.id(), new LeagueId(leagueId), season)
                 .map(details -> ResponseEntity.ok()
                         .cacheControl(CacheControl.noStore().cachePrivate())
-                        .body(toDto(details)))
+                        .body(RaceDtoMapper.toDto(details)))
                 .orElseGet(() -> ResponseEntity.noContent().cacheControl(CacheControl.noStore().cachePrivate()).build());
     }
 
-    private RaceDetailsDto toDto(RaceDetails details) {
-        var conditions = toDto(details.conditions());
-        var teams = details.teams().stream().map(RaceLineupDtoMapper::toDto).toList();
-        return new RaceDetailsDto(
-                RaceDtoMapper.toDto(details.race()),
-                details.race().season(),
-                teams,
-                details.lineupPrepared(),
-                conditions,
-                details.predictionsOpen(),
-                details.serverTime(),
-                details.startingGrid()
-        );
-    }
-
-    private PredictionConditionsDto toDto(PredictionConditions conditions) {
-        if (conditions == null) {
-            return null;
-        }
-        var driver = conditions.positionPredictionDriver();
-        return new PredictionConditionsDto(driver == null ? null : driver.name());
-    }
 }

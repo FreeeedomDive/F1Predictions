@@ -24,6 +24,9 @@ discord:
 imports:
   api-key: ${IMPORT_API_KEY:}
 
+internal-api:
+  service-key: ${INTERNAL_API_SERVICE_KEY:}
+
 sessions:
   hash-secret: ${SESSION_HASH_SECRET}
   cleanup-interval: PT1H
