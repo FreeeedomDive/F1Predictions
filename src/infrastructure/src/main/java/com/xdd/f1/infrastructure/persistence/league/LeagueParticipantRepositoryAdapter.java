@@ -33,6 +33,12 @@ public class LeagueParticipantRepositoryAdapter implements LeagueParticipantRepo
     }
 
     @Override
+    public Optional<LeagueParticipant> findByLeagueAndId(LeagueId leagueId, LeagueParticipantId participantId) {
+        return leagueParticipantJpaRepository.findByLeague_IdAndId(leagueId.value(), participantId.value())
+                .map(this::toDomain);
+    }
+
+    @Override
     public Optional<LeagueParticipant> findByLeagueAndUser(LeagueId leagueId, UserId userId) {
         var entity = leagueParticipantJpaRepository.findByLeague_IdAndUser_Id(leagueId.value(), userId.value());
         return entity.map(this::toDomain);

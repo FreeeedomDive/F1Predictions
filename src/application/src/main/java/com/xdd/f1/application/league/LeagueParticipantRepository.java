@@ -10,6 +10,8 @@ import java.util.Map;
 import java.util.Optional;
 
 public interface LeagueParticipantRepository {
+    Optional<LeagueParticipant> findByLeagueAndId(LeagueId leagueId, LeagueParticipantId participantId);
+
     Optional<LeagueParticipant> findByLeagueAndUser(LeagueId leagueId, UserId userId);
 
     List<UserLeague> findLeaguesByUserId(UserId userId);
