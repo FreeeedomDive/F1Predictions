@@ -106,6 +106,7 @@ export default function PredictionForm({
   leagues,
   receivedAt,
   resultPanel,
+  pointsPanel,
   predictionState,
 }: {
   page: RaceDetailsDto
@@ -115,6 +116,7 @@ export default function PredictionForm({
   leagues: UserLeagueDto[]
   receivedAt: number
   resultPanel: ReactNode
+  pointsPanel: ReactNode
   predictionState?: ReactNode
 }) {
   const [draft, setDraft] = useState<Draft | null>(null)
@@ -601,6 +603,7 @@ export default function PredictionForm({
               </Stack>
             </Paper>
           )}
+          {pointsPanel}
         </Stack>
         <Box sx={{ minWidth: 0 }}>{resultPanel}</Box>
       </Box>

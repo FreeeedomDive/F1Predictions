@@ -22,6 +22,7 @@ import type { LineSeriesType } from '@mui/x-charts/models'
 import { useMemo, useState } from 'react'
 import type { RaceDto } from '../../dto/race'
 import type { SeasonStandingsDto } from '../../dto/standings'
+import type { ParticipantAvatarUrls } from '../../dto/participant'
 import SortedAxisTooltip from './SortedAxisTooltip'
 import type { StandingsChartMode } from './SortedAxisTooltip'
 
@@ -30,6 +31,7 @@ interface Participant {
   seriesId: string
   isMe: boolean
   participantName: string
+  avatarUrl?: string
   color: string
   points: number[]
   racePoints: (number | null)[]
@@ -74,10 +76,12 @@ export default function StandingsChart({
   standings,
   races,
   currentParticipantId,
+  avatars = {},
 }: {
   standings: SeasonStandingsDto
   races: RaceDto[]
   currentParticipantId: string
+  avatars?: ParticipantAvatarUrls
 }) {
   const theme = useTheme()
   const desktop = useMediaQuery(theme.breakpoints.up('md'))
@@ -98,6 +102,7 @@ export default function StandingsChart({
       seriesId: `prediction_points_${chart.participantId}`,
       isMe: chart.participantId === currentParticipantId,
       participantName,
+      avatarUrl: avatars[chart.participantId] ?? undefined,
       color:
         chart.participantId === currentParticipantId ? '#ffffff' : COLORS[index % COLORS.length],
       points: chart.points,
@@ -286,223 +291,242 @@ export default function StandingsChart({
           </Box>
         )}
       </Paper>
-      <Paper
-        variant="outlined"
-        sx={{ ...PANEL_SX, p: 2, display: 'flex', flexDirection: 'column' }}
-      >
-        <Stack spacing={2} sx={{ flex: 1, minHeight: 0 }}>
-          <Typography sx={{ fontWeight: 600 }}>Chart settings</Typography>
-          <ToggleButtonGroup
-            value={mode}
-            exclusive
-            fullWidth
-            size="small"
-            color="primary"
-            aria-label="Chart mode"
-            sx={{
-              '& .MuiToggleButton-root': {
-                px: 0.75,
-                fontSize: '0.75rem',
-                whiteSpace: 'nowrap',
-              },
-            }}
-            onChange={(_, value: StandingsChartMode | null) => {
-              if (value !== null) setMode(value)
-            }}
-          >
-            <ToggleButton value="points" sx={{ flex: 1, textTransform: 'none' }}>
-              Points
-            </ToggleButton>
-            <ToggleButton value="gap" sx={{ flex: 1, textTransform: 'none' }}>
-              Gap
-            </ToggleButton>
-            <ToggleButton
-              value="race"
-              sx={{ flex: 1, textTransform: 'none' }}
-              disabled={races.length === 0}
-            >
-              Per race
-            </ToggleButton>
-          </ToggleButtonGroup>
-          <Divider />
-          <Stack spacing={1} sx={{ flex: 1, minHeight: 0 }}>
-            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                Participants
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {visibleParticipants.length} / {participants.length}
-              </Typography>
-            </Stack>
-            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-              <Checkbox
-                size="small"
-                checked={allSelected}
-                indeterminate={partlySelected}
-                onChange={(_, checked) =>
-                  setSelectedParticipants(checked ? null : new Set<string>())
-                }
-                slotProps={{
-                  input: {
-                    'aria-label': allSelected
-                      ? 'Deselect all participants'
-                      : 'Select all participants',
-                    'aria-checked': partlySelected ? 'mixed' : allSelected,
-                  },
-                }}
-                sx={{ p: 0.5, flexShrink: 0 }}
-              />
-              <TextField
-                size="small"
-                type="search"
-                placeholder="Search by name"
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                slotProps={{ htmlInput: { 'aria-label': 'Search participants by name' } }}
-                sx={{
-                  flex: 1,
-                  minWidth: 0,
-                  '& .MuiInputBase-input': { px: 1, fontSize: '0.8rem' },
-                  '& .MuiInputBase-root': { height: 36 },
-                }}
-              />
-              <Button
-                size="small"
-                variant="outlined"
-                onClick={selectMe}
-                disabled={!ownParticipant}
-                title="Show only my results"
-                sx={{ textTransform: 'none', minWidth: 32, height: 36, px: 1, flexShrink: 0 }}
-              >
-                Me
-              </Button>
-            </Stack>
-            <Stack
+      <Box sx={{ minWidth: 0, position: 'relative' }}>
+        <Paper
+          variant="outlined"
+          sx={{
+            ...PANEL_SX,
+            p: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            position: { lg: 'absolute' },
+            inset: { lg: 0 },
+          }}
+        >
+          <Stack spacing={2} sx={{ flex: 1, minHeight: 0 }}>
+            <Typography sx={{ fontWeight: 600 }}>Chart settings</Typography>
+            <ToggleButtonGroup
+              value={mode}
+              exclusive
+              fullWidth
+              size="small"
+              color="primary"
+              aria-label="Chart mode"
               sx={{
-                maxHeight: 280,
-                overflowY: 'auto',
-                minHeight: 0,
-                minWidth: 0,
-                scrollbarWidth: 'thin',
-                scrollbarColor: 'rgba(255,255,255,0.2) transparent',
-                '&::-webkit-scrollbar': { width: 5 },
-                '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
-                '&::-webkit-scrollbar-thumb': {
-                  backgroundColor: 'rgba(255,255,255,0.2)',
-                  borderRadius: 3,
-                },
-                '&::-webkit-scrollbar-thumb:hover': {
-                  backgroundColor: 'rgba(255,255,255,0.35)',
+                '& .MuiToggleButton-root': {
+                  px: 0.75,
+                  fontSize: '0.75rem',
+                  whiteSpace: 'nowrap',
                 },
               }}
+              onChange={(_, value: StandingsChartMode | null) => {
+                if (value !== null) setMode(value)
+              }}
             >
-              {filteredParticipants.map((participant) => (
-                <FormControlLabel
-                  key={participant.participantId}
-                  sx={{
-                    m: 0,
-                    width: '100%',
-                    px: 0.5,
-                    py: 0.5,
-                    minWidth: 0,
-                    borderRadius: 1,
-                    bgcolor: participant.isMe ? 'rgba(255,255,255,0.04)' : 'transparent',
-                    '& .MuiFormControlLabel-label': { flex: 1, minWidth: 0 },
-                  }}
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={
-                        selectedParticipants === null ||
-                        selectedParticipants.has(participant.participantId)
-                      }
-                      onChange={() => toggleParticipant(participant.participantId)}
-                      slotProps={{
-                        input: { 'aria-label': `Show ${participant.participantName}` },
-                      }}
-                      sx={{
-                        p: 0.5,
-                        mr: 0.5,
-                        color: participant.color,
-                        '&.Mui-checked': { color: participant.color },
-                      }}
-                    />
-                  }
-                  label={
-                    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-                      <Avatar
-                        alt={participant.participantName}
-                        sx={{ width: 22, height: 22, fontSize: '0.7rem' }}
-                      >
-                        {participant.participantName.slice(0, 1)}
-                      </Avatar>
-                      <Typography
-                        variant="body2"
-                        sx={{
-                          flex: 1,
-                          minWidth: 0,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          fontWeight: participant.isMe ? 600 : 400,
-                        }}
-                      >
-                        {participant.participantName}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        title="Total season points"
-                        sx={{ fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}
-                      >
-                        {pointsAt(participant.points, stageCount - 1)}
-                      </Typography>
-                    </Stack>
-                  }
-                />
-              ))}
-              {filteredParticipants.length === 0 && (
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ py: 2, textAlign: 'center' }}
-                >
-                  No participants found
+              <ToggleButton value="points" sx={{ flex: 1, textTransform: 'none' }}>
+                Points
+              </ToggleButton>
+              <ToggleButton value="gap" sx={{ flex: 1, textTransform: 'none' }}>
+                Gap
+              </ToggleButton>
+              <ToggleButton
+                value="race"
+                sx={{ flex: 1, textTransform: 'none' }}
+                disabled={races.length === 0}
+              >
+                Per race
+              </ToggleButton>
+            </ToggleButtonGroup>
+            <Divider />
+            <Stack spacing={1} sx={{ flex: 1, minHeight: 0 }}>
+              <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Participants
                 </Typography>
-              )}
-            </Stack>
-          </Stack>
-          {mode !== 'race' && (
-            <>
-              <Divider />
-              <Stack spacing={0.5}>
-                <FormControlLabel
-                  sx={{ m: 0, alignItems: 'center' }}
-                  control={
-                    <Switch
-                      size="small"
-                      checked={hasThreshold && showThreshold}
-                      disabled={!hasThreshold}
-                      onChange={(_, checked) => setShowThreshold(checked)}
-                    />
-                  }
-                  label={<Typography variant="body2">Title contention threshold</Typography>}
-                />
-                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                  <Box
-                    sx={{ width: 24, borderTop: `2px dashed ${THRESHOLD_COLOR}`, flexShrink: 0 }}
-                  />
-                  <Typography variant="caption" color="text.secondary">
-                    {hasThreshold
-                      ? 'Minimum points required to remain in the title fight'
-                      : 'Threshold not available yet'}
-                  </Typography>
-                </Stack>
+                <Typography variant="caption" color="text.secondary">
+                  {visibleParticipants.length} / {participants.length}
+                </Typography>
               </Stack>
-            </>
-          )}
-        </Stack>
-      </Paper>
+              <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                <Checkbox
+                  size="small"
+                  checked={allSelected}
+                  indeterminate={partlySelected}
+                  onChange={(_, checked) =>
+                    setSelectedParticipants(checked ? null : new Set<string>())
+                  }
+                  slotProps={{
+                    input: {
+                      'aria-label': allSelected
+                        ? 'Deselect all participants'
+                        : 'Select all participants',
+                      'aria-checked': partlySelected ? 'mixed' : allSelected,
+                    },
+                  }}
+                  sx={{ p: 0.5, flexShrink: 0 }}
+                />
+                <TextField
+                  size="small"
+                  type="search"
+                  placeholder="Search by name"
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  slotProps={{ htmlInput: { 'aria-label': 'Search participants by name' } }}
+                  sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    '& .MuiInputBase-input': { px: 1, fontSize: '0.8rem' },
+                    '& .MuiInputBase-root': { height: 36 },
+                  }}
+                />
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={selectMe}
+                  disabled={!ownParticipant}
+                  title="Show only my results"
+                  sx={{ textTransform: 'none', minWidth: 32, height: 36, px: 1, flexShrink: 0 }}
+                >
+                  Me
+                </Button>
+              </Stack>
+              <Box
+                tabIndex={0}
+                aria-label="Participants"
+                sx={{
+                  flex: 1,
+                  maxHeight: { xs: 320, lg: 'none' },
+                  overflowY: 'auto',
+                  minHeight: 0,
+                  minWidth: 0,
+                  py: 0.5,
+                  pr: 0.5,
+                  scrollbarGutter: 'stable',
+                  scrollbarWidth: 'thin',
+                  scrollbarColor: 'rgba(255,255,255,0.2) transparent',
+                  '&::-webkit-scrollbar': { width: 5 },
+                  '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+                  '&::-webkit-scrollbar-thumb': {
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    borderRadius: 3,
+                  },
+                  '&::-webkit-scrollbar-thumb:hover': {
+                    backgroundColor: 'rgba(255,255,255,0.35)',
+                  },
+                }}
+              >
+                {filteredParticipants.map((participant) => (
+                  <FormControlLabel
+                    key={participant.participantId}
+                    sx={{
+                      m: 0,
+                      width: '100%',
+                      px: 0.5,
+                      py: 0.5,
+                      minWidth: 0,
+                      display: 'flex',
+                      minHeight: 36,
+                      flexShrink: 0,
+                      borderRadius: 1,
+                      bgcolor: participant.isMe ? 'rgba(255,255,255,0.04)' : 'transparent',
+                      '& .MuiFormControlLabel-label': { flex: 1, minWidth: 0 },
+                    }}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={
+                          selectedParticipants === null ||
+                          selectedParticipants.has(participant.participantId)
+                        }
+                        onChange={() => toggleParticipant(participant.participantId)}
+                        slotProps={{
+                          input: { 'aria-label': `Show ${participant.participantName}` },
+                        }}
+                        sx={{
+                          p: 0.5,
+                          mr: 0.5,
+                          color: participant.color,
+                          '&.Mui-checked': { color: participant.color },
+                        }}
+                      />
+                    }
+                    label={
+                      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+                        <Avatar
+                          src={participant.avatarUrl}
+                          alt={participant.participantName}
+                          sx={{ width: 22, height: 22, fontSize: '0.7rem', flexShrink: 0 }}
+                        >
+                          {participant.participantName.slice(0, 1)}
+                        </Avatar>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            flex: 1,
+                            minWidth: 0,
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            fontWeight: participant.isMe ? 600 : 400,
+                          }}
+                        >
+                          {participant.participantName}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          title="Total season points"
+                          sx={{ fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}
+                        >
+                          {pointsAt(participant.points, stageCount - 1)}
+                        </Typography>
+                      </Stack>
+                    }
+                  />
+                ))}
+                {filteredParticipants.length === 0 && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ py: 2, textAlign: 'center' }}
+                  >
+                    No participants found
+                  </Typography>
+                )}
+              </Box>
+            </Stack>
+            {mode !== 'race' && (
+              <>
+                <Divider />
+                <Stack spacing={0.5}>
+                  <FormControlLabel
+                    sx={{ m: 0, alignItems: 'center' }}
+                    control={
+                      <Switch
+                        size="small"
+                        checked={hasThreshold && showThreshold}
+                        disabled={!hasThreshold}
+                        onChange={(_, checked) => setShowThreshold(checked)}
+                      />
+                    }
+                    label={<Typography variant="body2">Title contention threshold</Typography>}
+                  />
+                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                    <Box
+                      sx={{ width: 24, borderTop: `2px dashed ${THRESHOLD_COLOR}`, flexShrink: 0 }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {hasThreshold
+                        ? 'Minimum points required to remain in the title fight'
+                        : 'Threshold not available yet'}
+                    </Typography>
+                  </Stack>
+                </Stack>
+              </>
+            )}
+          </Stack>
+        </Paper>
+      </Box>
     </Box>
   )
 }

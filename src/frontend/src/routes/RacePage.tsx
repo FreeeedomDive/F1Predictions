@@ -16,6 +16,7 @@ import { Link, Navigate, useNavigate, useParams } from 'react-router'
 import { isUnauthorized } from '../api/session'
 import PredictionForm from '../components/prediction/PredictionForm'
 import RaceResultPanel from '../components/result/RaceResultPanel'
+import PredictionPointsPanel from '../components/result/PredictionPointsPanel'
 import { useLeague } from '../context/league'
 import { useCurrentRace, useOwnPrediction, useRaceDetails } from '../queries/predictions'
 import { useOwnRaceResult } from '../queries/raceResults'
@@ -193,6 +194,7 @@ export default function RacePage({ current = false }: { current?: boolean }) {
               leagues={profile.leagues}
               receivedAt={details.dataUpdatedAt}
               predictionState={predictionState}
+              pointsPanel={<PredictionPointsPanel data={outcome.data} prediction={own.data} />}
               resultPanel={
                 <RaceResultPanel
                   data={outcome.data}
