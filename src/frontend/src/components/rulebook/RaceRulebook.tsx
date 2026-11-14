@@ -361,8 +361,8 @@ export default function RaceRulebook({
 
         <RuleCard title="Sprint races" badge="×0.30" badgeColor="warning" from={2025} {...seasons}>
           <Rule>
-            Sprint races count with a <strong>×0.30</strong> multiplier
-            applied to the normal points total.
+            Sprint races count with a <strong>×0.30</strong> multiplier applied to the normal points
+            total.
           </Rule>
           <Rule>
             The multiplier is applied after adding the category points. Any fractional part is
