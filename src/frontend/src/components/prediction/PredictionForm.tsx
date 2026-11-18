@@ -312,6 +312,7 @@ export default function PredictionForm({
           ) : (
             <Paper
               component="form"
+              aria-label="Prediction"
               variant="outlined"
               onSubmit={submit}
               sx={{ p: 2, borderRadius: 1 }}

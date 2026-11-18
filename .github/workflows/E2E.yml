@@ -1,0 +1,54 @@
+name: E2E
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    name: Browser E2E suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '25'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          build-root-directory: src
+          add-job-summary: never
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: src/frontend/package-lock.json
+
+      - name: Install frontend dependencies and Chromium
+        working-directory: src/frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run browser tests
+        run: bash scripts/run-e2e.sh
+
+      - name: Upload browser diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: f1predictions-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            src/frontend/playwright-report/
+            src/frontend/test-results/
+          retention-days: 14

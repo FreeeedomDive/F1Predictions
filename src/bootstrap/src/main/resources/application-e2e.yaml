@@ -1,0 +1,40 @@
+spring:
+  docker:
+    compose:
+      enabled: false
+  datasource:
+    url: jdbc:postgresql://localhost:55434/f1predictions_e2e
+    username: f1predictions_e2e
+    password: f1predictions_e2e
+  flyway:
+    enabled: true
+
+server:
+  port: 18081
+
+discord:
+  enabled: false
+
+sessions:
+  hash-secret: ${E2E_SESSION_HASH_SECRET}
+
+races:
+  transition-scheduler:
+    enabled: false
+  calendar-sync:
+    enabled: false
+  starting-grid-sync:
+    enabled: false
+
+management:
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  tracing:
+    export:
+      enabled: false
+  logging:
+    export:
+      otlp:
+        enabled: false

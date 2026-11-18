@@ -42,9 +42,15 @@ jobs:
     if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || (github.event.label.name == 'run-checks' && needs.detect-changes.outputs.frontend == 'true')) }}
     uses: ./.github/workflows/Lint.yml
 
+  e2e:
+    name: Browser E2E
+    needs: [detect-changes]
+    if: ${{ !cancelled() && (github.event_name == 'workflow_dispatch' || (github.event.label.name == 'run-checks' && (needs.detect-changes.outputs.backend == 'true' || needs.detect-changes.outputs.migrate == 'true' || needs.detect-changes.outputs.frontend == 'true'))) }}
+    uses: ./.github/workflows/E2E.yml
+
   gate:
     name: Checks Passed
-    needs: [detect-changes, tests, lint]
+    needs: [detect-changes, tests, lint, e2e]
     if: always()
     runs-on: ubuntu-latest
     steps:
