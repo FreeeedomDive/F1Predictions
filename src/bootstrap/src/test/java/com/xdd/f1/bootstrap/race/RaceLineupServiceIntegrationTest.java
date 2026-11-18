@@ -1,8 +1,10 @@
 package com.xdd.f1.bootstrap.race;
 
+import com.xdd.f1.application.race.RaceRepository;
 import com.xdd.f1.application.race.RaceService;
 import com.xdd.f1.application.race.lineup.RaceLineupConflictException;
 import com.xdd.f1.application.race.lineup.RaceLineupNotEditableException;
+import com.xdd.f1.application.race.lineup.RaceLineupNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupNotPreparedException;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.application.race.lineup.RaceLineupService;
@@ -50,6 +52,7 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
     private static final Instant NOW = Instant.parse("2026-02-03T04:05:06Z");
 
     private final RaceService service;
+    private final RaceRepository races;
     private final RaceJpaRepository jpaRepository;
     private final RaceLineupService lineupService;
     private final TransactionTemplate transactions;
@@ -63,11 +66,13 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     RaceLineupServiceIntegrationTest(
             RaceService service,
+            RaceRepository races,
             RaceJpaRepository jpaRepository,
             RaceLineupService lineupService,
             PlatformTransactionManager transactionManager
     ) {
         this.service = service;
+        this.races = races;
         this.jpaRepository = jpaRepository;
         this.lineupService = lineupService;
         this.transactions = new TransactionTemplate(transactionManager);
@@ -226,21 +231,64 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "finished={0}")
     @ValueSource(booleans = {false, true})
-    void rejectsEditingClosedOrFinishedLineup(boolean finished) {
+    void allowsOnlyTeamMetadataAndTeamOrderChangesForClosedOrFinishedRaces(boolean finished) {
         var race = createRace(2027, 1, "Grand Prix", NOW, NOW.plusSeconds(3600));
-        var initial = lineup(race, "McLaren", "Lando Norris");
+        var initial = redBullLineup(race);
         prepareLineup(initial);
         service.openRacePredictions(race.id());
+        var base = lineupService.getForEditing(race.id()).teams();
         service.closeRacePredictions(race.id());
         if (finished) {
             service.finishRace(race.id());
         }
 
-        assertThatThrownBy(() -> editTeam(
-                race, "McLaren", lineup(race, "Ferrari", "Lando Norris").teams().getFirst()
-        ))
+        var redBull = base.getFirst();
+        var racingBulls = base.getLast();
+        var unchanged = new TeamEdit(racingBulls.branding().name(), racingBulls);
+        var renamed = new Team(new TeamBranding("Oracle Red Bull Racing", "RB", "#001D54", "#E5E5E5"), redBull.drivers());
+        var edit = new TeamEdit(redBull.branding().name(), renamed);
+        var replacement = new Driver("New Driver");
+
+        assertThatThrownBy(() -> lineupService.save(race.id(), base, List.of(unchanged, new TeamEdit(
+                redBull.branding().name(), new Team(renamed.branding(), List.of(redBull.drivers().getFirst(), replacement))
+        )), List.of())).isInstanceOf(RaceLineupNotEditableException.class);
+        assertThatThrownBy(() -> lineupService.save(race.id(), base, List.of(unchanged, new TeamEdit(
+                redBull.branding().name(), new Team(renamed.branding(), redBull.drivers().reversed())
+        )), List.of())).isInstanceOf(RaceLineupNotEditableException.class);
+        assertThatThrownBy(() -> saveByCurrentNames(race, base, swappedRedBullTeams(initial)))
                 .isInstanceOf(RaceLineupNotEditableException.class);
-        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(initial.teams());
+        assertThatThrownBy(() -> lineupService.save(race.id(), base, List.of(unchanged), List.of()))
+                .isInstanceOf(RaceLineupNotEditableException.class);
+        assertThatThrownBy(() -> lineupService.save(race.id(), base, List.of(unchanged, edit, new TeamEdit(
+                null, lineup(race, "Audi", "Bortoleto").teams().getFirst()
+        )), List.of())).isInstanceOf(RaceLineupNotEditableException.class);
+        assertThatThrownBy(() -> lineupService.save(race.id(), base, List.of(unchanged, edit),
+                List.of(new DriverReplacement(redBull.drivers().getLast(), replacement))))
+                .isInstanceOf(RaceLineupNotEditableException.class);
+        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(base);
+
+        var saved = lineupService.save(race.id(), base, List.of(unchanged, edit), List.of());
+        assertThat(saved.race().status()).isEqualTo(finished ? RaceStatus.FINISHED : RaceStatus.CLOSED);
+        assertThat(saved.teams()).containsExactly(racingBulls, renamed);
+        assertThat(lineupService.getForEditing(race.id())).isEqualTo(saved);
+    }
+
+    @Test
+    void doesNotInheritOrCreateAMissingHistoricalLineup() {
+        var previous = createRace(2026, 1, "Earlier Grand Prix", NOW, NOW.plusSeconds(1800));
+        var historical = createRace(2026, 2, "Historical Grand Prix", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
+        var previousLineup = redBullLineup(previous);
+        prepareLineup(previousLineup);
+        transactions.executeWithoutResult(status -> races.update(historical.open().close().finish()));
+
+        var editor = lineupService.getForEditing(historical.id());
+        assertThat(editor.prepared()).isFalse();
+        assertThat(editor.teams()).isEmpty();
+        assertThatThrownBy(() -> lineupService.save(historical.id(), List.of(),
+                List.of(new TeamEdit(null, previousLineup.teams().getFirst())), List.of()))
+                .isInstanceOf(RaceLineupNotFoundException.class);
+        var stored = transactions.execute(status -> lineups.findByRaceId(historical.id()));
+        assertThat(stored).isEmpty();
     }
 
     @Test
@@ -400,7 +448,7 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void rejectsInvalidOrClosedRaceTeamUpdateWithoutChangingLineup() {
+    void rejectsInvalidTeamUpdateWithoutChangingLineup() {
         var race = createRace(2027, 1, "Grand Prix", NOW, NOW.plusSeconds(3600));
         var previousDriver = new Driver("Lando Norris");
         var teammate = new Driver("Oscar Piastri");
@@ -419,11 +467,6 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
         var removed = new Team(original.teams().getFirst().branding(), List.of(teammate));
         assertThatThrownBy(() -> editTeam(race, "McLaren", removed))
                 .isInstanceOf(DomainValidationException.class);
-
-        service.openRacePredictions(race.id());
-        service.closeRacePredictions(race.id());
-        assertThatThrownBy(() -> editTeam(race, "McLaren", original.teams().getFirst()))
-                .isInstanceOf(RaceLineupNotEditableException.class);
 
         assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(original.teams());
     }

@@ -20,6 +20,7 @@ public final class RaceLineupDtoMapper {
     static RaceLineupDto toDto(RaceLineupEditor editor) {
         return new RaceLineupDto(
                 RaceDtoMapper.toDto(editor.race()),
+                editor.race().season(),
                 editor.teams().stream().map(RaceLineupDtoMapper::toDto).toList(),
                 editor.prepared()
         );

@@ -9,6 +9,7 @@ import com.xdd.f1.application.prediction.PredictionConditionsRepository;
 import com.xdd.f1.contract.race.DriverReplacementDto;
 import com.xdd.f1.contract.race.RaceDriversMovedEvent;
 import com.xdd.f1.contract.race.RaceDriversReplacedEvent;
+import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
 
@@ -74,18 +76,27 @@ public class RaceLineupService {
 
     @Transactional(readOnly = true)
     public RaceLineupEditor getForEditing(RaceId raceId) {
-        var race = raceRepository.findById(raceId).orElseThrow(() -> new RaceNotFoundException(raceId));
-        return toEditor(race);
+        return toEditor(findRace(raceId));
     }
 
     @Transactional
     public RaceLineupEditor save(
             RaceId raceId, List<Team> baseTeams, List<TeamEdit> edits, List<DriverReplacement> confirmedReplacements
     ) {
-        var race = getEditableRace(raceId);
+        lock.acquire("race:" + raceId.value());
+        var race = findRace(raceId);
         var current = toEditor(race);
+        var driversEditable = canEditDrivers(race);
+        if (!driversEditable && !current.prepared()) {
+            throw new RaceLineupNotFoundException(raceId);
+        }
         if (!current.teams().equals(baseTeams)) {
             throw new RaceLineupConflictException(raceId);
+        }
+        if (!driversEditable) {
+            validateHistoricalEdit(race, current.teams(), edits, confirmedReplacements);
+        } else if (edits.stream().anyMatch(edit -> edit.team().drivers().size() > 2)) {
+            throw new DomainValidationException("Team must not have more than two drivers");
         }
         var changes = RaceLineupChanges.calculate(raceId, current.teams(), edits, confirmedReplacements);
         var lineup = changes.lineup();
@@ -99,11 +110,28 @@ public class RaceLineupService {
         } else {
             lineupRepository.update(lineup);
         }
-        if (!changes.replacements().isEmpty()) {
-            replaceDriverReferences(race.id(), changes.replacements());
+        if (driversEditable) {
+            if (!changes.replacements().isEmpty()) {
+                replaceDriverReferences(race.id(), changes.replacements());
+            }
+            changes.teams().forEach(change -> publishDriverChanges(race, change));
         }
-        changes.teams().forEach(change -> publishDriverChanges(race, change));
         return new RaceLineupEditor(race, lineup.teams(), true);
+    }
+
+    private void validateHistoricalEdit(
+            Race race, List<Team> before, List<TeamEdit> edits, List<DriverReplacement> replacements
+    ) {
+        if (!replacements.isEmpty() || edits.size() != before.size()) {
+            throw new RaceLineupNotEditableException(race.id(), race.status());
+        }
+        var driversByTeam = new HashMap<String, List<Driver>>();
+        before.forEach(team -> driversByTeam.put(team.branding().name(), team.drivers()));
+        for (var edit : edits) {
+            if (!edit.team().drivers().equals(driversByTeam.remove(edit.previousName()))) {
+                throw new RaceLineupNotEditableException(race.id(), race.status());
+            }
+        }
     }
 
     @Transactional
@@ -153,20 +181,18 @@ public class RaceLineupService {
         }
     }
 
-    private Race getEditableRace(RaceId raceId) {
-        lock.acquire("race:" + raceId.value());
-        var race = raceRepository.findById(raceId).orElseThrow(() -> new RaceNotFoundException(raceId));
-        if (race.status() != RaceStatus.SCHEDULED && race.status() != RaceStatus.OPEN) {
-            throw new RaceLineupNotEditableException(race.id(), race.status());
-        }
-        return race;
+    private Race findRace(RaceId raceId) {
+        return raceRepository.findById(raceId).orElseThrow(() -> new RaceNotFoundException(raceId));
+    }
+
+    private boolean canEditDrivers(Race race) {
+        return race.status() == RaceStatus.SCHEDULED || race.status() == RaceStatus.OPEN;
     }
 
     private RaceLineupEditor toEditor(Race race) {
         var saved = lineupRepository.findByRaceId(race.id());
-        var teams = saved.or(() -> lineupRepository.findLatestBefore(race.closeAt()))
-                .map(RaceLineup::teams)
-                .orElse(List.of());
+        var lineup = canEditDrivers(race) ? saved.or(() -> lineupRepository.findLatestBefore(race.closeAt())) : saved;
+        var teams = lineup.map(RaceLineup::teams).orElse(List.of());
         return new RaceLineupEditor(race, teams, saved.isPresent());
     }
 }

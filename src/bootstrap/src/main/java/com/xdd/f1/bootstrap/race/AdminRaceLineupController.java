@@ -38,6 +38,14 @@ public class AdminRaceLineupController {
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
+    @GetMapping("races/{raceId}/lineup")
+    public RaceLineupDto get(
+            @CurrentUser AuthenticatedUser user,
+            @PathVariable UUID raceId
+    ) {
+        return RaceLineupDtoMapper.toDto(lineupService.getForEditing(new RaceId(raceId)));
+    }
+
     @PutMapping("races/{raceId}/lineup")
     public RaceLineupDto save(
             @CurrentUser AuthenticatedUser user,

@@ -25,9 +25,6 @@ public record RaceLineupChanges(
             if (team.branding().badge().length() > 3) {
                 throw new DomainValidationException("Team badge must not exceed 3 characters");
             }
-            if (team.drivers().size() > 2) {
-                throw new DomainValidationException("Team must not have more than two drivers");
-            }
             if (edit.previousName() != null) {
                 var previous = remaining.remove(edit.previousName());
                 if (previous == null) {
