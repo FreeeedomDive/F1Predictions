@@ -1,15 +1,19 @@
+import type {
+  DraggableProvided,
+  DraggableProvidedDraggableProps,
+  DraggableProvidedDragHandleProps,
+} from '@hello-pangea/dnd'
 import CloseRounded from '@mui/icons-material/CloseRounded'
+import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded'
+import DragIndicatorRounded from '@mui/icons-material/DragIndicatorRounded'
 import MoreVertRounded from '@mui/icons-material/MoreVertRounded'
-import SaveRounded from '@mui/icons-material/SaveRounded'
 import UndoRounded from '@mui/icons-material/UndoRounded'
 import {
   Box,
   Chip,
-  CircularProgress,
   IconButton,
   InputAdornment,
   ListItemIcon,
-  ListItemText,
   Menu,
   MenuItem,
   TableCell,
@@ -18,33 +22,10 @@ import {
   Tooltip,
 } from '@mui/material'
 import { useId, useState } from 'react'
-import type { RaceLineupTeamDto } from '../../dto/raceLineup'
+import { hexColor, normalizeTeam, teamValue, type TeamDraft } from './lineupDraft'
+import TeamDriversEditor from './TeamDriversEditor'
 
-const hexColor = /^#[0-9a-f]{6}$/i
-
-type TeamFields = Omit<RaceLineupTeamDto, 'drivers'>
-type TeamDraft = Partial<TeamFields> & { drivers?: Record<number, string> }
-
-function normalizeTeam(team: RaceLineupTeamDto): RaceLineupTeamDto {
-  return {
-    name: team.name.trim(),
-    badge: team.badge.trim(),
-    backgroundColor: team.backgroundColor.trim().toUpperCase(),
-    textColor: team.textColor.trim().toUpperCase(),
-    drivers: team.drivers.map((driver) => driver.trim()).filter(Boolean),
-  }
-}
-
-function sameTeam(left: RaceLineupTeamDto, right: RaceLineupTeamDto) {
-  return (
-    left.name === right.name &&
-    left.badge === right.badge &&
-    left.backgroundColor.toUpperCase() === right.backgroundColor.toUpperCase() &&
-    left.textColor.toUpperCase() === right.textColor.toUpperCase() &&
-    left.drivers.length === right.drivers.length &&
-    left.drivers.every((driver, index) => driver === right.drivers[index])
-  )
-}
+type TeamFields = TeamDraft['team']
 
 function ColorField({
   label,
@@ -99,102 +80,107 @@ function ColorField({
 }
 
 export default function TeamEditorRow({
-  team,
-  isNew = false,
-  busy,
-  saving,
-  onSave,
-  onCancel,
+  rowRef,
+  draggableProps,
+  dragHandleProps,
+  dragging,
+  dragCellWidths,
+  row,
+  isNew,
+  driversEditable,
+  dragSourceTeam,
+  disabled,
+  showErrors,
+  duplicateName,
+  duplicateDrivers,
+  onChange,
+  onDiscard,
+  onRemove,
 }: {
-  team: RaceLineupTeamDto
-  isNew?: boolean
-  busy: boolean
-  saving: boolean
-  onSave: (team: RaceLineupTeamDto, onSaved: () => void) => void
-  onCancel?: () => void
+  rowRef: DraggableProvided['innerRef']
+  draggableProps: DraggableProvidedDraggableProps
+  dragHandleProps: DraggableProvidedDragHandleProps | null
+  dragging: boolean
+  dragCellWidths?: number[]
+  row: TeamDraft
+  isNew: boolean
+  driversEditable: boolean
+  dragSourceTeam?: string
+  disabled: boolean
+  showErrors: boolean
+  duplicateName: boolean
+  duplicateDrivers: ReadonlySet<string>
+  onChange: (update: (row: TeamDraft) => TeamDraft) => void
+  onDiscard?: () => void
+  onRemove?: () => void
 }) {
-  const [draft, setDraft] = useState<TeamDraft>({})
-  const [showErrors, setShowErrors] = useState(false)
   const [actionsAnchor, setActionsAnchor] = useState<HTMLElement | null>(null)
   const actionsId = useId()
-  const actionsButtonId = useId()
-  const { drivers: driverDrafts = {}, ...fields } = draft
-  const driverCount = Math.max(
-    2,
-    team.drivers.length,
-    ...Object.keys(driverDrafts).map((index) => Number(index) + 1),
-  )
-  const value: RaceLineupTeamDto = {
-    ...team,
-    ...fields,
-    drivers: Array.from(
-      { length: driverCount },
-      (_, index) => driverDrafts[index] ?? team.drivers[index] ?? '',
-    ),
-  }
-  const normalized = normalizeTeam(value)
+  const value = row.team
+  const normalized = normalizeTeam(teamValue(row))
+  const nameError = !normalized.name
+    ? 'Team name is required.'
+    : duplicateName
+      ? 'Team must occur only once.'
+      : ''
   const badgeError = !normalized.badge
     ? 'Badge is required.'
     : normalized.badge.length > 3
       ? 'Use up to 3 characters.'
       : ''
-  const dirty = isNew || !sameTeam(normalized, team)
-  const drivers = value.drivers
-  const driverErrors = drivers.map((driver, index) => {
-    const name = driver.trim()
-    if (!name && (isNew || index < team.drivers.length)) return 'Driver name is required.'
-    if (name && drivers.filter((other) => other.trim() === name).length > 1)
-      return 'Driver must occur only once.'
-    return ''
-  })
-  const valid =
-    normalized.name.length > 0 &&
-    !badgeError &&
-    hexColor.test(normalized.backgroundColor) &&
-    hexColor.test(normalized.textColor) &&
-    driverErrors.every((error) => !error)
-
   function change(field: keyof TeamFields, nextValue: string) {
-    setDraft((current) => {
-      const next = { ...current }
-      if (nextValue === team[field]) delete next[field]
-      else next[field] = nextValue
-      return next
-    })
+    onChange((current) => ({ ...current, team: { ...current.team, [field]: nextValue } }))
   }
 
-  function changeDriver(index: number, nextValue: string) {
-    setDraft((current) => {
-      const drivers = { ...current.drivers }
-      if (nextValue === (team.drivers[index] ?? '')) delete drivers[index]
-      else drivers[index] = nextValue
-      return { ...current, drivers }
-    })
-  }
-
-  function reset() {
-    setActionsAnchor(null)
-    setDraft({})
-    setShowErrors(false)
-  }
-
-  function save() {
-    setActionsAnchor(null)
-    setShowErrors(true)
-    if (valid) onSave(normalized, reset)
+  function changeDriver(driverId: string, name: string) {
+    onChange((current) => ({
+      ...current,
+      drivers: current.drivers.map((driver) =>
+        driver.id === driverId ? { ...driver, name } : driver,
+      ),
+    }))
   }
 
   return (
-    <TableRow hover sx={{ bgcolor: isNew ? 'action.hover' : undefined }}>
+    <TableRow
+      ref={rowRef}
+      {...draggableProps}
+      hover
+      style={
+        dragging
+          ? { ...draggableProps.style, display: 'table', tableLayout: 'fixed' }
+          : draggableProps.style
+      }
+      sx={{
+        bgcolor: dragging ? 'background.paper' : isNew ? 'action.hover' : undefined,
+        ...Object.fromEntries(
+          (dragCellWidths ?? []).map((width, index) => [
+            `& > td:nth-of-type(${index + 1})`,
+            { width, boxSizing: 'border-box' },
+          ]),
+        ),
+      }}
+    >
+      <TableCell align="center" sx={{ width: 48, minWidth: 48, boxSizing: 'border-box' }}>
+        <IconButton
+          {...dragHandleProps}
+          size="small"
+          disabled={!dragHandleProps}
+          aria-label={`Move ${normalized.name || 'new team'}`}
+          sx={{ color: 'text.secondary', cursor: dragging ? 'grabbing' : 'grab' }}
+        >
+          <DragIndicatorRounded fontSize="small" />
+        </IconButton>
+      </TableCell>
       <TableCell sx={{ minWidth: 190 }}>
         <TextField
           fullWidth
           size="small"
           placeholder="Team name"
           value={value.name}
-          disabled={saving}
-          error={showErrors && !normalized.name}
-          helperText={showErrors && !normalized.name ? 'Team name is required.' : undefined}
+          disabled={disabled}
+          error={showErrors && !!nameError}
+          helperText={showErrors ? nameError || undefined : undefined}
           onChange={(event) => change('name', event.target.value)}
           slotProps={{ htmlInput: { 'aria-label': 'Team name' } }}
         />
@@ -205,7 +191,7 @@ export default function TeamEditorRow({
           size="small"
           placeholder="Badge"
           value={value.badge}
-          disabled={saving}
+          disabled={disabled}
           error={!!badgeError && (showErrors || normalized.badge.length > 3)}
           helperText={
             showErrors || normalized.badge.length > 3 ? badgeError || undefined : undefined
@@ -239,7 +225,7 @@ export default function TeamEditorRow({
         <ColorField
           label="Background color"
           value={value.backgroundColor}
-          disabled={saving}
+          disabled={disabled}
           showErrors={showErrors}
           onChange={(backgroundColor) => change('backgroundColor', backgroundColor)}
         />
@@ -248,76 +234,80 @@ export default function TeamEditorRow({
         <ColorField
           label="Text color"
           value={value.textColor}
-          disabled={saving}
+          disabled={disabled}
           showErrors={showErrors}
           onChange={(textColor) => change('textColor', textColor)}
         />
       </TableCell>
       <TableCell sx={{ minWidth: 380 }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.5 }}>
-          {drivers.map((driver, index) => (
-            <TextField
-              key={index}
-              size="small"
-              label={`Driver ${index + 1}`}
-              value={driver}
-              disabled={saving}
-              error={showErrors && !!driverErrors[index]}
-              helperText={showErrors ? driverErrors[index] || undefined : undefined}
-              onChange={(event) => changeDriver(index, event.target.value)}
-            />
-          ))}
-        </Box>
+        <TeamDriversEditor
+          row={row}
+          editable={driversEditable}
+          disabled={disabled}
+          dragSourceTeam={dragSourceTeam}
+          duplicateDrivers={duplicateDrivers}
+          showErrors={showErrors}
+          onChange={changeDriver}
+        />
       </TableCell>
       <TableCell align="right" sx={{ width: 64 }}>
-        <Tooltip title={saving ? 'Saving team…' : 'Team actions'}>
-          <span>
+        {onRemove ? (
+          <>
             <IconButton
-              id={actionsButtonId}
-              aria-label={`Actions for ${normalized.name || 'new team'}`}
+              aria-label={`Actions for ${normalized.name || row.previousName}`}
               aria-haspopup="menu"
               aria-controls={actionsAnchor ? actionsId : undefined}
-              aria-expanded={Boolean(actionsAnchor)}
-              aria-busy={saving}
-              disabled={saving}
+              aria-expanded={!!actionsAnchor}
+              disabled={disabled}
               onClick={(event) => setActionsAnchor(event.currentTarget)}
-              sx={{ width: 40, height: 40, border: 1, borderColor: 'divider', borderRadius: 1 }}
             >
-              {saving ? (
-                <CircularProgress size={18} color="inherit" />
-              ) : (
-                <MoreVertRounded fontSize="small" />
-              )}
+              <MoreVertRounded fontSize="small" />
             </IconButton>
-          </span>
-        </Tooltip>
-        <Menu
-          id={actionsId}
-          anchorEl={actionsAnchor}
-          open={Boolean(actionsAnchor)}
-          onClose={() => setActionsAnchor(null)}
-          slotProps={{ list: { 'aria-labelledby': actionsButtonId } }}
-        >
-          <MenuItem disabled={busy || !dirty} onClick={save}>
-            <ListItemIcon>
-              <SaveRounded fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Save</ListItemText>
-          </MenuItem>
-          <MenuItem
-            disabled={saving || (!isNew && !dirty)}
-            onClick={() => {
-              setActionsAnchor(null)
-              if (isNew) onCancel?.()
-              else reset()
-            }}
-          >
-            <ListItemIcon>
-              {isNew ? <CloseRounded fontSize="small" /> : <UndoRounded fontSize="small" />}
-            </ListItemIcon>
-            <ListItemText>{isNew ? 'Cancel' : 'Discard changes'}</ListItemText>
-          </MenuItem>
-        </Menu>
+            <Menu
+              anchorEl={actionsAnchor}
+              open={!!actionsAnchor && !disabled}
+              onClose={() => setActionsAnchor(null)}
+              slotProps={{ list: { id: actionsId, 'aria-label': 'Team actions' } }}
+            >
+              {onDiscard && (
+                <MenuItem
+                  onClick={() => {
+                    setActionsAnchor(null)
+                    onDiscard()
+                  }}
+                >
+                  <ListItemIcon>
+                    <UndoRounded fontSize="small" />
+                  </ListItemIcon>
+                  Discard team changes
+                </MenuItem>
+              )}
+              <MenuItem
+                onClick={() => {
+                  setActionsAnchor(null)
+                  onRemove()
+                }}
+              >
+                <ListItemIcon>
+                  <DeleteOutlineRounded fontSize="small" />
+                </ListItemIcon>
+                Remove team
+              </MenuItem>
+            </Menu>
+          </>
+        ) : (
+          onDiscard && (
+            <Tooltip title={isNew ? 'Remove new team' : 'Discard team changes'}>
+              <IconButton
+                aria-label={`${isNew ? 'Remove' : 'Discard changes for'} ${normalized.name || 'new team'}`}
+                disabled={disabled}
+                onClick={onDiscard}
+              >
+                {isNew ? <CloseRounded fontSize="small" /> : <UndoRounded fontSize="small" />}
+              </IconButton>
+            </Tooltip>
+          )
+        )}
       </TableCell>
     </TableRow>
   )

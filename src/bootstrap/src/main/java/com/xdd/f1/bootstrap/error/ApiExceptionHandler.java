@@ -3,6 +3,7 @@ package com.xdd.f1.bootstrap.error;
 import com.xdd.f1.application.league.LeagueNotFoundException;
 import com.xdd.f1.application.league.LeagueParticipantNotFoundException;
 import com.xdd.f1.application.race.RaceNotFoundException;
+import com.xdd.f1.application.race.lineup.RaceLineupConflictException;
 import com.xdd.f1.application.race.lineup.RaceLineupNotEditableException;
 import com.xdd.f1.application.race.lineup.RaceLineupNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupNotPreparedException;
@@ -53,6 +54,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler({
             InvalidRaceStatusException.class,
+            RaceLineupConflictException.class,
             RaceLineupNotPreparedException.class,
             RaceLineupNotEditableException.class,
             PredictionsClosedException.class,

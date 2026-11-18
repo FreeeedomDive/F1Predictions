@@ -25,6 +25,7 @@ import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
 import com.xdd.f1.domain.race.RaceType;
 import com.xdd.f1.domain.race.lineup.Driver;
+import com.xdd.f1.domain.race.lineup.RaceLineupChanges.TeamEdit;
 import com.xdd.f1.domain.race.lineup.Team;
 import com.xdd.f1.domain.race.lineup.TeamBranding;
 import com.xdd.f1.domain.user.User;
@@ -454,10 +455,14 @@ class RaceServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     private void prepareLineup(Race race) {
-        lineupService.addTeam(race.id(), new Team(
+        var base = lineupService.getForEditing(race.id()).teams();
+        var team = new Team(
                 new TeamBranding("McLaren", "MCL", "#FF8000", "#000000"),
                 List.of(new Driver("Lando Norris"))
-        ));
+        );
+        lineupService.save(race.id(), base, List.of(new TeamEdit(
+                base.isEmpty() ? null : team.branding().name(), team
+        )), List.of());
     }
 
     private RaceCalendarEntry calendarEntry(RaceType type, String name, Instant openAt, Instant closeAt) {

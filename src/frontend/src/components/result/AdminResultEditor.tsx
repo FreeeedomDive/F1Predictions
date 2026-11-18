@@ -123,6 +123,7 @@ export default function AdminResultEditor({
     page.season <= 2027 &&
     (!page.result || page.result.rulesVersion === expectedRules)
   const editable = page.race.status !== 'SCHEDULED' && page.lineupPrepared && supportedRules
+  const canPrepareLineup = page.race.status === 'SCHEDULED' || page.race.status === 'OPEN'
   const pending = busy || operation !== null || savingPrediction
   const canSave = editable && validLead && validIncidents && rosterMatches
   const complete =
@@ -347,6 +348,17 @@ export default function AdminResultEditor({
             {needsRecalculation && page.race.status === 'FINISHED' && (
               <Chip size="small" variant="outlined" color="warning" label="Recalculation needed" />
             )}
+            {(page.lineupPrepared || canPrepareLineup) && (
+              <RightsWrapper requiredRights={['EDIT_RACE_LINEUPS']}>
+                <Button
+                  component={Link}
+                  to={`/admin/teams/${encodeURIComponent(page.race.id)}`}
+                  size="small"
+                >
+                  Edit lineup
+                </Button>
+              </RightsWrapper>
+            )}
             <Button
               size="small"
               variant="outlined"
@@ -379,11 +391,9 @@ export default function AdminResultEditor({
       </Paper>
       {!page.lineupPrepared && (
         <Alert severity="info">
-          Prepare the race lineup in{' '}
-          <RightsWrapper requiredRights={['EDIT_RACE_LINEUPS']} fallback="Teams">
-            <Link to="/admin/teams">Teams</Link>
-          </RightsWrapper>{' '}
-          before entering a result.
+          {canPrepareLineup
+            ? 'Prepare the race lineup before entering a result.'
+            : 'No lineup was saved for this race.'}
         </Alert>
       )}
       {page.race.status === 'SCHEDULED' && (

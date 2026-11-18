@@ -8,16 +8,20 @@ import com.xdd.f1.application.race.RaceService;
 import com.xdd.f1.application.race.RaceNotFoundException;
 import com.xdd.f1.application.race.RaceCalendarEntry;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
+import com.xdd.f1.application.race.lineup.RaceLineupService;
 import com.xdd.f1.application.race.result.*;
 import com.xdd.f1.application.standings.SeasonPodiumEntry;
 import com.xdd.f1.application.standings.SeasonPodiumRepository;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
+import com.xdd.f1.contract.race.RaceDriversMovedEvent;
+import com.xdd.f1.contract.race.RaceDriversReplacedEvent;
 import com.xdd.f1.contract.race.RaceStartingGridUpdatedEvent;
 import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.league.*;
 import com.xdd.f1.domain.prediction.*;
 import com.xdd.f1.domain.race.*;
 import com.xdd.f1.domain.race.lineup.*;
+import com.xdd.f1.domain.race.lineup.RaceLineupChanges.TeamEdit;
 import com.xdd.f1.domain.race.result.*;
 import com.xdd.f1.domain.user.*;
 import com.xdd.f1.infrastructure.persistence.race.RaceJpaRepository;
@@ -66,6 +70,7 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
     private final PredictionRepository predictions;
     private final PredictionConditionsRepository conditions;
     private final RaceLineupRepository lineups;
+    private final RaceLineupService lineupService;
     private final LeagueRepository leagues;
     private final LeagueParticipantService participants;
     private final SeasonPodiumRepository podiums;
@@ -87,7 +92,7 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
     @Autowired
     RaceResultServiceIntegrationTest(RaceResultService service, RaceResultRepository results, RaceService races,
                                      PredictionService predictionService, PredictionRepository predictions,
-                                     PredictionConditionsRepository conditions, RaceLineupRepository lineups,
+                                      PredictionConditionsRepository conditions, RaceLineupRepository lineups, RaceLineupService lineupService,
                                      LeagueRepository leagues, LeagueParticipantService participants,
                                      SeasonPodiumRepository podiums, RaceJpaRepository raceJpaRepository, JdbcClient jdbc,
                                      PlatformTransactionManager transactionManager) {
@@ -98,6 +103,7 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
         this.predictions = predictions;
         this.conditions = conditions;
         this.lineups = lineups;
+        this.lineupService = lineupService;
         this.leagues = leagues;
         this.participants = participants;
         this.podiums = podiums;
@@ -307,6 +313,38 @@ class RaceResultServiceIntegrationTest extends AbstractIntegrationTest {
                 .param("id", race.id().value()).query(Long.class).single()).isEqualTo(1L);
         assertThat(jdbc.sql("SELECT version FROM prediction_points WHERE prediction_id = :id")
                 .param("id", saved.getFirst().id().value()).query(Long.class).single()).isZero();
+    }
+
+    @Test
+    void editingFinishedTeamBrandingKeepsResultsPointsAndPredictionsAndDoesNotAnnounceDriverChanges(ApplicationEvents events) {
+        var race = openRace(2027, 1, RaceType.RACE);
+        var savedPredictions = savePredictions(race);
+        var grid = List.of(new Driver("Norris"), new Driver("Piastri"));
+        assertThat(service.applyStartingGrid(race, grid)).isTrue();
+        publish(race);
+        var published = service.getForEditing(race.id()).result();
+        var savedConditions = service.getForEditing(race.id()).conditions();
+        var savedPoints = transactions.execute(status -> points.findAllByRaceId(race.id()));
+        events.clear();
+
+        var base = lineupService.getForEditing(race.id()).teams();
+        var original = base.getFirst();
+        var renamed = new Team(new TeamBranding("New name", "NEW", "#112233", "#FFFFFF"), original.drivers());
+        var edits = base.reversed().stream().map(team -> new TeamEdit(
+                team.branding().name(), team.equals(original) ? renamed : team
+        )).toList();
+        lineupService.save(race.id(), base, edits, List.of());
+
+        assertThat(lineupService.getForEditing(race.id()).teams().getLast()).isEqualTo(renamed);
+        transactions.executeWithoutResult(status -> {
+            assertThat(results.findByRaceId(race.id())).contains(published);
+            assertThat(points.findAllByRaceId(race.id())).containsExactlyInAnyOrderElementsOf(savedPoints);
+            assertThat(predictions.findAllByRaceId(race.id())).containsExactlyInAnyOrderElementsOf(savedPredictions);
+            assertThat(conditions.findByRaceId(race.id())).contains(savedConditions);
+        });
+        assertThat(events.stream(RaceDriversReplacedEvent.class)).isEmpty();
+        assertThat(events.stream(RaceDriversMovedEvent.class)).isEmpty();
+        assertThat(events.stream(RaceStartingGridUpdatedEvent.class)).isEmpty();
     }
 
     @Test
