@@ -136,12 +136,18 @@ export function analyzeDraft(baseTeams: RaceLineupTeamDto[], drafts: TeamDraft[]
   const after = new Map(
     teams.flatMap(({ previousName, team }) => team.drivers.map((name) => [name, previousName])),
   )
-  const removed = [...before.keys()].filter((name) => !after.has(name))
+  const retainedTeamNames = new Set(teams.map(({ previousName }) => previousName))
+  const removedTeams = baseTeams
+    .map((team) => team.name)
+    .filter((name) => !retainedTeamNames.has(name))
+  const removed = [...before].flatMap(([driver, team]) =>
+    !after.has(driver) && retainedTeamNames.has(team) ? [driver] : [],
+  )
   const added = [...after.keys()].filter((name) => !before.has(name))
   const needsPairing =
     removed.length > 0 &&
     !(removed.length === 1 && added.length === 1 && before.get(removed[0]) === after.get(added[0]))
-  return { teams, removed, added, needsPairing }
+  return { teams, removedTeams, removed, added, needsPairing }
 }
 
 export function selectedReplacements(

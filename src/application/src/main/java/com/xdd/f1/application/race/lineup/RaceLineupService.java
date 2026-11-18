@@ -99,6 +99,7 @@ public class RaceLineupService {
             throw new DomainValidationException("Team must not have more than two drivers");
         }
         var changes = RaceLineupChanges.calculate(raceId, current.teams(), edits, confirmedReplacements);
+        validateTeamRemoval(race, changes);
         var lineup = changes.lineup();
         if (current.prepared() && current.teams().equals(lineup.teams())) {
             return current;
@@ -117,6 +118,27 @@ public class RaceLineupService {
             changes.teams().forEach(change -> publishDriverChanges(race, change));
         }
         return new RaceLineupEditor(race, lineup.teams(), true);
+    }
+
+    private void validateTeamRemoval(Race race, RaceLineupChanges changes) {
+        if (!changes.teamRemoved()) {
+            return;
+        }
+        if (race.status() != RaceStatus.SCHEDULED) {
+            throw new RaceLineupNotEditableException(race.id(), race.status(), "Teams can only be removed before predictions open");
+        }
+        var withdrawn = changes.withdrawnDrivers();
+        if (withdrawn.isEmpty()) {
+            return;
+        }
+        var raceId = race.id();
+        if (results.hasStartingGridDriver(raceId, withdrawn)) {
+            throw new DomainValidationException("Remove departing drivers from the starting grid before removing their teams");
+        }
+        if (conditions.findByRaceId(raceId).filter(saved -> withdrawn.contains(saved.positionPredictionDriver())).isPresent()
+                || !predictions.findAllByRaceId(raceId).isEmpty()) {
+            throw new DomainValidationException("Cannot remove teams with departing drivers once prediction data has been saved");
+        }
     }
 
     private void validateHistoricalEdit(

@@ -4,18 +4,24 @@ import type {
   DraggableProvidedDragHandleProps,
 } from '@hello-pangea/dnd'
 import CloseRounded from '@mui/icons-material/CloseRounded'
+import DeleteOutlineRounded from '@mui/icons-material/DeleteOutlineRounded'
 import DragIndicatorRounded from '@mui/icons-material/DragIndicatorRounded'
+import MoreVertRounded from '@mui/icons-material/MoreVertRounded'
 import UndoRounded from '@mui/icons-material/UndoRounded'
 import {
   Box,
   Chip,
   IconButton,
   InputAdornment,
+  ListItemIcon,
+  Menu,
+  MenuItem,
   TableCell,
   TableRow,
   TextField,
   Tooltip,
 } from '@mui/material'
+import { useId, useState } from 'react'
 import { hexColor, normalizeTeam, teamValue, type TeamDraft } from './lineupDraft'
 import TeamDriversEditor from './TeamDriversEditor'
 
@@ -89,6 +95,7 @@ export default function TeamEditorRow({
   duplicateDrivers,
   onChange,
   onDiscard,
+  onRemove,
 }: {
   rowRef: DraggableProvided['innerRef']
   draggableProps: DraggableProvidedDraggableProps
@@ -105,7 +112,10 @@ export default function TeamEditorRow({
   duplicateDrivers: ReadonlySet<string>
   onChange: (update: (row: TeamDraft) => TeamDraft) => void
   onDiscard?: () => void
+  onRemove?: () => void
 }) {
+  const [actionsAnchor, setActionsAnchor] = useState<HTMLElement | null>(null)
+  const actionsId = useId()
   const value = row.team
   const normalized = normalizeTeam(teamValue(row))
   const nameError = !normalized.name
@@ -241,16 +251,62 @@ export default function TeamEditorRow({
         />
       </TableCell>
       <TableCell align="right" sx={{ width: 64 }}>
-        {onDiscard && (
-          <Tooltip title={isNew ? 'Remove new team' : 'Discard team changes'}>
+        {onRemove ? (
+          <>
             <IconButton
-              aria-label={`${isNew ? 'Remove' : 'Discard changes for'} ${normalized.name || 'new team'}`}
+              aria-label={`Actions for ${normalized.name || row.previousName}`}
+              aria-haspopup="menu"
+              aria-controls={actionsAnchor ? actionsId : undefined}
+              aria-expanded={!!actionsAnchor}
               disabled={disabled}
-              onClick={onDiscard}
+              onClick={(event) => setActionsAnchor(event.currentTarget)}
             >
-              {isNew ? <CloseRounded fontSize="small" /> : <UndoRounded fontSize="small" />}
+              <MoreVertRounded fontSize="small" />
             </IconButton>
-          </Tooltip>
+            <Menu
+              anchorEl={actionsAnchor}
+              open={!!actionsAnchor && !disabled}
+              onClose={() => setActionsAnchor(null)}
+              slotProps={{ list: { id: actionsId, 'aria-label': 'Team actions' } }}
+            >
+              {onDiscard && (
+                <MenuItem
+                  onClick={() => {
+                    setActionsAnchor(null)
+                    onDiscard()
+                  }}
+                >
+                  <ListItemIcon>
+                    <UndoRounded fontSize="small" />
+                  </ListItemIcon>
+                  Discard team changes
+                </MenuItem>
+              )}
+              <MenuItem
+                onClick={() => {
+                  setActionsAnchor(null)
+                  onRemove()
+                }}
+              >
+                <ListItemIcon>
+                  <DeleteOutlineRounded fontSize="small" />
+                </ListItemIcon>
+                Remove team
+              </MenuItem>
+            </Menu>
+          </>
+        ) : (
+          onDiscard && (
+            <Tooltip title={isNew ? 'Remove new team' : 'Discard team changes'}>
+              <IconButton
+                aria-label={`${isNew ? 'Remove' : 'Discard changes for'} ${normalized.name || 'new team'}`}
+                disabled={disabled}
+                onClick={onDiscard}
+              >
+                {isNew ? <CloseRounded fontSize="small" /> : <UndoRounded fontSize="small" />}
+              </IconButton>
+            </Tooltip>
+          )
         )}
       </TableCell>
     </TableRow>

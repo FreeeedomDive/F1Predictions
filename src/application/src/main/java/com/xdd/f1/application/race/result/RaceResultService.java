@@ -144,6 +144,14 @@ public class RaceResultService {
                 saveStartingGrid(race, Optional.of(previous), previous.replaceStartingGridDrivers(replacements)));
     }
 
+    @Transactional(readOnly = true)
+    public boolean hasStartingGridDriver(RaceId raceId, List<Driver> drivers) {
+        return results.findByRaceId(raceId)
+                .map(RaceResult::startingGrid)
+                .filter(grid -> grid.stream().anyMatch(drivers::contains))
+                .isPresent();
+    }
+
     @Transactional
     public RaceResult saveDraft(RaceId raceId, RaceResultValues values) {
         Objects.requireNonNull(values, "Race result values must not be null");

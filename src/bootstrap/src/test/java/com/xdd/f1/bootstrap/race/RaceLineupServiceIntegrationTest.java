@@ -8,6 +8,7 @@ import com.xdd.f1.application.race.lineup.RaceLineupNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupNotPreparedException;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.application.race.lineup.RaceLineupService;
+import com.xdd.f1.application.race.result.RaceResultService;
 import com.xdd.f1.bootstrap.base.AbstractIntegrationTest;
 import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.race.Race;
@@ -55,6 +56,7 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
     private final RaceRepository races;
     private final RaceJpaRepository jpaRepository;
     private final RaceLineupService lineupService;
+    private final RaceResultService results;
     private final TransactionTemplate transactions;
 
     @MockitoBean
@@ -69,12 +71,14 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
             RaceRepository races,
             RaceJpaRepository jpaRepository,
             RaceLineupService lineupService,
+            RaceResultService results,
             PlatformTransactionManager transactionManager
     ) {
         this.service = service;
         this.races = races;
         this.jpaRepository = jpaRepository;
         this.lineupService = lineupService;
+        this.results = results;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -568,6 +572,63 @@ class RaceLineupServiceIntegrationTest extends AbstractIntegrationTest {
 
         saveByCurrentNames(race, expected, original.teams());
         assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(original.teams());
+    }
+
+    @Test
+    void removesTeamFromScheduledRaceAndInheritsTheUpdatedLineupWithoutChangingSavedSnapshots() {
+        var previous = createRace(2026, 1, "Previous season", NOW, NOW.plusSeconds(1800));
+        var race = createRace(2027, 1, "Season opener", NOW.plusSeconds(3600), NOW.plusSeconds(7200));
+        var next = createRace(2027, 2, "Next Grand Prix", NOW.plusSeconds(7200), NOW.plusSeconds(10800));
+        var prepared = createRace(2027, 3, "Prepared Grand Prix", NOW.plusSeconds(10800), NOW.plusSeconds(14400));
+        var base = redBullLineup(previous).teams();
+        prepareLineup(new RaceLineup(previous.id(), base));
+        prepareLineup(new RaceLineup(prepared.id(), base));
+        var kept = base.getFirst();
+
+        saveByCurrentNames(race, base, List.of(kept));
+
+        assertThat(lineupService.getForEditing(race.id()).teams()).containsExactly(kept);
+        assertThat(lineupService.getForEditing(next.id()).teams()).containsExactly(kept);
+        service.openRacePredictions(next.id());
+        assertThat(lineupService.getForEditing(next.id()).teams()).containsExactly(kept);
+        assertThat(lineupService.getForEditing(previous.id()).teams()).isEqualTo(base);
+        assertThat(lineupService.getForEditing(prepared.id()).teams()).isEqualTo(base);
+    }
+
+    @Test
+    void keepsReassignedDriversAndRejectsRemovingTheLastTeam() {
+        var race = createRace(2027, 1, "Grand Prix", NOW, NOW.plusSeconds(3600));
+        var prior = redBullLineup(race);
+        var kept = prior.teams().getFirst();
+        var departing = prior.teams().getLast();
+        var base = List.of(new Team(kept.branding(), List.of(kept.drivers().getFirst())), departing);
+        prepareLineup(new RaceLineup(race.id(), base));
+        var updated = new Team(kept.branding(), List.of(kept.drivers().getFirst(), departing.drivers().getLast()));
+
+        saveByCurrentNames(race, base, List.of(updated));
+        assertThat(lineupService.getForEditing(race.id()).teams()).containsExactly(updated);
+        assertThatThrownBy(() -> lineupService.save(race.id(), List.of(updated), List.of(), List.of()))
+                .isInstanceOf(DomainValidationException.class).hasMessageContaining("at least one team");
+    }
+
+    @Test
+    void rejectsTeamRemovalWhenItWouldLeaveAnInvalidGridOrPredictionsHaveOpened() {
+        var race = createRace(2027, 1, "Grand Prix", NOW, NOW.plusSeconds(3600));
+        var original = redBullLineup(race);
+        var base = original.teams();
+        var remaining = List.of(base.getFirst());
+        prepareLineup(original);
+        var grid = List.of(base.getFirst().drivers().getFirst(), base.getLast().drivers().getFirst());
+        results.saveStartingGridForAdmin(race.id(), grid);
+
+        assertThatThrownBy(() -> saveByCurrentNames(race, base, remaining))
+                .isInstanceOf(DomainValidationException.class).hasMessageContaining("starting grid");
+        assertThat(results.getForEditing(race.id()).result().startingGrid()).isEqualTo(grid);
+        results.saveStartingGridForAdmin(race.id(), List.of(grid.getFirst()));
+        service.openRacePredictions(race.id());
+        assertThatThrownBy(() -> saveByCurrentNames(race, base, remaining))
+                .isInstanceOf(RaceLineupNotEditableException.class).hasMessageContaining("before predictions open");
+        assertThat(lineupService.getForEditing(race.id()).teams()).isEqualTo(base);
     }
 
     @Test

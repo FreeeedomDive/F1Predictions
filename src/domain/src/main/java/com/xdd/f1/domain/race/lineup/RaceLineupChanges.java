@@ -11,7 +11,8 @@ import java.util.List;
 import java.util.Map;
 
 public record RaceLineupChanges(
-        RaceLineup lineup, List<DriverReplacement> replacements, List<TeamChange> teams
+        RaceLineup lineup, List<DriverReplacement> replacements, List<TeamChange> teams,
+        boolean teamRemoved, List<Driver> withdrawnDrivers
 ) {
     public static RaceLineupChanges calculate(
             RaceId raceId, List<Team> before, List<TeamEdit> edits, List<DriverReplacement> confirmed
@@ -33,13 +34,12 @@ public record RaceLineupChanges(
                 previousTeams.put(team, previous);
             }
         }
-        if (!remaining.isEmpty()) {
-            throw new DomainValidationException("Existing teams must not be removed from the lineup");
-        }
-
         var oldOwners = driverOwners(before);
         var newOwners = driverOwners(lineup.teams());
-        var removed = oldOwners.keySet().stream().filter(driver -> !newOwners.containsKey(driver)).toList();
+        var absent = oldOwners.keySet().stream().filter(driver -> !newOwners.containsKey(driver)).toList();
+        var withdrawn = absent.stream()
+                .filter(driver -> remaining.containsKey(oldOwners.get(driver).branding().name())).toList();
+        var removed = absent.stream().filter(driver -> !withdrawn.contains(driver)).toList();
         var added = newOwners.keySet().stream().filter(driver -> !oldOwners.containsKey(driver)).toList();
         var replacements = new ArrayList<DriverReplacement>();
         var matchedRemoved = new HashSet<Driver>();
@@ -75,7 +75,7 @@ public record RaceLineupChanges(
                     .filter(pair -> oldOwners.get(pair.previousDriver()).equals(previous)).toList();
             return new TeamChange(team.branding(), replaced, outgoing, incoming);
         }).toList();
-        return new RaceLineupChanges(lineup, List.copyOf(replacements), teamChanges);
+        return new RaceLineupChanges(lineup, List.copyOf(replacements), teamChanges, !remaining.isEmpty(), withdrawn);
     }
 
     private static Map<Driver, Team> driverOwners(List<Team> teams) {

@@ -98,12 +98,14 @@ export default function LineupEditor({
   }
   const dragging = activeDrag !== null
   const { baseTeams, rows } = draft ?? activeDrag?.draft ?? initial
-  const { teams, removed, added, needsPairing } = analyzeDraft(baseTeams, rows)
+  const { teams, removedTeams, removed, added, needsPairing } = analyzeDraft(baseTeams, rows)
   const normalized = teams.map(({ team }) => team)
   const dirty =
     !sameTeams(normalized, baseTeams) ||
     teams.some(({ previousName }, index) => previousName !== baseTeams[index]?.name)
   const stale = (draft !== null || dragging) && !sameTeams(baseTeams, lineup.teams)
+  const canRemoveTeams = lineup.race.status === 'SCHEDULED'
+  const removalLocked = removedTeams.length > 0 && !canRemoveTeams
   const lockedChanges =
     !driversEditable &&
     (teams.length !== baseTeams.length ||
@@ -183,7 +185,7 @@ export default function LineupEditor({
 
   function discardRow(row: TeamDraft, original: RaceLineupTeamDto | undefined) {
     if (!original) {
-      editRows((current) => current.filter((item) => item.id !== row.id))
+      removeRow(row.id)
       return
     }
     const restored = createTeamDraft(
@@ -196,6 +198,10 @@ export default function LineupEditor({
     )
   }
 
+  function removeRow(id: string) {
+    editRows((current) => current.filter((item) => item.id !== id))
+  }
+
   function discardDraft() {
     setDraft(null)
     setShowErrors(false)
@@ -204,7 +210,7 @@ export default function LineupEditor({
 
   function save() {
     setShowErrors(true)
-    if (!lockedChanges && !overCapacity && teamFieldsValid && pairingComplete) {
+    if (!lockedChanges && !removalLocked && !overCapacity && teamFieldsValid && pairingComplete) {
       onSave({ baseTeams, teams, replacements }, discardDraft)
     }
   }
@@ -248,6 +254,7 @@ export default function LineupEditor({
               stale ||
               dragging ||
               lockedChanges ||
+              removalLocked ||
               overCapacity ||
               rows.length === 0 ||
               (!dirty && lineup.prepared)
@@ -271,7 +278,14 @@ export default function LineupEditor({
           the latest lineup.
         </Alert>
       )}
-      {!stale && lockedChanges && (
+      {!stale && removedTeams.length > 0 && (
+        <Alert severity={removalLocked ? 'warning' : 'info'}>
+          {removalLocked
+            ? 'Teams can only be removed before predictions open. Discard these changes before saving.'
+            : `Removing on save: ${removedTeams.join(', ')}. Drivers not reassigned will leave this lineup.`}
+        </Alert>
+      )}
+      {!stale && !removalLocked && lockedChanges && (
         <Alert severity="warning">
           This race no longer allows changes to drivers or the team list. Discard those edits before
           saving.
@@ -396,6 +410,11 @@ export default function LineupEditor({
                               )
                             }
                             onDiscard={changed ? () => discardRow(row, original) : undefined}
+                            onRemove={
+                              original && canRemoveTeams && rows.length > 1
+                                ? () => removeRow(row.id)
+                                : undefined
+                            }
                           />
                         )}
                       </Draggable>
