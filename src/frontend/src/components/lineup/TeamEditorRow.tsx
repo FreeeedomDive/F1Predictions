@@ -1,4 +1,10 @@
+import type {
+  DraggableProvided,
+  DraggableProvidedDraggableProps,
+  DraggableProvidedDragHandleProps,
+} from '@hello-pangea/dnd'
 import CloseRounded from '@mui/icons-material/CloseRounded'
+import DragIndicatorRounded from '@mui/icons-material/DragIndicatorRounded'
 import UndoRounded from '@mui/icons-material/UndoRounded'
 import {
   Box,
@@ -68,6 +74,11 @@ function ColorField({
 }
 
 export default function TeamEditorRow({
+  rowRef,
+  draggableProps,
+  dragHandleProps,
+  dragging,
+  dragCellWidths,
   team: value,
   isNew,
   driversEditable,
@@ -78,6 +89,11 @@ export default function TeamEditorRow({
   onChange,
   onDiscard,
 }: {
+  rowRef: DraggableProvided['innerRef']
+  draggableProps: DraggableProvidedDraggableProps
+  dragHandleProps: DraggableProvidedDragHandleProps | null
+  dragging: boolean
+  dragCellWidths?: number[]
   team: RaceLineupTeamDto
   isNew: boolean
   driversEditable: boolean
@@ -113,7 +129,36 @@ export default function TeamEditorRow({
   }
 
   return (
-    <TableRow hover sx={{ bgcolor: isNew ? 'action.hover' : undefined }}>
+    <TableRow
+      ref={rowRef}
+      {...draggableProps}
+      hover
+      style={
+        dragging
+          ? { ...draggableProps.style, display: 'table', tableLayout: 'fixed' }
+          : draggableProps.style
+      }
+      sx={{
+        bgcolor: dragging ? 'background.paper' : isNew ? 'action.hover' : undefined,
+        ...Object.fromEntries(
+          (dragCellWidths ?? []).map((width, index) => [
+            `& > td:nth-of-type(${index + 1})`,
+            { width, boxSizing: 'border-box' },
+          ]),
+        ),
+      }}
+    >
+      <TableCell align="center" sx={{ width: 48, minWidth: 48, boxSizing: 'border-box' }}>
+        <IconButton
+          {...dragHandleProps}
+          size="small"
+          disabled={!dragHandleProps}
+          aria-label={`Move ${normalized.name || 'new team'}`}
+          sx={{ color: 'text.secondary', cursor: dragging ? 'grabbing' : 'grab' }}
+        >
+          <DragIndicatorRounded fontSize="small" />
+        </IconButton>
+      </TableCell>
       <TableCell sx={{ minWidth: 190 }}>
         <TextField
           fullWidth

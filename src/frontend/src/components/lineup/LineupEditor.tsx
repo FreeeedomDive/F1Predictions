@@ -1,3 +1,5 @@
+import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd'
+import type { DragStart, DropResult } from '@hello-pangea/dnd'
 import AddRounded from '@mui/icons-material/AddRounded'
 import SaveRounded from '@mui/icons-material/SaveRounded'
 import SwapHorizRounded from '@mui/icons-material/SwapHorizRounded'
@@ -26,8 +28,8 @@ import type {
 import {
   analyzeDraft,
   hexColor,
-  sameDrivers,
   normalizeTeam,
+  sameDrivers,
   sameTeam,
   sameTeams,
   selectedReplacements,
@@ -43,6 +45,8 @@ const emptyTeam: RaceLineupTeamDto = {
   textColor: '#FFFFFF',
   drivers: ['', ''],
 }
+
+const teamDroppableId = 'lineup-teams'
 
 function duplicates(values: string[]) {
   const seen = new Set<string>()
@@ -74,21 +78,24 @@ export default function LineupEditor({
   onSave: (request: SaveRaceLineupRequestDto, onSaved: () => void) => void
 }) {
   const [draft, setDraft] = useState<Draft | null>(null)
+  const [activeDrag, setActiveDrag] = useState<{ draft: Draft; cellWidths: number[] } | null>(null)
   const [showErrors, setShowErrors] = useState(false)
   const [swapOpen, setSwapOpen] = useState(false)
   const [pairs, setPairs] = useState<ReadonlyMap<string, string>>(new Map())
   const nextNewTeamId = useRef(0)
+  const table = useRef<HTMLTableElement>(null)
   const initial: Draft = {
     baseTeams: lineup.teams,
     rows: lineup.teams.map((team) => ({ id: `team:${team.name}`, previousName: team.name, team })),
   }
-  const { baseTeams, rows } = draft ?? initial
+  const dragging = activeDrag !== null
+  const { baseTeams, rows } = draft ?? activeDrag?.draft ?? initial
   const { teams, removed, added, needsPairing } = analyzeDraft(baseTeams, rows)
   const normalized = teams.map(({ team }) => team)
   const dirty =
     !sameTeams(normalized, baseTeams) ||
     teams.some(({ previousName }, index) => previousName !== baseTeams[index]?.name)
-  const stale = draft !== null && !sameTeams(baseTeams, lineup.teams)
+  const stale = (draft !== null || dragging) && !sameTeams(baseTeams, lineup.teams)
   const lockedChanges =
     !driversEditable &&
     (teams.length !== baseTeams.length ||
@@ -121,7 +128,7 @@ export default function LineupEditor({
 
   function editRows(update: (rows: TeamDraft[]) => TeamDraft[]) {
     setDraft((current) => {
-      const base = current ?? initial
+      const base = current ?? activeDrag?.draft ?? initial
       const next = update(base.rows)
       return sameTeams(
         next.map(({ team }) => team),
@@ -130,6 +137,31 @@ export default function LineupEditor({
         ? null
         : { ...base, rows: next }
     })
+  }
+
+  function startDrag({ source }: DragStart) {
+    const row = table.current?.tBodies.item(0)?.rows.item(source.index)
+    setActiveDrag({
+      draft: draft ?? initial,
+      cellWidths: Array.from(row?.cells ?? [], (cell) => cell.getBoundingClientRect().width),
+    })
+  }
+
+  function finishDrag({ destination, source, draggableId }: DropResult) {
+    if (
+      destination?.droppableId === teamDroppableId &&
+      source.droppableId === teamDroppableId &&
+      destination.index !== source.index
+    ) {
+      editRows((current) => {
+        if (current[source.index]?.id !== draggableId) return current
+        const next = [...current]
+        const [moved] = next.splice(source.index, 1)
+        next.splice(destination.index, 0, moved)
+        return next
+      })
+    }
+    setActiveDrag(null)
   }
 
   function addDraft() {
@@ -179,7 +211,11 @@ export default function LineupEditor({
         </Typography>
         <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
           {dirty && !stale && (
-            <Button startIcon={<UndoRounded />} disabled={saving} onClick={discardDraft}>
+            <Button
+              startIcon={<UndoRounded />}
+              disabled={saving || dragging}
+              onClick={discardDraft}
+            >
               Discard changes
             </Button>
           )}
@@ -188,7 +224,9 @@ export default function LineupEditor({
               <Button
                 variant="outlined"
                 startIcon={<SwapHorizRounded />}
-                disabled={saving || stale || drivers.length < 2 || duplicateDrivers.size > 0}
+                disabled={
+                  saving || stale || dragging || drivers.length < 2 || duplicateDrivers.size > 0
+                }
                 onClick={() => setSwapOpen(true)}
               >
                 Swap drivers
@@ -196,7 +234,7 @@ export default function LineupEditor({
               <Button
                 variant="outlined"
                 startIcon={<AddRounded />}
-                disabled={saving || stale}
+                disabled={saving || stale || dragging}
                 onClick={addDraft}
               >
                 Add team
@@ -208,7 +246,12 @@ export default function LineupEditor({
             startIcon={<SaveRounded />}
             loading={saving}
             disabled={
-              busy || stale || lockedChanges || rows.length === 0 || (!dirty && lineup.prepared)
+              busy ||
+              stale ||
+              dragging ||
+              lockedChanges ||
+              rows.length === 0 ||
+              (!dirty && lineup.prepared)
             }
             onClick={save}
           >
@@ -220,7 +263,7 @@ export default function LineupEditor({
         <Alert
           severity="warning"
           action={
-            <Button color="inherit" onClick={discardDraft}>
+            <Button color="inherit" disabled={dragging} onClick={discardDraft}>
               Discard draft
             </Button>
           }
@@ -285,77 +328,105 @@ export default function LineupEditor({
         ) : (
           <Alert severity="warning">Each removed driver needs a replacement.</Alert>
         ))}
-      <TableContainer component={Paper} variant="outlined" tabIndex={0}>
-        <Table
-          size="small"
-          aria-label="Race team lineup editor"
-          sx={{
-            minWidth: 1220,
-            '& th, & td': { px: 1.5, py: 2 },
-            '& thead th': { fontWeight: 650, whiteSpace: 'nowrap' },
-            '& tbody td': { verticalAlign: 'top' },
-            '& tbody tr:last-child > *': { borderBottom: 0 },
-          }}
-        >
-          <TableHead sx={{ bgcolor: 'action.hover' }}>
-            <TableRow>
-              <TableCell scope="col">Team</TableCell>
-              <TableCell scope="col">Badge</TableCell>
-              <TableCell scope="col">Background</TableCell>
-              <TableCell scope="col">Text</TableCell>
-              <TableCell scope="col">Drivers</TableCell>
-              <TableCell scope="col" align="right">
-                Actions
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((row, index) => {
-              const original = baseTeams.find((team) => team.name === row.previousName)
-              const changed =
-                !original || !sameTeam(normalizeTeam(row.team), normalizeTeam(original))
-              return (
-                <TeamEditorRow
-                  key={row.id}
-                  team={row.team}
-                  isNew={!original}
-                  driversEditable={driversEditable}
-                  disabled={saving || stale}
-                  showErrors={showErrors}
-                  duplicateName={duplicateNames.has(normalized[index].name)}
-                  duplicateDrivers={duplicateDrivers}
-                  onChange={(team) =>
-                    editRows((current) =>
-                      current.map((item) => (item.id === row.id ? { ...item, team } : item)),
-                    )
-                  }
-                  onDiscard={
-                    changed
-                      ? () =>
-                          editRows((current) =>
-                            original
-                              ? current.map((item) =>
-                                  item.id === row.id ? { ...item, team: original } : item,
-                                )
-                              : current.filter((item) => item.id !== row.id),
-                          )
-                      : undefined
-                  }
-                />
-              )
-            })}
-            {rows.length === 0 && (
+      <DragDropContext onBeforeDragStart={startDrag} onDragEnd={finishDrag}>
+        <TableContainer component={Paper} variant="outlined" tabIndex={0}>
+          <Table
+            ref={table}
+            size="small"
+            aria-label="Race team lineup editor"
+            sx={{
+              minWidth: 1220,
+              '& th, & td': { px: 1.5, py: 2 },
+              '& thead th': { fontWeight: 650, whiteSpace: 'nowrap' },
+              '& tbody td:first-of-type': { px: 0.5, verticalAlign: 'middle' },
+              '& tbody td:not(:first-of-type)': { verticalAlign: 'top' },
+              '& tbody tr:last-child > *': { borderBottom: 0 },
+            }}
+          >
+            <TableHead sx={{ bgcolor: 'action.hover' }}>
               <TableRow>
-                <TableCell colSpan={6} sx={{ textAlign: 'center' }}>
-                  <Typography color="text.secondary">
-                    No teams yet. Add the first team to prepare this lineup.
-                  </Typography>
+                <TableCell scope="col" aria-label="Reorder teams" />
+                <TableCell scope="col">Team</TableCell>
+                <TableCell scope="col">Badge</TableCell>
+                <TableCell scope="col">Background</TableCell>
+                <TableCell scope="col">Text</TableCell>
+                <TableCell scope="col">Drivers</TableCell>
+                <TableCell scope="col" align="right">
+                  Actions
                 </TableCell>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            </TableHead>
+            <Droppable droppableId={teamDroppableId} type="TEAM">
+              {(list) => (
+                <TableBody ref={list.innerRef} {...list.droppableProps}>
+                  {rows.map((row, index) => {
+                    const original = baseTeams.find((team) => team.name === row.previousName)
+                    const changed =
+                      !original || !sameTeam(normalizeTeam(row.team), normalizeTeam(original))
+                    return (
+                      <Draggable
+                        key={row.id}
+                        draggableId={row.id}
+                        index={index}
+                        isDragDisabled={saving || (!dragging && stale) || rows.length < 2}
+                        disableInteractiveElementBlocking
+                      >
+                        {({ innerRef, draggableProps, dragHandleProps }, snapshot) => (
+                          <TeamEditorRow
+                            rowRef={innerRef}
+                            draggableProps={draggableProps}
+                            dragHandleProps={dragHandleProps}
+                            dragging={snapshot.isDragging}
+                            dragCellWidths={
+                              snapshot.isDragging ? activeDrag?.cellWidths : undefined
+                            }
+                            team={row.team}
+                            isNew={!original}
+                            driversEditable={driversEditable}
+                            disabled={saving || stale}
+                            showErrors={showErrors}
+                            duplicateName={duplicateNames.has(normalized[index].name)}
+                            duplicateDrivers={duplicateDrivers}
+                            onChange={(team) =>
+                              editRows((current) =>
+                                current.map((item) =>
+                                  item.id === row.id ? { ...item, team } : item,
+                                ),
+                              )
+                            }
+                            onDiscard={
+                              changed
+                                ? () =>
+                                    editRows((current) =>
+                                      original
+                                        ? current.map((item) =>
+                                            item.id === row.id ? { ...item, team: original } : item,
+                                          )
+                                        : current.filter((item) => item.id !== row.id),
+                                    )
+                                : undefined
+                            }
+                          />
+                        )}
+                      </Draggable>
+                    )
+                  })}
+                  {rows.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} sx={{ textAlign: 'center' }}>
+                        <Typography color="text.secondary">
+                          No teams yet. Add the first team to prepare this lineup.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {list.placeholder}
+                </TableBody>
+              )}
+            </Droppable>
+          </Table>
+        </TableContainer>
+      </DragDropContext>
       {driversEditable && swapOpen && (
         <SwapDriversDialog
           lineup={{ ...lineup, teams: normalized }}
