@@ -16,10 +16,10 @@ import {
   TextField,
   Tooltip,
 } from '@mui/material'
-import type { RaceLineupTeamDto } from '../../dto/raceLineup'
-import { hexColor, normalizeTeam } from './lineupDraft'
+import { hexColor, normalizeTeam, teamValue, type TeamDraft } from './lineupDraft'
+import TeamDriversEditor from './TeamDriversEditor'
 
-type TeamFields = Omit<RaceLineupTeamDto, 'drivers'>
+type TeamFields = TeamDraft['team']
 
 function ColorField({
   label,
@@ -79,9 +79,10 @@ export default function TeamEditorRow({
   dragHandleProps,
   dragging,
   dragCellWidths,
-  team: value,
+  row,
   isNew,
   driversEditable,
+  dragSourceTeam,
   disabled,
   showErrors,
   duplicateName,
@@ -94,17 +95,19 @@ export default function TeamEditorRow({
   dragHandleProps: DraggableProvidedDragHandleProps | null
   dragging: boolean
   dragCellWidths?: number[]
-  team: RaceLineupTeamDto
+  row: TeamDraft
   isNew: boolean
   driversEditable: boolean
+  dragSourceTeam?: string
   disabled: boolean
   showErrors: boolean
   duplicateName: boolean
   duplicateDrivers: ReadonlySet<string>
-  onChange: (team: RaceLineupTeamDto) => void
+  onChange: (update: (row: TeamDraft) => TeamDraft) => void
   onDiscard?: () => void
 }) {
-  const normalized = normalizeTeam(value)
+  const value = row.team
+  const normalized = normalizeTeam(teamValue(row))
   const nameError = !normalized.name
     ? 'Team name is required.'
     : duplicateName
@@ -115,17 +118,17 @@ export default function TeamEditorRow({
     : normalized.badge.length > 3
       ? 'Use up to 3 characters.'
       : ''
-  const drivers = Array.from(
-    { length: driversEditable ? Math.max(2, value.drivers.length) : value.drivers.length },
-    (_, index) => value.drivers[index] ?? '',
-  )
-
   function change(field: keyof TeamFields, nextValue: string) {
-    onChange({ ...value, [field]: nextValue })
+    onChange((current) => ({ ...current, team: { ...current.team, [field]: nextValue } }))
   }
 
-  function changeDriver(index: number, nextValue: string) {
-    onChange({ ...value, drivers: drivers.map((driver, i) => (i === index ? nextValue : driver)) })
+  function changeDriver(driverId: string, name: string) {
+    onChange((current) => ({
+      ...current,
+      drivers: current.drivers.map((driver) =>
+        driver.id === driverId ? { ...driver, name } : driver,
+      ),
+    }))
   }
 
   return (
@@ -227,29 +230,15 @@ export default function TeamEditorRow({
         />
       </TableCell>
       <TableCell sx={{ minWidth: 380 }}>
-        <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.5 }}>
-          {drivers.map((driver, index) => {
-            const error =
-              duplicateDrivers.has(driver) || duplicateDrivers.has(driver.trim())
-                ? 'Driver must occur only once.'
-                : index === 0 && normalized.drivers.length === 0
-                  ? 'At least one driver is required.'
-                  : ''
-            return (
-              <TextField
-                key={index}
-                size="small"
-                label={`Driver ${index + 1}`}
-                value={driver}
-                disabled={disabled}
-                slotProps={{ input: { readOnly: !driversEditable } }}
-                error={showErrors && !!error}
-                helperText={showErrors ? error || undefined : undefined}
-                onChange={(event) => changeDriver(index, event.target.value)}
-              />
-            )
-          })}
-        </Box>
+        <TeamDriversEditor
+          row={row}
+          editable={driversEditable}
+          disabled={disabled}
+          dragSourceTeam={dragSourceTeam}
+          duplicateDrivers={duplicateDrivers}
+          showErrors={showErrors}
+          onChange={changeDriver}
+        />
       </TableCell>
       <TableCell align="right" sx={{ width: 64 }}>
         {onDiscard && (

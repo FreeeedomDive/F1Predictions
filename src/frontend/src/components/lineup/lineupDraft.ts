@@ -3,10 +3,81 @@ import type { RaceLineupTeamDto, SaveRaceLineupRequestDto } from '../../dto/race
 export interface TeamDraft {
   id: string
   previousName: string | null
-  team: RaceLineupTeamDto
+  team: Omit<RaceLineupTeamDto, 'drivers'>
+  drivers: DriverDraft[]
+}
+
+export interface DriverDraft {
+  id: string
+  name: string
 }
 
 export const hexColor = /^#[0-9a-f]{6}$/i
+export const maxDraftDrivers = 3
+export const maxSavedDrivers = 2
+
+export function createTeamDraft(
+  id: string,
+  previousName: string | null,
+  value: RaceLineupTeamDto,
+): TeamDraft {
+  const { drivers, ...team } = value
+  return {
+    id,
+    previousName,
+    team,
+    drivers: Array.from({ length: Math.max(maxSavedDrivers, drivers.length) }, (_, index) => ({
+      id: `driver:${id}:${index}`,
+      name: drivers[index] ?? '',
+    })),
+  }
+}
+
+export function teamValue({ team, drivers }: TeamDraft): RaceLineupTeamDto {
+  return {
+    ...team,
+    drivers: drivers.map((driver) => driver.name).filter((name) => name.trim() !== ''),
+  }
+}
+
+export function isNamedDriver(driver: DriverDraft) {
+  return driver.name.trim() !== ''
+}
+
+export function moveDriver(
+  rows: TeamDraft[],
+  source: { droppableId: string; index: number },
+  destination: { droppableId: string; index: number },
+  driverId: string,
+  emptySlot: DriverDraft,
+): TeamDraft[] {
+  const from = rows.find((row) => row.id === source.droppableId)
+  const to = rows.find((row) => row.id === destination.droppableId)
+  const moved = from?.drivers[source.index]
+  if (!from || !to || !moved || moved.id !== driverId || !isNamedDriver(moved)) return rows
+  if (from === to && source.index === destination.index) return rows
+
+  const sourceSlots = from.drivers.filter((slot) => slot.id !== moved.id)
+  const targetSlots = from === to ? sourceSlots : to.drivers
+  const targetDrivers = targetSlots.filter(isNamedDriver)
+  if (from !== to && targetDrivers.length >= maxDraftDrivers) return rows
+  const targetIndex = targetSlots.slice(0, destination.index).filter(isNamedDriver).length
+  targetDrivers.splice(targetIndex, 0, moved)
+
+  function withEmptySlots(occupied: DriverDraft[], allSlots: DriverDraft[]) {
+    if (occupied.length >= maxSavedDrivers) return occupied
+    const empty = allSlots.filter((slot) => !isNamedDriver(slot))
+    return [...occupied, ...[...empty, emptySlot].slice(0, maxSavedDrivers - occupied.length)]
+  }
+
+  return rows.map((row) => {
+    if (row === to) return { ...row, drivers: withEmptySlots(targetDrivers, targetSlots) }
+    if (row === from) {
+      return { ...row, drivers: withEmptySlots(sourceSlots.filter(isNamedDriver), sourceSlots) }
+    }
+    return row
+  })
+}
 
 export function normalizeTeam(team: RaceLineupTeamDto): RaceLineupTeamDto {
   return {
@@ -38,7 +109,9 @@ export function sameTeams(left: RaceLineupTeamDto[], right: RaceLineupTeamDto[])
 
 export function analyzeDraft(baseTeams: RaceLineupTeamDto[], drafts: TeamDraft[]) {
   const before = new Map(baseTeams.flatMap((team) => team.drivers.map((name) => [name, team.name])))
-  const teams = drafts.map(({ previousName, team }) => {
+  const teams = drafts.map((row) => {
+    const { previousName } = row
+    const team = teamValue(row)
     const original = baseTeams.find((item) => item.name === previousName)
     const current = normalizeTeam(team)
     return {

@@ -2,7 +2,6 @@ import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd'
 import type { DragStart, DropResult } from '@hello-pangea/dnd'
 import AddRounded from '@mui/icons-material/AddRounded'
 import SaveRounded from '@mui/icons-material/SaveRounded'
-import SwapHorizRounded from '@mui/icons-material/SwapHorizRounded'
 import UndoRounded from '@mui/icons-material/UndoRounded'
 import {
   Alert,
@@ -27,15 +26,18 @@ import type {
 } from '../../dto/raceLineup'
 import {
   analyzeDraft,
+  createTeamDraft,
   hexColor,
+  maxSavedDrivers,
+  moveDriver,
   normalizeTeam,
   sameDrivers,
   sameTeam,
   sameTeams,
   selectedReplacements,
+  teamValue,
   type TeamDraft,
 } from './lineupDraft'
-import SwapDriversDialog from './SwapDriversDialog'
 import TeamEditorRow from './TeamEditorRow'
 
 const emptyTeam: RaceLineupTeamDto = {
@@ -64,6 +66,12 @@ interface Draft {
   rows: TeamDraft[]
 }
 
+interface ActiveDrag {
+  draft: Draft
+  cellWidths?: number[]
+  driverSourceTeam?: string
+}
+
 export default function LineupEditor({
   lineup,
   driversEditable,
@@ -78,15 +86,15 @@ export default function LineupEditor({
   onSave: (request: SaveRaceLineupRequestDto, onSaved: () => void) => void
 }) {
   const [draft, setDraft] = useState<Draft | null>(null)
-  const [activeDrag, setActiveDrag] = useState<{ draft: Draft; cellWidths: number[] } | null>(null)
+  const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null)
   const [showErrors, setShowErrors] = useState(false)
-  const [swapOpen, setSwapOpen] = useState(false)
   const [pairs, setPairs] = useState<ReadonlyMap<string, string>>(new Map())
   const nextNewTeamId = useRef(0)
+  const nextDriverId = useRef(0)
   const table = useRef<HTMLTableElement>(null)
   const initial: Draft = {
     baseTeams: lineup.teams,
-    rows: lineup.teams.map((team) => ({ id: `team:${team.name}`, previousName: team.name, team })),
+    rows: lineup.teams.map((team) => createTeamDraft(`team:${team.name}`, team.name, team)),
   }
   const dragging = activeDrag !== null
   const { baseTeams, rows } = draft ?? activeDrag?.draft ?? initial
@@ -106,6 +114,8 @@ export default function LineupEditor({
   const duplicateNames = duplicates(normalized.map((team) => team.name))
   const drivers = normalized.flatMap((team) => team.drivers)
   const duplicateDrivers = duplicates(drivers)
+  const overCapacity =
+    driversEditable && normalized.some((team) => team.drivers.length > maxSavedDrivers)
   const teamFieldsValid =
     duplicateNames.size === 0 &&
     duplicateDrivers.size === 0 &&
@@ -116,8 +126,7 @@ export default function LineupEditor({
         team.badge.length <= 3 &&
         hexColor.test(team.backgroundColor) &&
         hexColor.test(team.textColor) &&
-        team.drivers.length > 0 &&
-        (!driversEditable || team.drivers.length <= 2),
+        team.drivers.length > 0,
     )
   const replacements = needsPairing ? selectedReplacements(removed, added, pairs) : []
   const canPair = added.length >= removed.length
@@ -130,16 +139,18 @@ export default function LineupEditor({
     setDraft((current) => {
       const base = current ?? activeDrag?.draft ?? initial
       const next = update(base.rows)
-      return sameTeams(
-        next.map(({ team }) => team),
-        base.baseTeams,
-      ) && next.every(({ previousName }, index) => previousName === base.baseTeams[index].name)
+      return sameTeams(next.map(teamValue), base.baseTeams) &&
+        next.every(({ previousName }, index) => previousName === base.baseTeams[index].name)
         ? null
         : { ...base, rows: next }
     })
   }
 
-  function startDrag({ source }: DragStart) {
+  function startDrag({ source, type }: DragStart) {
+    if (type === 'DRIVER') {
+      setActiveDrag({ draft: draft ?? initial, driverSourceTeam: source.droppableId })
+      return
+    }
     const row = table.current?.tBodies.item(0)?.rows.item(source.index)
     setActiveDrag({
       draft: draft ?? initial,
@@ -147,26 +158,42 @@ export default function LineupEditor({
     })
   }
 
-  function finishDrag({ destination, source, draggableId }: DropResult) {
-    if (
-      destination?.droppableId === teamDroppableId &&
-      source.droppableId === teamDroppableId &&
-      destination.index !== source.index
-    ) {
-      editRows((current) => {
-        if (current[source.index]?.id !== draggableId) return current
-        const next = [...current]
-        const [moved] = next.splice(source.index, 1)
-        next.splice(destination.index, 0, moved)
-        return next
-      })
+  function finishDrag({ destination, source, draggableId, type }: DropResult) {
+    if (destination) {
+      if (type === 'DRIVER' && driversEditable) {
+        const emptySlot = { id: `empty:${nextDriverId.current++}`, name: '' }
+        editRows((current) => moveDriver(current, source, destination, draggableId, emptySlot))
+      } else if (type === 'TEAM' && destination.index !== source.index) {
+        editRows((current) => {
+          if (current[source.index]?.id !== draggableId) return current
+          const next = [...current]
+          const [moved] = next.splice(source.index, 1)
+          next.splice(destination.index, 0, moved)
+          return next
+        })
+      }
     }
     setActiveDrag(null)
   }
 
   function addDraft() {
     const id = `new:${nextNewTeamId.current++}`
-    editRows((current) => [...current, { id, previousName: null, team: emptyTeam }])
+    editRows((current) => [...current, createTeamDraft(id, null, emptyTeam)])
+  }
+
+  function discardRow(row: TeamDraft, original: RaceLineupTeamDto | undefined) {
+    if (!original) {
+      editRows((current) => current.filter((item) => item.id !== row.id))
+      return
+    }
+    const restored = createTeamDraft(
+      `restored:${nextDriverId.current++}`,
+      row.previousName,
+      original,
+    )
+    editRows((current) =>
+      current.map((item) => (item.id === row.id ? { ...restored, id: row.id } : item)),
+    )
   }
 
   function discardDraft() {
@@ -175,26 +202,9 @@ export default function LineupEditor({
     setPairs(new Map())
   }
 
-  function swapDrivers(first: string, second: string) {
-    editRows((current) =>
-      current.map((row) => ({
-        ...row,
-        team: {
-          ...row.team,
-          drivers: row.team.drivers.map((name) => {
-            if (name === first || name.trim() === first) return second
-            if (name === second || name.trim() === second) return first
-            return name
-          }),
-        },
-      })),
-    )
-    setSwapOpen(false)
-  }
-
   function save() {
     setShowErrors(true)
-    if (!lockedChanges && teamFieldsValid && pairingComplete) {
+    if (!lockedChanges && !overCapacity && teamFieldsValid && pairingComplete) {
       onSave({ baseTeams, teams, replacements }, discardDraft)
     }
   }
@@ -220,26 +230,14 @@ export default function LineupEditor({
             </Button>
           )}
           {driversEditable && (
-            <>
-              <Button
-                variant="outlined"
-                startIcon={<SwapHorizRounded />}
-                disabled={
-                  saving || stale || dragging || drivers.length < 2 || duplicateDrivers.size > 0
-                }
-                onClick={() => setSwapOpen(true)}
-              >
-                Swap drivers
-              </Button>
-              <Button
-                variant="outlined"
-                startIcon={<AddRounded />}
-                disabled={saving || stale || dragging}
-                onClick={addDraft}
-              >
-                Add team
-              </Button>
-            </>
+            <Button
+              variant="outlined"
+              startIcon={<AddRounded />}
+              disabled={saving || stale || dragging}
+              onClick={addDraft}
+            >
+              Add team
+            </Button>
           )}
           <Button
             variant="contained"
@@ -250,6 +248,7 @@ export default function LineupEditor({
               stale ||
               dragging ||
               lockedChanges ||
+              overCapacity ||
               rows.length === 0 ||
               (!dirty && lineup.prepared)
             }
@@ -277,6 +276,9 @@ export default function LineupEditor({
           This race no longer allows changes to drivers or the team list. Discard those edits before
           saving.
         </Alert>
+      )}
+      {!stale && overCapacity && (
+        <Alert severity="warning">Move a driver out of each three-driver team before saving.</Alert>
       )}
       {driversEditable &&
         showErrors &&
@@ -362,7 +364,7 @@ export default function LineupEditor({
                   {rows.map((row, index) => {
                     const original = baseTeams.find((team) => team.name === row.previousName)
                     const changed =
-                      !original || !sameTeam(normalizeTeam(row.team), normalizeTeam(original))
+                      !original || !sameTeam(normalizeTeam(teamValue(row)), normalizeTeam(original))
                     return (
                       <Draggable
                         key={row.id}
@@ -380,32 +382,20 @@ export default function LineupEditor({
                             dragCellWidths={
                               snapshot.isDragging ? activeDrag?.cellWidths : undefined
                             }
-                            team={row.team}
+                            row={row}
                             isNew={!original}
-                            driversEditable={driversEditable}
-                            disabled={saving || stale}
+                            driversEditable={driversEditable || !!activeDrag?.driverSourceTeam}
+                            dragSourceTeam={activeDrag?.driverSourceTeam}
+                            disabled={saving || (!dragging && stale)}
                             showErrors={showErrors}
                             duplicateName={duplicateNames.has(normalized[index].name)}
                             duplicateDrivers={duplicateDrivers}
-                            onChange={(team) =>
+                            onChange={(update) =>
                               editRows((current) =>
-                                current.map((item) =>
-                                  item.id === row.id ? { ...item, team } : item,
-                                ),
+                                current.map((item) => (item.id === row.id ? update(item) : item)),
                               )
                             }
-                            onDiscard={
-                              changed
-                                ? () =>
-                                    editRows((current) =>
-                                      original
-                                        ? current.map((item) =>
-                                            item.id === row.id ? { ...item, team: original } : item,
-                                          )
-                                        : current.filter((item) => item.id !== row.id),
-                                    )
-                                : undefined
-                            }
+                            onDiscard={changed ? () => discardRow(row, original) : undefined}
                           />
                         )}
                       </Draggable>
@@ -427,13 +417,6 @@ export default function LineupEditor({
           </Table>
         </TableContainer>
       </DragDropContext>
-      {driversEditable && swapOpen && (
-        <SwapDriversDialog
-          lineup={{ ...lineup, teams: normalized }}
-          onSwap={swapDrivers}
-          onClose={() => setSwapOpen(false)}
-        />
-      )}
     </Stack>
   )
 }
