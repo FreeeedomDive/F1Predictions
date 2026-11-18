@@ -4,6 +4,7 @@ import com.xdd.f1.contract.league.LeagueApi;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import org.slf4j.Logger;
 
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 
 public abstract class AbstractCommand {
@@ -15,6 +16,14 @@ public abstract class AbstractCommand {
     protected abstract CommandDefinition definition();
     protected abstract String validateInput(CommandContext context);
     protected abstract String executeWithResponse(CommandContext context);
+
+    protected List<String> executeWithResponses(CommandContext context) {
+        return List.of(executeWithResponse(context));
+    }
+
+    protected boolean ephemeral() {
+        return true;
+    }
 
     protected AbstractCommand(
             LeagueApi leagues,
@@ -39,7 +48,7 @@ public abstract class AbstractCommand {
 
         var guildId = guild.getIdLong();
         var guildName = guild.getName();
-        event.deferReply(true).queue(hook ->
+        event.deferReply(ephemeral()).queue(hook ->
                         executor.execute(() -> {
                             try {
                                 var league = leagues.ensureDiscordLeague(
@@ -55,9 +64,16 @@ public abstract class AbstractCommand {
                                     return;
                                 }
 
-                                var message = executeWithResponse(context);
-
-                                hook.editOriginal(message).queue();
+                                var messages = executeWithResponses(context);
+                                var response = hook.editOriginal(messages.getFirst()).submit();
+                                for (var message : messages.subList(1, messages.size())) {
+                                    response = response.thenCompose(_ -> hook.sendMessage(message)
+                                            .setEphemeral(ephemeral()).submit());
+                                }
+                                response.exceptionally(error -> {
+                                    log.error("Failed to send command response", error);
+                                    return null;
+                                });
                             } catch (RuntimeException exception) {
                                 var command = event.getFullCommandName();
                                 log.error(
