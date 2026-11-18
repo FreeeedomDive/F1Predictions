@@ -15,9 +15,11 @@ import {
 import { isAxiosError } from 'axios'
 import { Navigate } from 'react-router'
 import { isUnauthorized } from '../api/session'
+import RaceActionsMenu from '../components/calendar/RaceActionsMenu'
 import RaceTable from '../components/calendar/RaceTable'
 import { useLeague } from '../context/league'
 import { useAdminRaceCalendar, useChangeRacePredictionsStatus } from '../queries/races'
+import { useRights } from '../queries/rights'
 
 const timeZone = new Intl.DateTimeFormat().resolvedOptions().timeZone.replaceAll('_', ' ')
 
@@ -37,6 +39,7 @@ function actionErrorMessage(error: Error | null, action: 'open' | 'close') {
 
 export default function AdminRacesPage() {
   const { selectedSeason } = useLeague()
+  const canEditLineup = useRights().includes('EDIT_RACE_LINEUPS')
   const calendar = useAdminRaceCalendar(selectedSeason)
   const transition = useChangeRacePredictionsStatus()
   const action = transition.variables?.action ?? 'open'
@@ -122,28 +125,15 @@ export default function AdminRacesPage() {
             <RaceTable
               races={calendar.data}
               raceLink={(race) => `/admin/results/${encodeURIComponent(race.id)}`}
-              renderActions={(race) => {
-                const action =
-                  race.status === 'SCHEDULED' ? 'open' : race.status === 'OPEN' ? 'close' : null
-                if (!action) return null
-
-                const label = action === 'open' ? 'Open predictions' : 'Close predictions'
-
-                return (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    color={action === 'close' ? 'warning' : 'primary'}
-                    aria-label={`${label} for ${race.name} (${race.type === 'SPRINT' ? 'Sprint' : 'Race'})`}
-                    loading={transition.isPending && transition.variables?.raceId === race.id}
-                    disabled={transition.isPending}
-                    onClick={() => transition.mutate({ raceId: race.id, action })}
-                    sx={{ whiteSpace: 'nowrap' }}
-                  >
-                    {label}
-                  </Button>
-                )
-              }}
+              renderActions={(race) => (
+                <RaceActionsMenu
+                  race={race}
+                  canEditLineup={canEditLineup}
+                  transitionPending={transition.isPending}
+                  transitioning={transition.isPending && transition.variables?.raceId === race.id}
+                  onTransition={(action) => transition.mutate({ raceId: race.id, action })}
+                />
+              )}
             />
           </Stack>
         )}
