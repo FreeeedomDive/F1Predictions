@@ -39,12 +39,10 @@ function DriverLabel({ name, team }: { name: string; team: RaceLineupTeamDto }) 
 
 export default function SwapDriversDialog({
   lineup,
-  busy,
   onSwap,
   onClose,
 }: {
   lineup: RaceLineupDto
-  busy: boolean
   onSwap: (firstDriverName: string, secondDriverName: string) => void
   onClose: () => void
 }) {
@@ -58,13 +56,7 @@ export default function SwapDriversDialog({
   const second = drivers.some((driver) => driver.name === secondDriver) ? secondDriver : ''
 
   return (
-    <Dialog
-      open
-      fullWidth
-      maxWidth="sm"
-      aria-labelledby={titleId}
-      onClose={busy ? undefined : onClose}
-    >
+    <Dialog open fullWidth maxWidth="sm" aria-labelledby={titleId} onClose={onClose}>
       <DialogTitle id={titleId}>
         Swap drivers · {lineup.race.name}
         {lineup.race.type === 'SPRINT' ? ' (Sprint)' : ''}
@@ -72,9 +64,9 @@ export default function SwapDriversDialog({
       <DialogContent>
         <Stack spacing={3} sx={{ pt: 1 }}>
           <DialogContentText>
-            Choose two drivers to exchange their places in this race's lineup.
+            Choose two drivers to swap in the draft. Save the lineup to apply the swap.
           </DialogContentText>
-          <FormControl fullWidth disabled={busy}>
+          <FormControl fullWidth>
             <InputLabel id={firstLabelId}>First driver</InputLabel>
             <Select
               labelId={firstLabelId}
@@ -89,7 +81,7 @@ export default function SwapDriversDialog({
               ))}
             </Select>
           </FormControl>
-          <FormControl fullWidth disabled={busy}>
+          <FormControl fullWidth>
             <InputLabel id={secondLabelId}>Second driver</InputLabel>
             <Select
               labelId={secondLabelId}
@@ -107,14 +99,11 @@ export default function SwapDriversDialog({
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose} disabled={busy}>
-          Cancel
-        </Button>
+        <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="contained"
           startIcon={<SwapHorizRounded />}
-          loading={busy}
-          disabled={busy || !first || !second || first === second}
+          disabled={!first || !second || first === second}
           onClick={() => onSwap(first, second)}
         >
           Swap

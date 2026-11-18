@@ -1,24 +1,13 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
-import {
-  addRaceLineupTeam,
-  getRaceLineupTarget,
-  swapRaceLineupDrivers,
-  updateRaceLineupTeam,
-} from '../api/raceLineups'
-import type { RaceLineupDto, RaceLineupTeamDto, SwapRaceDriversRequestDto } from '../dto/raceLineup'
+import { getRaceLineupTarget, saveRaceLineup } from '../api/raceLineups'
+import type { RaceLineupDto, SaveRaceLineupRequestDto } from '../dto/raceLineup'
 import { invalidateRacePredictions } from './predictions'
 
-interface SaveTeamVariables {
+interface SaveRaceLineupVariables {
   season: number
   raceId: string
-  previousName?: string
-  team: RaceLineupTeamDto
-}
-
-interface SwapDriversVariables extends SwapRaceDriversRequestDto {
-  season: number
-  raceId: string
+  request: SaveRaceLineupRequestDto
 }
 
 export function useRaceLineupTarget(season: number | null) {
@@ -36,43 +25,11 @@ export function useRaceLineupTarget(season: number | null) {
   })
 }
 
-export function useSaveRaceLineupTeam() {
+export function useSaveRaceLineup() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ raceId, previousName, team }: SaveTeamVariables) =>
-      previousName === undefined
-        ? addRaceLineupTeam(raceId, team)
-        : updateRaceLineupTeam(raceId, previousName, team),
-    retry: false,
-    onSuccess: async (_, variables) => {
-      const queryKey = ['admin', 'raceLineups', variables.season]
-      await queryClient.cancelQueries({ queryKey })
-      queryClient.setQueryData<RaceLineupDto | null>(queryKey, (current) => {
-        if (!current || current.race.id !== variables.raceId) return current
-        const teams =
-          variables.previousName === undefined
-            ? [...current.teams, variables.team]
-            : current.teams.map((team) =>
-                team.name === variables.previousName ? variables.team : team,
-              )
-        return { ...current, teams, prepared: true }
-      })
-    },
-    onSettled: (_, _error, variables) =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['admin', 'raceLineups', variables.season] }),
-        invalidateRacePredictions(queryClient, variables.raceId),
-      ]),
-  })
-}
-
-export function useSwapRaceLineupDrivers() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: ({ raceId, firstDriverName, secondDriverName }: SwapDriversVariables) =>
-      swapRaceLineupDrivers(raceId, { firstDriverName, secondDriverName }),
+    mutationFn: ({ raceId, request }: SaveRaceLineupVariables) => saveRaceLineup(raceId, request),
     retry: false,
     onSuccess: async (lineup, variables) => {
       const queryKey = ['admin', 'raceLineups', variables.season]

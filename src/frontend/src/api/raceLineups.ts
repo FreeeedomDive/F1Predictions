@@ -1,4 +1,4 @@
-import type { RaceLineupDto, RaceLineupTeamDto, SwapRaceDriversRequestDto } from '../dto/raceLineup'
+import type { RaceLineupDto, SaveRaceLineupRequestDto } from '../dto/raceLineup'
 import { api } from './client'
 
 export async function getRaceLineupTarget(
@@ -12,27 +12,12 @@ export async function getRaceLineupTarget(
   return response.status === 204 ? null : response.data
 }
 
-export async function addRaceLineupTeam(raceId: string, team: RaceLineupTeamDto): Promise<void> {
-  await api.post(`/adminApi/v1/races/${encodeURIComponent(raceId)}/lineup/teams`, team)
-}
-
-export async function updateRaceLineupTeam(
+export async function saveRaceLineup(
   raceId: string,
-  previousName: string,
-  team: RaceLineupTeamDto,
-): Promise<void> {
-  await api.put(
-    `/adminApi/v1/races/${encodeURIComponent(raceId)}/lineup/teams/${encodeURIComponent(previousName)}`,
-    team,
-  )
-}
-
-export async function swapRaceLineupDrivers(
-  raceId: string,
-  request: SwapRaceDriversRequestDto,
+  request: SaveRaceLineupRequestDto,
 ): Promise<RaceLineupDto> {
-  const response = await api.post<RaceLineupDto>(
-    `/adminApi/v1/races/${encodeURIComponent(raceId)}/lineup/swapDrivers`,
+  const response = await api.put<RaceLineupDto>(
+    `/adminApi/v1/races/${encodeURIComponent(raceId)}/lineup`,
     request,
   )
   return response.data

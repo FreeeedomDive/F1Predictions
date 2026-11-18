@@ -1,50 +1,19 @@
 import CloseRounded from '@mui/icons-material/CloseRounded'
-import MoreVertRounded from '@mui/icons-material/MoreVertRounded'
-import SaveRounded from '@mui/icons-material/SaveRounded'
 import UndoRounded from '@mui/icons-material/UndoRounded'
 import {
   Box,
   Chip,
-  CircularProgress,
   IconButton,
   InputAdornment,
-  ListItemIcon,
-  ListItemText,
-  Menu,
-  MenuItem,
   TableCell,
   TableRow,
   TextField,
   Tooltip,
 } from '@mui/material'
-import { useId, useState } from 'react'
 import type { RaceLineupTeamDto } from '../../dto/raceLineup'
-
-const hexColor = /^#[0-9a-f]{6}$/i
+import { hexColor, normalizeTeam } from './lineupDraft'
 
 type TeamFields = Omit<RaceLineupTeamDto, 'drivers'>
-type TeamDraft = Partial<TeamFields> & { drivers?: Record<number, string> }
-
-function normalizeTeam(team: RaceLineupTeamDto): RaceLineupTeamDto {
-  return {
-    name: team.name.trim(),
-    badge: team.badge.trim(),
-    backgroundColor: team.backgroundColor.trim().toUpperCase(),
-    textColor: team.textColor.trim().toUpperCase(),
-    drivers: team.drivers.map((driver) => driver.trim()).filter(Boolean),
-  }
-}
-
-function sameTeam(left: RaceLineupTeamDto, right: RaceLineupTeamDto) {
-  return (
-    left.name === right.name &&
-    left.badge === right.badge &&
-    left.backgroundColor.toUpperCase() === right.backgroundColor.toUpperCase() &&
-    left.textColor.toUpperCase() === right.textColor.toUpperCase() &&
-    left.drivers.length === right.drivers.length &&
-    left.drivers.every((driver, index) => driver === right.drivers[index])
-  )
-}
 
 function ColorField({
   label,
@@ -99,89 +68,46 @@ function ColorField({
 }
 
 export default function TeamEditorRow({
-  team,
-  isNew = false,
-  busy,
-  saving,
-  onSave,
-  onCancel,
+  team: value,
+  isNew,
+  disabled,
+  showErrors,
+  duplicateName,
+  duplicateDrivers,
+  onChange,
+  onDiscard,
 }: {
   team: RaceLineupTeamDto
-  isNew?: boolean
-  busy: boolean
-  saving: boolean
-  onSave: (team: RaceLineupTeamDto, onSaved: () => void) => void
-  onCancel?: () => void
+  isNew: boolean
+  disabled: boolean
+  showErrors: boolean
+  duplicateName: boolean
+  duplicateDrivers: ReadonlySet<string>
+  onChange: (team: RaceLineupTeamDto) => void
+  onDiscard?: () => void
 }) {
-  const [draft, setDraft] = useState<TeamDraft>({})
-  const [showErrors, setShowErrors] = useState(false)
-  const [actionsAnchor, setActionsAnchor] = useState<HTMLElement | null>(null)
-  const actionsId = useId()
-  const actionsButtonId = useId()
-  const { drivers: driverDrafts = {}, ...fields } = draft
-  const driverCount = Math.max(
-    2,
-    team.drivers.length,
-    ...Object.keys(driverDrafts).map((index) => Number(index) + 1),
-  )
-  const value: RaceLineupTeamDto = {
-    ...team,
-    ...fields,
-    drivers: Array.from(
-      { length: driverCount },
-      (_, index) => driverDrafts[index] ?? team.drivers[index] ?? '',
-    ),
-  }
   const normalized = normalizeTeam(value)
+  const nameError = !normalized.name
+    ? 'Team name is required.'
+    : duplicateName
+      ? 'Team must occur only once.'
+      : ''
   const badgeError = !normalized.badge
     ? 'Badge is required.'
     : normalized.badge.length > 3
       ? 'Use up to 3 characters.'
       : ''
-  const dirty = isNew || !sameTeam(normalized, team)
-  const drivers = value.drivers
-  const driverErrors = drivers.map((driver, index) => {
-    const name = driver.trim()
-    if (!name && (isNew || index < team.drivers.length)) return 'Driver name is required.'
-    if (name && drivers.filter((other) => other.trim() === name).length > 1)
-      return 'Driver must occur only once.'
-    return ''
-  })
-  const valid =
-    normalized.name.length > 0 &&
-    !badgeError &&
-    hexColor.test(normalized.backgroundColor) &&
-    hexColor.test(normalized.textColor) &&
-    driverErrors.every((error) => !error)
+  const drivers = Array.from(
+    { length: Math.max(2, value.drivers.length) },
+    (_, index) => value.drivers[index] ?? '',
+  )
 
   function change(field: keyof TeamFields, nextValue: string) {
-    setDraft((current) => {
-      const next = { ...current }
-      if (nextValue === team[field]) delete next[field]
-      else next[field] = nextValue
-      return next
-    })
+    onChange({ ...value, [field]: nextValue })
   }
 
   function changeDriver(index: number, nextValue: string) {
-    setDraft((current) => {
-      const drivers = { ...current.drivers }
-      if (nextValue === (team.drivers[index] ?? '')) delete drivers[index]
-      else drivers[index] = nextValue
-      return { ...current, drivers }
-    })
-  }
-
-  function reset() {
-    setActionsAnchor(null)
-    setDraft({})
-    setShowErrors(false)
-  }
-
-  function save() {
-    setActionsAnchor(null)
-    setShowErrors(true)
-    if (valid) onSave(normalized, reset)
+    onChange({ ...value, drivers: drivers.map((driver, i) => (i === index ? nextValue : driver)) })
   }
 
   return (
@@ -192,9 +118,9 @@ export default function TeamEditorRow({
           size="small"
           placeholder="Team name"
           value={value.name}
-          disabled={saving}
-          error={showErrors && !normalized.name}
-          helperText={showErrors && !normalized.name ? 'Team name is required.' : undefined}
+          disabled={disabled}
+          error={showErrors && !!nameError}
+          helperText={showErrors ? nameError || undefined : undefined}
           onChange={(event) => change('name', event.target.value)}
           slotProps={{ htmlInput: { 'aria-label': 'Team name' } }}
         />
@@ -205,7 +131,7 @@ export default function TeamEditorRow({
           size="small"
           placeholder="Badge"
           value={value.badge}
-          disabled={saving}
+          disabled={disabled}
           error={!!badgeError && (showErrors || normalized.badge.length > 3)}
           helperText={
             showErrors || normalized.badge.length > 3 ? badgeError || undefined : undefined
@@ -239,7 +165,7 @@ export default function TeamEditorRow({
         <ColorField
           label="Background color"
           value={value.backgroundColor}
-          disabled={saving}
+          disabled={disabled}
           showErrors={showErrors}
           onChange={(backgroundColor) => change('backgroundColor', backgroundColor)}
         />
@@ -248,76 +174,47 @@ export default function TeamEditorRow({
         <ColorField
           label="Text color"
           value={value.textColor}
-          disabled={saving}
+          disabled={disabled}
           showErrors={showErrors}
           onChange={(textColor) => change('textColor', textColor)}
         />
       </TableCell>
       <TableCell sx={{ minWidth: 380 }}>
         <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 1.5 }}>
-          {drivers.map((driver, index) => (
-            <TextField
-              key={index}
-              size="small"
-              label={`Driver ${index + 1}`}
-              value={driver}
-              disabled={saving}
-              error={showErrors && !!driverErrors[index]}
-              helperText={showErrors ? driverErrors[index] || undefined : undefined}
-              onChange={(event) => changeDriver(index, event.target.value)}
-            />
-          ))}
+          {drivers.map((driver, index) => {
+            const error =
+              duplicateDrivers.has(driver) || duplicateDrivers.has(driver.trim())
+                ? 'Driver must occur only once.'
+                : index === 0 && normalized.drivers.length === 0
+                  ? 'At least one driver is required.'
+                  : ''
+            return (
+              <TextField
+                key={index}
+                size="small"
+                label={`Driver ${index + 1}`}
+                value={driver}
+                disabled={disabled}
+                error={showErrors && !!error}
+                helperText={showErrors ? error || undefined : undefined}
+                onChange={(event) => changeDriver(index, event.target.value)}
+              />
+            )
+          })}
         </Box>
       </TableCell>
       <TableCell align="right" sx={{ width: 64 }}>
-        <Tooltip title={saving ? 'Saving team…' : 'Team actions'}>
-          <span>
+        {onDiscard && (
+          <Tooltip title={isNew ? 'Remove new team' : 'Discard team changes'}>
             <IconButton
-              id={actionsButtonId}
-              aria-label={`Actions for ${normalized.name || 'new team'}`}
-              aria-haspopup="menu"
-              aria-controls={actionsAnchor ? actionsId : undefined}
-              aria-expanded={Boolean(actionsAnchor)}
-              aria-busy={saving}
-              disabled={saving}
-              onClick={(event) => setActionsAnchor(event.currentTarget)}
-              sx={{ width: 40, height: 40, border: 1, borderColor: 'divider', borderRadius: 1 }}
+              aria-label={`${isNew ? 'Remove' : 'Discard changes for'} ${normalized.name || 'new team'}`}
+              disabled={disabled}
+              onClick={onDiscard}
             >
-              {saving ? (
-                <CircularProgress size={18} color="inherit" />
-              ) : (
-                <MoreVertRounded fontSize="small" />
-              )}
-            </IconButton>
-          </span>
-        </Tooltip>
-        <Menu
-          id={actionsId}
-          anchorEl={actionsAnchor}
-          open={Boolean(actionsAnchor)}
-          onClose={() => setActionsAnchor(null)}
-          slotProps={{ list: { 'aria-labelledby': actionsButtonId } }}
-        >
-          <MenuItem disabled={busy || !dirty} onClick={save}>
-            <ListItemIcon>
-              <SaveRounded fontSize="small" />
-            </ListItemIcon>
-            <ListItemText>Save</ListItemText>
-          </MenuItem>
-          <MenuItem
-            disabled={saving || (!isNew && !dirty)}
-            onClick={() => {
-              setActionsAnchor(null)
-              if (isNew) onCancel?.()
-              else reset()
-            }}
-          >
-            <ListItemIcon>
               {isNew ? <CloseRounded fontSize="small" /> : <UndoRounded fontSize="small" />}
-            </ListItemIcon>
-            <ListItemText>{isNew ? 'Cancel' : 'Discard changes'}</ListItemText>
-          </MenuItem>
-        </Menu>
+            </IconButton>
+          </Tooltip>
+        )}
       </TableCell>
     </TableRow>
   )

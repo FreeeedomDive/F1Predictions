@@ -14,7 +14,8 @@ export interface RaceLineupDto {
   prepared: boolean
 }
 
-export interface SwapRaceDriversRequestDto {
-  firstDriverName: string
-  secondDriverName: string
+export interface SaveRaceLineupRequestDto {
+  baseTeams: RaceLineupTeamDto[]
+  teams: { previousName: string | null; team: RaceLineupTeamDto }[]
+  replacements: { previousDriverName: string; newDriverName: string }[]
 }
