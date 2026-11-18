@@ -4,15 +4,13 @@ import com.xdd.f1.application.race.lineup.RaceLineupService;
 import com.xdd.f1.bootstrap.auth.AuthenticatedUser;
 import com.xdd.f1.bootstrap.auth.CurrentUser;
 import com.xdd.f1.bootstrap.auth.RequireRights;
-import com.xdd.f1.domain.rights.Right;
 import com.xdd.f1.contract.race.lineup.RaceLineupDto;
-import com.xdd.f1.contract.race.lineup.RaceLineupTeamDto;
-import com.xdd.f1.contract.race.lineup.SwapRaceDriversRequestDto;
+import com.xdd.f1.contract.race.lineup.SaveRaceLineupRequestDto;
 import com.xdd.f1.domain.race.RaceId;
+import com.xdd.f1.domain.rights.Right;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -40,41 +38,18 @@ public class AdminRaceLineupController {
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
-    @PostMapping("races/{raceId}/lineup/teams")
-    public void addTeam(
+    @PutMapping("races/{raceId}/lineup")
+    public RaceLineupDto save(
             @CurrentUser AuthenticatedUser user,
             @PathVariable UUID raceId,
-            @RequestBody RaceLineupTeamDto request
+            @RequestBody SaveRaceLineupRequestDto request
     ) {
-        lineupService.addTeam(new RaceId(raceId), RaceLineupDtoMapper.toDomain(request));
-    }
-
-    @PutMapping("races/{raceId}/lineup/teams/{teamName}")
-    public void updateTeam(
-            @CurrentUser AuthenticatedUser user,
-            @PathVariable UUID raceId,
-            @PathVariable String teamName,
-            @RequestBody RaceLineupTeamDto request
-    ) {
-        lineupService.updateTeam(
+        RaceLineupDtoMapper.validate(request);
+        return RaceLineupDtoMapper.toDto(lineupService.save(
                 new RaceId(raceId),
-                teamName,
-                RaceLineupDtoMapper.toDomain(request)
-        );
-    }
-
-    @PostMapping("races/{raceId}/lineup/swapDrivers")
-    public RaceLineupDto swapDrivers(
-            @CurrentUser AuthenticatedUser user,
-            @PathVariable UUID raceId,
-            @RequestBody SwapRaceDriversRequestDto request
-    ) {
-        var id = new RaceId(raceId);
-        lineupService.swapDrivers(
-                id,
-                RaceLineupDtoMapper.toDriver(request.firstDriverName()),
-                RaceLineupDtoMapper.toDriver(request.secondDriverName())
-        );
-        return RaceLineupDtoMapper.toDto(lineupService.getForEditing(id));
+                request.baseTeams().stream().map(RaceLineupDtoMapper::toDomain).toList(),
+                request.teams().stream().map(RaceLineupDtoMapper::toEdit).toList(),
+                request.replacements().stream().map(RaceLineupDtoMapper::toReplacement).toList()
+        ));
     }
 }

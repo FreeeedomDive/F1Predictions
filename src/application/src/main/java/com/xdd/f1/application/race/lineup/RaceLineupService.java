@@ -7,14 +7,16 @@ import com.xdd.f1.application.locking.TransactionLock;
 import com.xdd.f1.application.prediction.PredictionRepository;
 import com.xdd.f1.application.prediction.PredictionConditionsRepository;
 import com.xdd.f1.contract.race.DriverReplacementDto;
+import com.xdd.f1.contract.race.RaceDriversMovedEvent;
 import com.xdd.f1.contract.race.RaceDriversReplacedEvent;
-import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceStatus;
 import com.xdd.f1.domain.race.lineup.Driver;
 import com.xdd.f1.domain.race.lineup.DriverReplacement;
 import com.xdd.f1.domain.race.lineup.RaceLineup;
+import com.xdd.f1.domain.race.lineup.RaceLineupChanges;
+import com.xdd.f1.domain.race.lineup.RaceLineupChanges.TeamEdit;
 import com.xdd.f1.domain.race.lineup.Team;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -77,30 +79,31 @@ public class RaceLineupService {
     }
 
     @Transactional
-    public RaceLineup addTeam(RaceId raceId, Team team) {
-        return saveTeam(getEditableRace(raceId), Optional.empty(), team);
-    }
-
-    @Transactional
-    public RaceLineup updateTeam(RaceId raceId, String previousName, Team team) {
-        return saveTeam(getEditableRace(raceId), Optional.of(previousName), team);
-    }
-
-    @Transactional
-    public RaceLineup swapDrivers(RaceId raceId, Driver firstDriver, Driver secondDriver) {
+    public RaceLineupEditor save(
+            RaceId raceId, List<Team> baseTeams, List<TeamEdit> edits, List<DriverReplacement> confirmedReplacements
+    ) {
         var race = getEditableRace(raceId);
-        ensureForRace(race);
-        var current = lineupRepository.findByRaceId(raceId)
-                .orElseThrow(() -> new RaceLineupNotFoundException(raceId));
-        var updated = current.swapDrivers(firstDriver, secondDriver);
-        if (!current.equals(updated)) {
-            lineupRepository.update(updated);
-            for (var team : updated.teams()) {
-                var replacements = current.findTeam(team.branding().name()).orElseThrow().driverReplacementsTo(team);
-                publishReplacements(race, team, replacements);
-            }
+        var current = toEditor(race);
+        if (!current.teams().equals(baseTeams)) {
+            throw new RaceLineupConflictException(raceId);
         }
-        return updated;
+        var changes = RaceLineupChanges.calculate(raceId, current.teams(), edits, confirmedReplacements);
+        var lineup = changes.lineup();
+        if (current.prepared() && current.teams().equals(lineup.teams())) {
+            return current;
+        }
+        if (!current.prepared()) {
+            if (!lineupRepository.createIfAbsent(lineup)) {
+                throw new RaceLineupConflictException(raceId);
+            }
+        } else {
+            lineupRepository.update(lineup);
+        }
+        if (!changes.replacements().isEmpty()) {
+            replaceDriverReferences(race.id(), changes.replacements());
+        }
+        changes.teams().forEach(change -> publishDriverChanges(race, change));
+        return new RaceLineupEditor(race, lineup.teams(), true);
     }
 
     @Transactional
@@ -115,80 +118,39 @@ public class RaceLineupService {
         lineupRepository.createIfAbsent(new RaceLineup(race.id(), previous.teams()));
     }
 
-    private RaceLineup saveTeam(Race race, Optional<String> previousName, Team team) {
-        if (team.branding().badge().length() > 3) {
-            throw new DomainValidationException("Team badge must not exceed 3 characters");
-        }
-        var saved = lineupRepository.findByRaceId(race.id());
-        var current = saved.or(() -> lineupRepository.findLatestBefore(race.closeAt())
-                .map(previous -> new RaceLineup(race.id(), previous.teams())));
-        var updated = applyTeamChange(race.id(), current, previousName, team);
-
-        if (saved.isEmpty()) {
-            if (lineupRepository.createIfAbsent(updated)) {
-                completeTeamChange(race, current, previousName, team);
-                return updated;
-            }
-            current = Optional.of(lineupRepository.findByRaceId(race.id())
-                    .orElseThrow(() -> new RaceLineupNotFoundException(race.id())));
-            updated = applyTeamChange(race.id(), current, previousName, team);
-        }
-
-        if (!current.orElseThrow().equals(updated)) {
-            lineupRepository.update(updated);
-            completeTeamChange(race, current, previousName, team);
-        }
-        return updated;
-    }
-
-    private RaceLineup applyTeamChange(RaceId raceId, Optional<RaceLineup> current, Optional<String> previousName, Team team) {
-        if (previousName.isPresent()) {
-            return current.orElseThrow(() -> new RaceLineupNotPreparedException(raceId))
-                    .updateTeam(previousName.get(), team);
-        }
-        return current.map(lineup -> lineup.addTeam(team))
-                .orElseGet(() -> new RaceLineup(raceId, List.of(team)));
-    }
-
-    private void completeTeamChange(Race race, Optional<RaceLineup> current, Optional<String> previousName, Team team) {
-        var replacements = current.flatMap(lineup -> previousName.flatMap(lineup::findTeam))
-                .map(previous -> previous.driverReplacementsTo(team))
-                .orElse(List.of());
-        if (replacements.isEmpty()) {
-            return;
-        }
-        for (var prediction : predictions.findAllByRaceId(race.id())) {
+    private void replaceDriverReferences(RaceId raceId, List<DriverReplacement> replacements) {
+        for (var prediction : predictions.findAllByRaceId(raceId)) {
             var updated = prediction.replaceDrivers(replacements);
             if (!updated.equals(prediction)) {
                 predictions.update(updated);
             }
         }
-        conditions.findByRaceId(race.id()).ifPresent(currentConditions -> {
+        conditions.findByRaceId(raceId).ifPresent(currentConditions -> {
             var updated = currentConditions.replaceDrivers(replacements);
             if (!updated.equals(currentConditions)) {
                 conditions.update(updated);
             }
         });
-        results.replaceStartingGridDrivers(race.id(), replacements);
-        publishReplacements(race, team, replacements);
+        results.replaceStartingGridDrivers(raceId, replacements);
     }
 
-    private void publishReplacements(Race race, Team team, List<DriverReplacement> replacements) {
-        if (replacements.isEmpty()) {
-            return;
+    private void publishDriverChanges(Race race, RaceLineupChanges.TeamChange change) {
+        var branding = change.branding();
+        if (!change.replacements().isEmpty()) {
+            eventPublisher.publishEvent(new RaceDriversReplacedEvent(
+                    race.id().value(), race.name(), race.type().name(), branding.name(), branding.backgroundColor(),
+                    change.replacements().stream()
+                            .map(pair -> new DriverReplacementDto(pair.previousDriver().name(), pair.newDriver().name()))
+                            .toList()
+            ));
         }
-        eventPublisher.publishEvent(new RaceDriversReplacedEvent(
-                race.id().value(),
-                race.name(),
-                race.type().name(),
-                team.branding().name(),
-                team.branding().backgroundColor(),
-                replacements.stream()
-                        .map(replacement -> new DriverReplacementDto(
-                                replacement.previousDriver().name(), replacement.newDriver().name()
-                        ))
-                        .toList()
-        ));
+        if (!change.departures().isEmpty() || !change.arrivals().isEmpty()) {
+            eventPublisher.publishEvent(new RaceDriversMovedEvent(
+                    race.id().value(), race.name(), race.type().name(), branding.name(), branding.backgroundColor(),
+                    change.departures().stream().map(Driver::name).toList(),
+                    change.arrivals().stream().map(Driver::name).toList()
+            ));
+        }
     }
 
     private Race getEditableRace(RaceId raceId) {
