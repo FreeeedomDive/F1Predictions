@@ -153,8 +153,8 @@ const router = createBrowserRouter([
               }
             },
           })),
-          {
-            path: 'admin/teams',
+          ...['admin/teams', 'admin/teams/:raceId'].map((path) => ({
+            path,
             lazy: async () => {
               const { default: AdminTeamsPage } = await import('./routes/AdminTeamsPage')
               return {
@@ -171,7 +171,7 @@ const router = createBrowserRouter([
                 ),
               }
             },
-          },
+          })),
           {
             path: 'admin/rights',
             lazy: async () => {

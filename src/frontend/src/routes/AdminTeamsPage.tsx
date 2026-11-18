@@ -14,12 +14,12 @@ import {
   Typography,
 } from '@mui/material'
 import { isAxiosError } from 'axios'
-import { Navigate } from 'react-router'
+import { Navigate, useParams } from 'react-router'
 import { isUnauthorized } from '../api/session'
 import LineupEditor from '../components/lineup/LineupEditor'
 import { useLeague } from '../context/league'
 import type { SaveRaceLineupRequestDto } from '../dto/raceLineup'
-import { useRaceLineupTarget, useSaveRaceLineup } from '../queries/raceLineups'
+import { useRaceLineupEditor, useSaveRaceLineup } from '../queries/raceLineups'
 
 const dateTime = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
 
@@ -34,21 +34,25 @@ function errorMessage(error: Error | null, fallback: string) {
 }
 
 export default function AdminTeamsPage() {
+  const { raceId } = useParams()
   const { selectedSeason } = useLeague()
-  const target = useRaceLineupTarget(selectedSeason)
+  const editor = useRaceLineupEditor(selectedSeason, raceId)
   const save = useSaveRaceLineup()
-  const lineup = target.data
+  const lineup = editor.data
+  const season = raceId ? lineup?.season : selectedSeason
+  const noSelection = !raceId && selectedSeason === null
+  const driversEditable = lineup?.race.status === 'SCHEDULED' || lineup?.race.status === 'OPEN'
 
   if (
-    (target.isError && isUnauthorized(target.error)) ||
+    (editor.isError && isUnauthorized(editor.error)) ||
     (save.isError && isUnauthorized(save.error))
   ) {
     return <Navigate to="/auth" replace />
   }
 
   function saveLineup(request: SaveRaceLineupRequestDto, onSaved: () => void) {
-    if (!lineup || selectedSeason === null) return
-    save.mutate({ season: selectedSeason, raceId: lineup.race.id, request }, { onSuccess: onSaved })
+    if (!lineup) return
+    save.mutate({ season: lineup.season, raceId: lineup.race.id, request }, { onSuccess: onSaved })
   }
 
   return (
@@ -67,15 +71,15 @@ export default function AdminTeamsPage() {
               Team administration
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Race lineup{selectedSeason !== null && ` · ${selectedSeason}`}
+              Race lineup{season != null && ` · ${season}`}
             </Typography>
           </Stack>
           <Tooltip title="Refresh lineup">
             <span>
               <IconButton
                 aria-label="Refresh lineup"
-                disabled={selectedSeason === null || target.isFetching || save.isPending}
-                onClick={() => void target.refetch()}
+                disabled={noSelection || editor.isFetching || save.isPending}
+                onClick={() => void editor.refetch()}
               >
                 <RefreshRounded />
               </IconButton>
@@ -83,32 +87,32 @@ export default function AdminTeamsPage() {
           </Tooltip>
         </Stack>
 
-        {selectedSeason === null ? (
+        {noSelection ? (
           <Alert severity="info">
             No seasons available. This league's first season has not started yet.
           </Alert>
-        ) : target.isPending ? (
+        ) : editor.isPending ? (
           <Stack spacing={1} role="status" aria-label="Loading lineup">
             {[0, 1, 2, 3].map((index) => (
               <Skeleton key={index} variant="rounded" height={80} />
             ))}
           </Stack>
-        ) : target.isError && !lineup ? (
+        ) : editor.isError && !lineup ? (
           <Alert
             severity="error"
             action={
-              <Button color="inherit" onClick={() => void target.refetch()}>
+              <Button color="inherit" onClick={() => void editor.refetch()}>
                 Retry
               </Button>
             }
           >
-            {errorMessage(target.error, 'Could not load the lineup. Please try again.')}
+            {errorMessage(editor.error, 'Could not load the lineup. Please try again.')}
           </Alert>
         ) : !lineup ? (
           <Paper variant="outlined" sx={{ p: { xs: 3, md: 5 }, textAlign: 'center' }}>
             <GroupsRounded sx={{ color: 'text.secondary', fontSize: 36, mb: 1.5 }} />
             <Typography variant="h6" sx={{ mb: 1 }}>
-              No editable race in {selectedSeason}
+              No target race in {selectedSeason}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               There are no open or upcoming scheduled races in this season.
@@ -116,10 +120,10 @@ export default function AdminTeamsPage() {
           </Paper>
         ) : (
           <>
-            {target.isError && (
+            {editor.isError && (
               <Alert severity="warning">
                 {errorMessage(
-                  target.error,
+                  editor.error,
                   'Could not refresh the lineup. Your changes are still here. Try Refresh again.',
                 )}
               </Alert>
@@ -156,20 +160,32 @@ export default function AdminTeamsPage() {
                 </Typography>
               </Stack>
             </Paper>
-            {!lineup.prepared && (
+            {!lineup.prepared && driversEditable && (
               <Alert severity="info">
                 {lineup.teams.length > 0
                   ? 'This is a preview of the previous lineup. Save it to prepare the lineup for this race.'
                   : 'Add the first team and save to prepare the lineup for this race.'}
               </Alert>
             )}
-            <LineupEditor
-              key={lineup.race.id}
-              lineup={lineup}
-              busy={save.isPending || target.isFetching}
-              saving={save.isPending && save.variables?.raceId === lineup.race.id}
-              onSave={saveLineup}
-            />
+            {!lineup.prepared && !driversEditable ? (
+              <Alert severity="info">No lineup was saved for this race.</Alert>
+            ) : (
+              <>
+                {!driversEditable && (
+                  <Alert severity="info">
+                    Driver assignments are read-only for closed and finished races.
+                  </Alert>
+                )}
+                <LineupEditor
+                  key={lineup.race.id}
+                  lineup={lineup}
+                  driversEditable={driversEditable}
+                  busy={save.isPending || editor.isFetching}
+                  saving={save.isPending && save.variables?.raceId === lineup.race.id}
+                  onSave={saveLineup}
+                />
+              </>
+            )}
           </>
         )}
       </Stack>

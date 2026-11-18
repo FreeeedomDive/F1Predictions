@@ -26,6 +26,7 @@ import type {
 import {
   analyzeDraft,
   hexColor,
+  sameDrivers,
   normalizeTeam,
   sameTeam,
   sameTeams,
@@ -61,11 +62,13 @@ interface Draft {
 
 export default function LineupEditor({
   lineup,
+  driversEditable,
   busy,
   saving,
   onSave,
 }: {
   lineup: RaceLineupDto
+  driversEditable: boolean
   busy: boolean
   saving: boolean
   onSave: (request: SaveRaceLineupRequestDto, onSaved: () => void) => void
@@ -86,6 +89,13 @@ export default function LineupEditor({
     !sameTeams(normalized, baseTeams) ||
     teams.some(({ previousName }, index) => previousName !== baseTeams[index]?.name)
   const stale = draft !== null && !sameTeams(baseTeams, lineup.teams)
+  const lockedChanges =
+    !driversEditable &&
+    (teams.length !== baseTeams.length ||
+      teams.some(({ previousName, team }) => {
+        const original = baseTeams.find((item) => item.name === previousName)
+        return !original || !sameDrivers(team.drivers, original.drivers)
+      }))
   const duplicateNames = duplicates(normalized.map((team) => team.name))
   const drivers = normalized.flatMap((team) => team.drivers)
   const duplicateDrivers = duplicates(drivers)
@@ -100,7 +110,7 @@ export default function LineupEditor({
         hexColor.test(team.backgroundColor) &&
         hexColor.test(team.textColor) &&
         team.drivers.length > 0 &&
-        team.drivers.length <= 2,
+        (!driversEditable || team.drivers.length <= 2),
     )
   const replacements = needsPairing ? selectedReplacements(removed, added, pairs) : []
   const canPair = added.length >= removed.length
@@ -152,7 +162,9 @@ export default function LineupEditor({
 
   function save() {
     setShowErrors(true)
-    if (teamFieldsValid && pairingComplete) onSave({ baseTeams, teams, replacements }, discardDraft)
+    if (!lockedChanges && teamFieldsValid && pairingComplete) {
+      onSave({ baseTeams, teams, replacements }, discardDraft)
+    }
   }
 
   return (
@@ -171,27 +183,33 @@ export default function LineupEditor({
               Discard changes
             </Button>
           )}
-          <Button
-            variant="outlined"
-            startIcon={<SwapHorizRounded />}
-            disabled={saving || stale || drivers.length < 2 || duplicateDrivers.size > 0}
-            onClick={() => setSwapOpen(true)}
-          >
-            Swap drivers
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<AddRounded />}
-            disabled={saving || stale}
-            onClick={addDraft}
-          >
-            Add team
-          </Button>
+          {driversEditable && (
+            <>
+              <Button
+                variant="outlined"
+                startIcon={<SwapHorizRounded />}
+                disabled={saving || stale || drivers.length < 2 || duplicateDrivers.size > 0}
+                onClick={() => setSwapOpen(true)}
+              >
+                Swap drivers
+              </Button>
+              <Button
+                variant="outlined"
+                startIcon={<AddRounded />}
+                disabled={saving || stale}
+                onClick={addDraft}
+              >
+                Add team
+              </Button>
+            </>
+          )}
           <Button
             variant="contained"
             startIcon={<SaveRounded />}
             loading={saving}
-            disabled={busy || stale || rows.length === 0 || (!dirty && lineup.prepared)}
+            disabled={
+              busy || stale || lockedChanges || rows.length === 0 || (!dirty && lineup.prepared)
+            }
             onClick={save}
           >
             Save lineup
@@ -211,7 +229,14 @@ export default function LineupEditor({
           the latest lineup.
         </Alert>
       )}
-      {showErrors &&
+      {!stale && lockedChanges && (
+        <Alert severity="warning">
+          This race no longer allows changes to drivers or the team list. Discard those edits before
+          saving.
+        </Alert>
+      )}
+      {driversEditable &&
+        showErrors &&
         duplicateDrivers.size === 0 &&
         needsPairing &&
         (canPair ? (
@@ -294,6 +319,7 @@ export default function LineupEditor({
                   key={row.id}
                   team={row.team}
                   isNew={!original}
+                  driversEditable={driversEditable}
                   disabled={saving || stale}
                   showErrors={showErrors}
                   duplicateName={duplicateNames.has(normalized[index].name)}
@@ -330,7 +356,7 @@ export default function LineupEditor({
           </TableBody>
         </Table>
       </TableContainer>
-      {swapOpen && (
+      {driversEditable && swapOpen && (
         <SwapDriversDialog
           lineup={{ ...lineup, teams: normalized }}
           onSwap={swapDrivers}

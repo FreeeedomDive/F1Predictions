@@ -70,6 +70,7 @@ function ColorField({
 export default function TeamEditorRow({
   team: value,
   isNew,
+  driversEditable,
   disabled,
   showErrors,
   duplicateName,
@@ -79,6 +80,7 @@ export default function TeamEditorRow({
 }: {
   team: RaceLineupTeamDto
   isNew: boolean
+  driversEditable: boolean
   disabled: boolean
   showErrors: boolean
   duplicateName: boolean
@@ -98,7 +100,7 @@ export default function TeamEditorRow({
       ? 'Use up to 3 characters.'
       : ''
   const drivers = Array.from(
-    { length: Math.max(2, value.drivers.length) },
+    { length: driversEditable ? Math.max(2, value.drivers.length) : value.drivers.length },
     (_, index) => value.drivers[index] ?? '',
   )
 
@@ -195,6 +197,7 @@ export default function TeamEditorRow({
                 label={`Driver ${index + 1}`}
                 value={driver}
                 disabled={disabled}
+                slotProps={{ input: { readOnly: !driversEditable } }}
                 error={showErrors && !!error}
                 helperText={showErrors ? error || undefined : undefined}
                 onChange={(event) => changeDriver(index, event.target.value)}

@@ -1,6 +1,6 @@
 import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
-import { getRaceLineupTarget, saveRaceLineup } from '../api/raceLineups'
+import { getRaceLineup, getRaceLineupTarget, saveRaceLineup } from '../api/raceLineups'
 import type { RaceLineupDto, SaveRaceLineupRequestDto } from '../dto/raceLineup'
 import { invalidateRacePredictions } from './predictions'
 
@@ -10,10 +10,18 @@ interface SaveRaceLineupVariables {
   request: SaveRaceLineupRequestDto
 }
 
-export function useRaceLineupTarget(season: number | null) {
+const lineupKey = ['admin', 'raceLineups'] as const
+const targetKey = (season: number | null) => [...lineupKey, 'target', season] as const
+const raceKey = (raceId: string) => [...lineupKey, 'race', raceId] as const
+
+export function useRaceLineupEditor(season: number | null, raceId: string | undefined) {
   return useQuery({
-    queryKey: ['admin', 'raceLineups', season],
-    queryFn: season !== null ? ({ signal }) => getRaceLineupTarget(season, signal) : skipToken,
+    queryKey: raceId ? raceKey(raceId) : targetKey(season),
+    queryFn: raceId
+      ? ({ signal }) => getRaceLineup(raceId, signal)
+      : season !== null
+        ? ({ signal }) => getRaceLineupTarget(season, signal)
+        : skipToken,
     staleTime: 30_000,
     refetchInterval: 60_000,
     retry: (failureCount, error) => {
@@ -32,15 +40,20 @@ export function useSaveRaceLineup() {
     mutationFn: ({ raceId, request }: SaveRaceLineupVariables) => saveRaceLineup(raceId, request),
     retry: false,
     onSuccess: async (lineup, variables) => {
-      const queryKey = ['admin', 'raceLineups', variables.season]
-      await queryClient.cancelQueries({ queryKey })
-      queryClient.setQueryData<RaceLineupDto | null>(queryKey, (current) =>
+      const direct = raceKey(variables.raceId)
+      const target = targetKey(variables.season)
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: direct }),
+        queryClient.cancelQueries({ queryKey: target }),
+      ])
+      queryClient.setQueryData(direct, lineup)
+      queryClient.setQueryData<RaceLineupDto | null>(target, (current) =>
         current?.race.id === variables.raceId ? lineup : current,
       )
     },
     onSettled: (_, _error, variables) =>
       Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['admin', 'raceLineups', variables.season] }),
+        queryClient.invalidateQueries({ queryKey: lineupKey }),
         invalidateRacePredictions(queryClient, variables.raceId),
       ]),
   })

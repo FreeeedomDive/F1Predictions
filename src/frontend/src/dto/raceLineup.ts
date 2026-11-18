@@ -10,6 +10,7 @@ export interface RaceLineupTeamDto {
 
 export interface RaceLineupDto {
   race: RaceDto
+  season: number
   teams: RaceLineupTeamDto[]
   prepared: boolean
 }

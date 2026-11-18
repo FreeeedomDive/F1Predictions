@@ -24,9 +24,12 @@ export function sameTeam(left: RaceLineupTeamDto, right: RaceLineupTeamDto) {
     left.badge === right.badge &&
     left.backgroundColor === right.backgroundColor &&
     left.textColor === right.textColor &&
-    left.drivers.length === right.drivers.length &&
-    left.drivers.every((driver, index) => driver === right.drivers[index])
+    sameDrivers(left.drivers, right.drivers)
   )
+}
+
+export function sameDrivers(left: string[], right: string[]) {
+  return left.length === right.length && left.every((driver, index) => driver === right[index])
 }
 
 export function sameTeams(left: RaceLineupTeamDto[], right: RaceLineupTeamDto[]) {
