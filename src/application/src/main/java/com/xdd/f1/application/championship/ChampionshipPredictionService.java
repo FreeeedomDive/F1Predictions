@@ -1,0 +1,161 @@
+package com.xdd.f1.application.championship;
+
+import com.xdd.f1.application.league.LeagueNotFoundException;
+import com.xdd.f1.application.league.LeagueParticipantNotFoundException;
+import com.xdd.f1.application.league.LeagueParticipantRepository;
+import com.xdd.f1.application.league.LeagueRepository;
+import com.xdd.f1.application.locking.TransactionLock;
+import com.xdd.f1.application.race.RaceNotFoundException;
+import com.xdd.f1.application.race.RaceRepository;
+import com.xdd.f1.application.race.lineup.RaceLineupNotFoundException;
+import com.xdd.f1.application.race.lineup.RaceLineupRepository;
+import com.xdd.f1.domain.championship.ChampionshipPrediction;
+import com.xdd.f1.domain.championship.ChampionshipRulesVersion;
+import com.xdd.f1.domain.championship.ChampionshipSeason;
+import com.xdd.f1.domain.championship.ChampionshipStage;
+import com.xdd.f1.domain.error.DomainValidationException;
+import com.xdd.f1.domain.league.League;
+import com.xdd.f1.domain.league.LeagueId;
+import com.xdd.f1.domain.league.LeagueParticipantId;
+import com.xdd.f1.domain.race.RaceId;
+import com.xdd.f1.domain.race.RaceType;
+import com.xdd.f1.domain.race.lineup.Driver;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static com.xdd.f1.domain.championship.ChampionshipStage.MID_SEASON;
+import static com.xdd.f1.domain.championship.ChampionshipStage.PRE_SEASON;
+import static com.xdd.f1.domain.championship.ChampionshipSubmissionSource.PRE_SEASON_COPY;
+import static com.xdd.f1.domain.championship.ChampionshipSubmissionSource.USER;
+
+@Service
+public class ChampionshipPredictionService {
+    private final ChampionshipSeasonRepository seasons;
+    private final ChampionshipPredictionRepository predictions;
+    private final LeagueRepository leagues;
+    private final LeagueParticipantRepository participants;
+    private final RaceRepository races;
+    private final RaceLineupRepository lineups;
+    private final TransactionLock lock;
+
+    public ChampionshipPredictionService(ChampionshipSeasonRepository seasons, ChampionshipPredictionRepository predictions,
+                                         LeagueRepository leagues, LeagueParticipantRepository participants,
+                                         RaceRepository races, RaceLineupRepository lineups, TransactionLock lock) {
+        this.seasons = seasons;
+        this.predictions = predictions;
+        this.leagues = leagues;
+        this.participants = participants;
+        this.races = races;
+        this.lineups = lineups;
+        this.lock = lock;
+    }
+
+    @Transactional
+    public ChampionshipSeason configure(int season, ChampionshipRulesVersion rulesVersion) {
+        lock.acquire("championship:" + season);
+        var existing = seasons.findBySeason(season);
+        if (existing.isPresent()) {
+            if (existing.get().rulesVersion() != rulesVersion) {
+                throw new ChampionshipConflictException(season, "rules version is already set");
+            }
+            return existing.get();
+        }
+        var configured = new ChampionshipSeason(season, rulesVersion, PRE_SEASON, false, false, List.of(), List.of());
+        seasons.save(configured);
+        return configured;
+    }
+
+    @Transactional
+    public ChampionshipSeason openStage(int season, ChampionshipStage stage, RaceId lineupRaceId) {
+        lock.acquire("championship:" + season);
+        var current = getSeason(season);
+        boolean canOpen = switch (stage) {
+            case PRE_SEASON -> !current.stageStarted();
+            case MID_SEASON -> current.stage() == PRE_SEASON && current.isPublished(PRE_SEASON);
+        };
+        if (!canOpen) {
+            throw new ChampionshipConflictException(season, "cannot open " + stage);
+        }
+        var lineupRace = races.findById(lineupRaceId).orElseThrow(() -> new RaceNotFoundException(lineupRaceId));
+        if (lineupRace.season() != season || lineupRace.type() != RaceType.RACE) {
+            throw new DomainValidationException("Championship roster must come from a race in the same season");
+        }
+        var lineup = lineups.findByRaceId(lineupRaceId).orElseThrow(() -> new RaceLineupNotFoundException(lineupRaceId));
+        var roster = lineup.teams().stream().flatMap(team -> team.drivers().stream()).map(Driver::name).toList();
+        var opened = new ChampionshipSeason(season, current.rulesVersion(), stage, true, true,
+                stage == PRE_SEASON ? roster : current.preSeasonRoster(),
+                stage == MID_SEASON ? roster : current.midSeasonRoster());
+        seasons.save(opened);
+        return opened;
+    }
+
+    @Transactional
+    public ChampionshipSeason closeStage(int season, ChampionshipStage stage) {
+        lock.acquire("championship:" + season);
+        var current = getSeason(season);
+        if (current.isPublished(stage)) {
+            return current;
+        }
+        if (current.stage() != stage || !current.isOpen()) {
+            throw new ChampionshipConflictException(season, "cannot close " + stage);
+        }
+        if (stage == MID_SEASON) {
+            copyPreSeasonPredictions(season);
+        }
+        var closed = new ChampionshipSeason(season, current.rulesVersion(), stage, true, false,
+                current.preSeasonRoster(), current.midSeasonRoster());
+        seasons.save(closed);
+        return closed;
+    }
+
+    @Transactional
+    public ChampionshipPrediction save(LeagueId leagueId, int season, LeagueParticipantId participantId,
+                                       ChampionshipStage stage, List<String> orderedDrivers) {
+        lock.acquire("championship:" + season);
+        participants.findByLeagueAndId(leagueId, participantId)
+                .orElseThrow(() -> new LeagueParticipantNotFoundException(participantId));
+        var league = leagues.findById(leagueId).orElseThrow(() -> new LeagueNotFoundException(leagueId));
+        if (season < league.settings().firstSeason()) {
+            throw new ChampionshipSeasonNotFoundException(season);
+        }
+        var current = seasons.findBySeason(season).orElseThrow(() -> new ChampionshipPredictionsClosedException(season, stage));
+        if (current.stage() != stage || !current.isOpen()) {
+            throw new ChampionshipPredictionsClosedException(season, stage);
+        }
+        var roster = current.roster(stage);
+        if (orderedDrivers == null || orderedDrivers.isEmpty() || orderedDrivers.size() != roster.size()
+                || !new HashSet<>(orderedDrivers).equals(new HashSet<>(roster))) {
+            throw new DomainValidationException("Championship prediction must rank every driver in the stage roster exactly once");
+        }
+        var prediction = new ChampionshipPrediction(leagueId, season, participantId, stage, orderedDrivers, USER);
+        predictions.save(prediction);
+        return prediction;
+    }
+
+    private ChampionshipSeason getSeason(int season) {
+        return seasons.findBySeason(season).orElseThrow(() -> new ChampionshipSeasonNotFoundException(season));
+    }
+
+    private void copyPreSeasonPredictions(int season) {
+        var eligibleLeagues = leagues.findAll().stream()
+                .filter(league -> season >= league.settings().firstSeason())
+                .map(League::id).collect(Collectors.toSet());
+        var submitted = predictions.findAllBySeason(season);
+        var midSeasonParticipants = submitted.stream().filter(prediction -> prediction.stage() == MID_SEASON)
+                .map(ChampionshipPrediction::participantId).collect(Collectors.toSet());
+        for (var preSeason : submitted) {
+            if (preSeason.stage() != PRE_SEASON || preSeason.orderedDrivers().isEmpty()
+                    || preSeason.submissionSource() != USER
+                    || !eligibleLeagues.contains(preSeason.leagueId())
+                    || midSeasonParticipants.contains(preSeason.participantId())) {
+                continue;
+            }
+            predictions.save(new ChampionshipPrediction(preSeason.leagueId(), season, preSeason.participantId(),
+                    MID_SEASON, preSeason.orderedDrivers(), PRE_SEASON_COPY));
+        }
+    }
+}

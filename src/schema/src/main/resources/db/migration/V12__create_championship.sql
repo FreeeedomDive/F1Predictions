@@ -28,7 +28,7 @@ CREATE TABLE championship_predictions
     participant_id    uuid    NOT NULL,
     stage             text    NOT NULL CHECK (stage IN ('PRE_SEASON', 'MID_SEASON')),
     ordered_drivers   jsonb   NOT NULL,
-    submission_source text    NOT NULL CHECK (submission_source IN ('USER', 'PRE_SEASON_FALLBACK', 'LEGACY_UNKNOWN')),
+    submission_source text    NOT NULL CHECK (submission_source IN ('USER', 'PRE_SEASON_COPY')),
     version           bigint  NOT NULL,
 
     CONSTRAINT pk_championship_predictions PRIMARY KEY (league_id, season, participant_id, stage),
