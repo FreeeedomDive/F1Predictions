@@ -24,7 +24,12 @@ export default function PredictionPointsPanel({
     : []
 
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, minWidth: 0, borderRadius: 1 }}>
+    <Paper
+      component="section"
+      aria-label="Your points"
+      variant="outlined"
+      sx={{ p: 1.5, minWidth: 0, borderRadius: 1 }}
+    >
       <Stack spacing={1.25}>
         <Stack
           direction="row"

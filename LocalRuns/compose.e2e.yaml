@@ -1,0 +1,25 @@
+name: f1predictions-e2e
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: f1predictions_e2e
+      POSTGRES_USER: f1predictions_e2e
+      POSTGRES_PASSWORD: f1predictions_e2e
+    ports:
+      - "127.0.0.1:55434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U f1predictions_e2e -d f1predictions_e2e"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "127.0.0.1:18089:80"
+    volumes:
+      - ./nginx.e2e.conf:/etc/nginx/nginx.conf:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
