@@ -31,4 +31,12 @@ public class SchedulingConfiguration {
         scheduler.setThreadNamePrefix("race-calendar-sync-");
         return scheduler;
     }
+
+    @Bean
+    public ThreadPoolTaskScheduler championshipStandingsTaskScheduler() {
+        var scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(1);
+        scheduler.setThreadNamePrefix("championship-standings-sync-");
+        return scheduler;
+    }
 }

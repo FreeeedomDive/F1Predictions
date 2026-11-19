@@ -6,4 +6,7 @@ import org.springframework.web.service.annotation.GetExchange;
 public interface JolpicaClient {
     @GetExchange("/{season}.json")
     JolpicaSeasonResponse getSeason(@PathVariable int season);
+
+    @GetExchange("/{season}/driverstandings/?limit=100")
+    JolpicaDriverStandingsResponse getDriverStandings(@PathVariable int season);
 }
