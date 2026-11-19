@@ -14,5 +14,6 @@ public interface ChampionshipPredictionRepository {
     );
 
     List<ChampionshipPrediction> findAllBySeason(int season);
+    List<ChampionshipPrediction> findAllByLeagueAndSeason(LeagueId leagueId, int season);
     void save(ChampionshipPrediction prediction);
 }

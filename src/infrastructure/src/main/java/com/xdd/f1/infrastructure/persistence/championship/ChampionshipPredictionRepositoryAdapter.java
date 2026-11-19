@@ -33,6 +33,11 @@ public class ChampionshipPredictionRepositoryAdapter implements ChampionshipPred
     }
 
     @Override
+    public List<ChampionshipPrediction> findAllByLeagueAndSeason(LeagueId leagueId, int season) {
+        return repository.findAllByIdLeagueIdAndIdSeason(leagueId.value(), season).stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public void save(ChampionshipPrediction prediction) {
         var id = new ChampionshipPredictionEntityId(prediction.leagueId().value(), prediction.season(),
                 prediction.participantId().value(), prediction.stage().name());

@@ -1,24 +1,18 @@
 CREATE TABLE championship_seasons
 (
-    season            integer PRIMARY KEY,
-    rules_version     text    NOT NULL,
-    stage             text    NOT NULL CHECK (stage IN ('PRE_SEASON', 'MID_SEASON')),
-    stage_started     boolean NOT NULL,
-    is_open           boolean NOT NULL,
-    pre_season_roster jsonb   NOT NULL,
-    mid_season_roster jsonb   NOT NULL,
-    version           bigint  NOT NULL,
+    season               integer PRIMARY KEY,
+    rules_version        text    NOT NULL,
+    stage                text    NOT NULL CHECK (stage IN ('PRE_SEASON', 'MID_SEASON')),
+    stage_started        boolean NOT NULL,
+    is_open              boolean NOT NULL,
+    pre_season_roster    jsonb   NOT NULL,
+    mid_season_roster    jsonb   NOT NULL,
+    driver_standings     jsonb,
+    last_synced_round    integer,
+    standings_updated_at timestamptz,
+    version              bigint  NOT NULL,
 
     CONSTRAINT ck_championship_stage_started CHECK (stage_started OR (stage = 'PRE_SEASON' AND NOT is_open))
-);
-
-CREATE TABLE championship_driver_standings
-(
-    season            integer PRIMARY KEY REFERENCES championship_seasons (season) ON DELETE CASCADE,
-    ordered_drivers   jsonb       NOT NULL,
-    last_synced_round integer,
-    updated_at        timestamptz NOT NULL,
-    version           bigint      NOT NULL
 );
 
 CREATE TABLE championship_predictions

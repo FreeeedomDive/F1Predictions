@@ -1,6 +1,8 @@
 package com.xdd.f1.infrastructure.persistence.championship;
 
+import com.xdd.f1.application.championship.ChampionshipSeasonNotFoundException;
 import com.xdd.f1.application.championship.ChampionshipSeasonRepository;
+import com.xdd.f1.domain.championship.ChampionshipDriverStandings;
 import com.xdd.f1.domain.championship.ChampionshipRulesVersion;
 import com.xdd.f1.domain.championship.ChampionshipSeason;
 import com.xdd.f1.domain.championship.ChampionshipStage;
@@ -35,6 +37,23 @@ public class ChampionshipSeasonRepositoryAdapter implements ChampionshipSeasonRe
         entity.isOpen = season.isOpen();
         entity.preSeasonRoster = season.preSeasonRoster();
         entity.midSeasonRoster = season.midSeasonRoster();
+        repository.save(entity);
+    }
+
+    @Override
+    public Optional<ChampionshipDriverStandings> findDriverStandings(int season) {
+        return repository.findById(season).filter(entity -> entity.driverStandings != null)
+                .map(entity -> new ChampionshipDriverStandings(
+                        entity.season, entity.driverStandings, entity.lastSyncedRound, entity.standingsUpdatedAt));
+    }
+
+    @Override
+    public void saveDriverStandings(ChampionshipDriverStandings standings) {
+        var entity = repository.findById(standings.season())
+                .orElseThrow(() -> new ChampionshipSeasonNotFoundException(standings.season()));
+        entity.driverStandings = standings.orderedDrivers();
+        entity.lastSyncedRound = standings.lastSyncedRound();
+        entity.standingsUpdatedAt = standings.updatedAt();
         repository.save(entity);
     }
 }

@@ -8,6 +8,7 @@ import jakarta.persistence.Version;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.time.Instant;
 import java.util.List;
 
 @Entity
@@ -35,6 +36,16 @@ public class ChampionshipSeasonEntity {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "mid_season_roster", nullable = false, columnDefinition = "jsonb")
     List<String> midSeasonRoster;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "driver_standings", columnDefinition = "jsonb")
+    List<String> driverStandings;
+
+    @Column(name = "last_synced_round")
+    Integer lastSyncedRound;
+
+    @Column(name = "standings_updated_at")
+    Instant standingsUpdatedAt;
 
     @Version
     @Column(name = "version", nullable = false)
