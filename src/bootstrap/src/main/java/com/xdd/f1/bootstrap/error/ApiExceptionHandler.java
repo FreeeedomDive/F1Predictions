@@ -1,5 +1,8 @@
 package com.xdd.f1.bootstrap.error;
 
+import com.xdd.f1.application.championship.ChampionshipConflictException;
+import com.xdd.f1.application.championship.ChampionshipPredictionsClosedException;
+import com.xdd.f1.application.championship.ChampionshipSeasonNotFoundException;
 import com.xdd.f1.application.league.LeagueNotFoundException;
 import com.xdd.f1.application.league.LeagueParticipantNotFoundException;
 import com.xdd.f1.application.race.RaceNotFoundException;
@@ -46,6 +49,7 @@ public class ApiExceptionHandler {
             PredictionNotFoundException.class,
             PredictionConditionsNotFoundException.class,
             PredictionPointsNotFoundException.class,
+            ChampionshipSeasonNotFoundException.class,
             RaceResultNotFoundException.class
     })
     public ProblemDetail notFound(RuntimeException exception) {
@@ -58,11 +62,19 @@ public class ApiExceptionHandler {
             RaceLineupNotPreparedException.class,
             RaceLineupNotEditableException.class,
             PredictionsClosedException.class,
+            ChampionshipConflictException.class,
             RaceResultOperationNotAllowedException.class,
             RaceResultIncompleteException.class,
             RaceResultRulesException.class
     })
     public ProblemDetail conflict(RuntimeException exception) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+    }
+
+    @ExceptionHandler(ChampionshipPredictionsClosedException.class)
+    public ProblemDetail championshipPredictionsClosed(ChampionshipPredictionsClosedException exception) {
+        var problem = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, exception.getMessage());
+        problem.setProperty("code", "CHAMPIONSHIP_PREDICTIONS_CLOSED");
+        return problem;
     }
 }

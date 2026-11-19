@@ -20,8 +20,8 @@ public class ChampionshipPredictionEntity {
     @Column(name = "ordered_drivers", nullable = false, columnDefinition = "jsonb")
     List<String> orderedDrivers;
 
-    @Column(name = "submission_source", nullable = false)
-    String submissionSource;
+    @Column(name = "prediction_source", nullable = false)
+    String predictionSource;
 
     @Version
     @Column(name = "version", nullable = false)

@@ -68,6 +68,11 @@ public class ChampionshipStandingsService {
                 publishedPoints(configuration, officialOrder, leaguePredictions));
     }
 
+    @Transactional(readOnly = true)
+    public SeasonState getSeasonState(int season) {
+        return new SeasonState(seasons.findBySeason(season).orElse(null), seasons.findDriverStandings(season).orElse(null));
+    }
+
     @Transactional
     public ChampionshipDriverStandings saveStandings(int season, List<String> orderedDrivers) {
         lock.acquire("championship:" + season);
@@ -113,5 +118,8 @@ public class ChampionshipStandingsService {
 
     private List<Integer> points(ChampionshipSeason season, List<String> officialOrder, ChampionshipPrediction prediction) {
         return ChampionshipPointsCalculator.calculate(season, prediction.stage(), officialOrder, prediction.orderedDrivers());
+    }
+
+    public record SeasonState(ChampionshipSeason configuration, ChampionshipDriverStandings driverStandings) {
     }
 }

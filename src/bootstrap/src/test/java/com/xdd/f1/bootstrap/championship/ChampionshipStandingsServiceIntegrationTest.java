@@ -39,8 +39,8 @@ import java.util.stream.Stream;
 import static com.xdd.f1.domain.championship.ChampionshipRulesVersion.V2027;
 import static com.xdd.f1.domain.championship.ChampionshipStage.MID_SEASON;
 import static com.xdd.f1.domain.championship.ChampionshipStage.PRE_SEASON;
-import static com.xdd.f1.domain.championship.ChampionshipSubmissionSource.PRE_SEASON_COPY;
-import static com.xdd.f1.domain.championship.ChampionshipSubmissionSource.USER;
+import static com.xdd.f1.domain.championship.ChampionshipPredictionSource.PRE_SEASON_COPY;
+import static com.xdd.f1.domain.championship.ChampionshipPredictionSource.USER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -166,7 +166,7 @@ class ChampionshipStandingsServiceIntegrationTest extends AbstractIntegrationTes
         assertThat(closed.rows().getFirst()).isEqualTo(new ParticipantPoints(alice.id(), "Alice", 52));
         assertThat(closed.rows()).contains(new ParticipantPoints(onlyMid.id(), onlyMid.displayName(), 20));
         var copy = details(bob).midSeasonPrediction();
-        assertThat(copy.prediction().submissionSource()).isEqualTo(PRE_SEASON_COPY);
+        assertThat(copy.prediction().predictionSource()).isEqualTo(PRE_SEASON_COPY);
         assertThat(copy.points()).containsExactly(0, 10);
 
         service.saveStandings(SEASON, List.of("Verstappen", "Norris", "Piastri", "Hamilton"));

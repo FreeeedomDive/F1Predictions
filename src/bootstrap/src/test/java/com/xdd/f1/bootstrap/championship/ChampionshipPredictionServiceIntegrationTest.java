@@ -49,8 +49,8 @@ import static com.xdd.f1.domain.championship.ChampionshipRulesVersion.V2026;
 import static com.xdd.f1.domain.championship.ChampionshipRulesVersion.V2027;
 import static com.xdd.f1.domain.championship.ChampionshipStage.MID_SEASON;
 import static com.xdd.f1.domain.championship.ChampionshipStage.PRE_SEASON;
-import static com.xdd.f1.domain.championship.ChampionshipSubmissionSource.PRE_SEASON_COPY;
-import static com.xdd.f1.domain.championship.ChampionshipSubmissionSource.USER;
+import static com.xdd.f1.domain.championship.ChampionshipPredictionSource.PRE_SEASON_COPY;
+import static com.xdd.f1.domain.championship.ChampionshipPredictionSource.USER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -189,7 +189,7 @@ class ChampionshipPredictionServiceIntegrationTest extends AbstractIntegrationTe
     }
 
     @Test
-    void keepsImportedAndIdenticalSecondSubmissionsAsUser() {
+    void keepsImportedAndIdenticalSecondPredictionsAsUser() {
         var member = createParticipant(identity(), SEASON);
         var other = participants.ensureParticipant(member.leagueId(), identity(), "Other");
         var race = createLineup(1, RaceType.RACE, PRE_ROSTER);
@@ -203,7 +203,7 @@ class ChampionshipPredictionServiceIntegrationTest extends AbstractIntegrationTe
         var identical = save(other, MID_SEASON, PRE_ROSTER);
 
         assertThat(service.closeStage(SEASON, MID_SEASON).isOpen()).isFalse();
-        assertThat(identical.submissionSource()).isEqualTo(USER);
+        assertThat(identical.predictionSource()).isEqualTo(USER);
         assertThat(find(member, MID_SEASON)).contains(imported);
         assertThat(find(other, MID_SEASON)).contains(identical);
     }
@@ -235,7 +235,7 @@ class ChampionshipPredictionServiceIntegrationTest extends AbstractIntegrationTe
         }
         var copy = find(member, MID_SEASON).orElseThrow();
         assertThat(copy.orderedDrivers()).containsExactlyElementsOf(PRE_ROSTER);
-        assertThat(copy.submissionSource()).isEqualTo(PRE_SEASON_COPY);
+        assertThat(copy.predictionSource()).isEqualTo(PRE_SEASON_COPY);
     }
 
     @Test

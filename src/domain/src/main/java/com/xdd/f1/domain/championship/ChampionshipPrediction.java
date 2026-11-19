@@ -12,13 +12,13 @@ public record ChampionshipPrediction(
         LeagueParticipantId participantId,
         ChampionshipStage stage,
         List<String> orderedDrivers,
-        ChampionshipSubmissionSource submissionSource
+        ChampionshipPredictionSource predictionSource
 ) {
     public ChampionshipPrediction {
         Objects.requireNonNull(leagueId, "League ID must not be null");
         Objects.requireNonNull(participantId, "League participant ID must not be null");
         Objects.requireNonNull(stage, "Championship stage must not be null");
-        Objects.requireNonNull(submissionSource, "Championship submission source must not be null");
+        Objects.requireNonNull(predictionSource, "Championship prediction source must not be null");
         orderedDrivers = List.copyOf(orderedDrivers);
     }
 }

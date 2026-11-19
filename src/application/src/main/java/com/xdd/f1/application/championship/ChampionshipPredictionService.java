@@ -10,6 +10,7 @@ import com.xdd.f1.application.race.RaceRepository;
 import com.xdd.f1.application.race.lineup.RaceLineupNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.domain.championship.ChampionshipPrediction;
+import com.xdd.f1.domain.championship.ChampionshipPredictionSource;
 import com.xdd.f1.domain.championship.ChampionshipRulesVersion;
 import com.xdd.f1.domain.championship.ChampionshipSeason;
 import com.xdd.f1.domain.championship.ChampionshipStage;
@@ -27,10 +28,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static com.xdd.f1.domain.championship.ChampionshipPredictionSource.PRE_SEASON_COPY;
+import static com.xdd.f1.domain.championship.ChampionshipPredictionSource.USER;
 import static com.xdd.f1.domain.championship.ChampionshipStage.MID_SEASON;
 import static com.xdd.f1.domain.championship.ChampionshipStage.PRE_SEASON;
-import static com.xdd.f1.domain.championship.ChampionshipSubmissionSource.PRE_SEASON_COPY;
-import static com.xdd.f1.domain.championship.ChampionshipSubmissionSource.USER;
 
 @Service
 public class ChampionshipPredictionService {
@@ -136,6 +137,24 @@ public class ChampionshipPredictionService {
         return prediction;
     }
 
+    @Transactional(readOnly = true)
+    public List<PredictionStatus> findPredictionStatuses(LeagueId leagueId, int season) {
+        var league = leagues.findById(leagueId).orElseThrow(() -> new LeagueNotFoundException(leagueId));
+        if (season < league.settings().firstSeason() || seasons.findBySeason(season).isEmpty()) {
+            return List.of();
+        }
+        var leaguePredictions = predictions.findAllByLeagueAndSeason(leagueId, season);
+        var preSeasonParticipants = leaguePredictions.stream()
+                .filter(prediction -> prediction.stage() == PRE_SEASON && !prediction.orderedDrivers().isEmpty())
+                .map(ChampionshipPrediction::participantId).collect(Collectors.toSet());
+        var midSeasonSources = leaguePredictions.stream().filter(prediction -> prediction.stage() == MID_SEASON)
+                .collect(Collectors.toMap(ChampionshipPrediction::participantId, ChampionshipPrediction::predictionSource));
+        return participants.findAllByLeague(leagueId).stream().map(participant -> new PredictionStatus(
+                participant.id(), participant.displayName(), preSeasonParticipants.contains(participant.id()),
+                midSeasonSources.get(participant.id())
+        )).toList();
+    }
+
     private ChampionshipSeason getSeason(int season) {
         return seasons.findBySeason(season).orElseThrow(() -> new ChampionshipSeasonNotFoundException(season));
     }
@@ -144,12 +163,12 @@ public class ChampionshipPredictionService {
         var eligibleLeagues = leagues.findAll().stream()
                 .filter(league -> season >= league.settings().firstSeason())
                 .map(League::id).collect(Collectors.toSet());
-        var submitted = predictions.findAllBySeason(season);
-        var midSeasonParticipants = submitted.stream().filter(prediction -> prediction.stage() == MID_SEASON)
+        var seasonPredictions = predictions.findAllBySeason(season);
+        var midSeasonParticipants = seasonPredictions.stream().filter(prediction -> prediction.stage() == MID_SEASON)
                 .map(ChampionshipPrediction::participantId).collect(Collectors.toSet());
-        for (var preSeason : submitted) {
+        for (var preSeason : seasonPredictions) {
             if (preSeason.stage() != PRE_SEASON || preSeason.orderedDrivers().isEmpty()
-                    || preSeason.submissionSource() != USER
+                    || preSeason.predictionSource() != USER
                     || !eligibleLeagues.contains(preSeason.leagueId())
                     || midSeasonParticipants.contains(preSeason.participantId())) {
                 continue;
@@ -157,5 +176,9 @@ public class ChampionshipPredictionService {
             predictions.save(new ChampionshipPrediction(preSeason.leagueId(), season, preSeason.participantId(),
                     MID_SEASON, preSeason.orderedDrivers(), PRE_SEASON_COPY));
         }
+    }
+
+    public record PredictionStatus(LeagueParticipantId participantId, String displayName, boolean hasPreSeasonPrediction,
+                                   ChampionshipPredictionSource midSeasonPredictionSource) {
     }
 }
