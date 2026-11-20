@@ -56,6 +56,7 @@ class RightsServiceIntegrationTest extends AbstractIntegrationTest {
         rights.grant(userId, Right.EDIT_RACE_RESULTS);
         rights.grant(userId, Right.EDIT_PREDICTIONS);
         rights.grant(userId, Right.EDIT_RACE_LINEUPS);
+        rights.grant(userId, Right.EDIT_CHAMPIONSHIP);
         rights.grant(otherUserId, Right.EDIT_RACE_LINEUPS);
         assertThat(rights.findByUserId(userId)).containsExactlyInAnyOrder(Right.values());
 
@@ -63,7 +64,8 @@ class RightsServiceIntegrationTest extends AbstractIntegrationTest {
         rights.revoke(userId, Right.EDIT_RACE_RESULTS);
         rights.revoke(otherUserId, Right.EDIT_RIGHTS);
         assertThat(rights.findByUserId(userId))
-                .containsExactlyInAnyOrder(Right.EDIT_RIGHTS, Right.EDIT_PREDICTIONS, Right.EDIT_RACE_LINEUPS);
+                .containsExactlyInAnyOrder(Right.EDIT_RIGHTS, Right.EDIT_PREDICTIONS,
+                        Right.EDIT_RACE_LINEUPS, Right.EDIT_CHAMPIONSHIP);
         assertThat(rights.findByUserId(otherUserId)).containsExactly(Right.EDIT_RACE_LINEUPS);
     }
 

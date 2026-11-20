@@ -3,6 +3,7 @@ package com.xdd.f1.infrastructure.persistence.race.lineup;
 import com.xdd.f1.application.race.lineup.RaceLineupNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.domain.race.RaceId;
+import com.xdd.f1.domain.race.RaceType;
 import com.xdd.f1.domain.race.lineup.Driver;
 import com.xdd.f1.domain.race.lineup.RaceLineup;
 import com.xdd.f1.domain.race.lineup.Team;
@@ -28,6 +29,18 @@ public class RaceLineupRepositoryAdapter implements RaceLineupRepository {
     @Override
     public Optional<RaceLineup> findByRaceId(RaceId raceId) {
         return repository.findById(raceId.value()).map(this::toDomain);
+    }
+
+    @Override
+    public List<RaceLineup> findStartedBySeasonAndRaceTypeOrderByCloseAtDesc(int season, RaceType raceType, Instant now) {
+        return repository.findStartedBySeasonAndRaceTypeOrderByCloseAtDesc(season, raceType.name(), now).stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    public Optional<RaceLineup> findFirstBySeasonAndRaceTypeOrderByCloseAtAsc(int season, RaceType raceType) {
+        return repository.findFirstBySeasonAndRaceTypeOrderByCloseAtAsc(season, raceType.name()).map(this::toDomain);
     }
 
     @Override

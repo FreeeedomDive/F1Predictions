@@ -2,6 +2,7 @@ export const rightLabels = {
   EDIT_RACE_RESULTS: 'Edit race results',
   EDIT_PREDICTIONS: 'Edit predictions',
   EDIT_RACE_LINEUPS: 'Edit race lineups',
+  EDIT_CHAMPIONSHIP: 'Edit championship',
   EDIT_RIGHTS: 'Manage rights',
 } as const
 

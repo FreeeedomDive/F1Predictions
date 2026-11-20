@@ -45,6 +45,12 @@ public class LeagueParticipantRepositoryAdapter implements LeagueParticipantRepo
     }
 
     @Override
+    public List<LeagueParticipant> findAllByLeague(LeagueId leagueId) {
+        return leagueParticipantJpaRepository.findAllByLeague_IdOrderByDisplayNameAscIdAsc(leagueId.value())
+                .stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public List<UserLeague> findLeaguesByUserId(UserId userId) {
         return leagueParticipantJpaRepository.findLeaguesByUserId(userId.value())
                 .stream()

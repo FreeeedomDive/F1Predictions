@@ -16,11 +16,15 @@ export function DriverLabel({
   teams,
   grid,
   highlighted = false,
+  showUnknownTeam = false,
+  formerTeam = false,
 }: {
   name: string
   teams: RaceLineupTeamDto[]
   grid?: string[] | null
   highlighted?: boolean
+  showUnknownTeam?: boolean
+  formerTeam?: boolean
 }) {
   const team = teams.find((item) => item.drivers.includes(name))
   const position = (grid?.indexOf(name) ?? -1) + 1
@@ -48,15 +52,20 @@ export function DriverLabel({
           P{position}
         </Box>
       )}
-      {team && (
+      {(team || showUnknownTeam) && (
         <Chip
           component="span"
           size="small"
-          label={team.badge}
-          title={team.name}
+          label={team?.badge ?? '—'}
+          title={
+            team
+              ? `${team.name}${formerTeam ? ' · Not in the current lineup' : ''}`
+              : 'Team not recorded'
+          }
           sx={{
-            bgcolor: team.backgroundColor,
-            color: team.textColor,
+            bgcolor: team?.backgroundColor,
+            color: team?.textColor,
+            opacity: team && formerTeam ? 0.6 : undefined,
             fontWeight: 650,
             minWidth: 40,
             height: 20,

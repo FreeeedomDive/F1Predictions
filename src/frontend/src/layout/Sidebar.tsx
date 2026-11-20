@@ -8,6 +8,7 @@ import EditNoteRounded from '@mui/icons-material/EditNoteRounded'
 import SportsScoreRounded from '@mui/icons-material/SportsScoreRounded'
 import AdminPanelSettingsRounded from '@mui/icons-material/AdminPanelSettingsRounded'
 import MenuBookRounded from '@mui/icons-material/MenuBookRounded'
+import EmojiEventsRounded from '@mui/icons-material/EmojiEventsRounded'
 import {
   Avatar,
   Box,
@@ -127,6 +128,23 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         </ListItemButton>
         <ListItemButton
           component={NavLink}
+          to="/championship"
+          onClick={onClose}
+          sx={{
+            borderRadius: 1,
+            '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+            <EmojiEventsRounded fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="Championship"
+            slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
+          />
+        </ListItemButton>
+        <ListItemButton
+          component={NavLink}
           to="/statistics"
           onClick={onClose}
           sx={{
@@ -201,6 +219,25 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
                 </ListItemIcon>
                 <ListItemText
                   primary="Teams"
+                  slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
+                />
+              </ListItemButton>
+            </RightsWrapper>
+            <RightsWrapper requiredRights={['EDIT_CHAMPIONSHIP']}>
+              <ListItemButton
+                component={NavLink}
+                to="/admin/championship"
+                onClick={onClose}
+                sx={{
+                  borderRadius: 1,
+                  '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+                  <EmojiEventsRounded fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Championship"
                   slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
                 />
               </ListItemButton>

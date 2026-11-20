@@ -17,6 +17,10 @@ races:
   starting-grid-sync:
     enabled: false
 
+championship:
+  standings-sync:
+    enabled: false
+
 management:
   otlp:
     metrics:

@@ -14,6 +14,8 @@ public interface LeagueParticipantRepository {
 
     Optional<LeagueParticipant> findByLeagueAndUser(LeagueId leagueId, UserId userId);
 
+    List<LeagueParticipant> findAllByLeague(LeagueId leagueId);
+
     List<UserLeague> findLeaguesByUserId(UserId userId);
 
     Map<LeagueParticipantId, String> findNamesByIds(List<LeagueParticipantId> ids);
