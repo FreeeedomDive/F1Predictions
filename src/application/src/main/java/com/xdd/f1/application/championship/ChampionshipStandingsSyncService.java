@@ -1,6 +1,5 @@
 package com.xdd.f1.application.championship;
 
-import com.xdd.f1.application.championship.ChampionshipStandingsProvider.Snapshot;
 import com.xdd.f1.application.locking.TransactionLock;
 import com.xdd.f1.application.race.RaceRepository;
 import com.xdd.f1.domain.championship.ChampionshipDriverStandings;
@@ -64,7 +63,8 @@ public class ChampionshipStandingsSyncService {
         }
     }
 
-    private Outcome apply(int season, Snapshot snapshot, Optional<ChampionshipDriverStandings> beforeFetch) {
+    private Outcome apply(int season, ChampionshipStandingsSnapshot snapshot,
+                          Optional<ChampionshipDriverStandings> beforeFetch) {
         lock.acquire("championship:" + season);
         if (seasons.findBySeason(season).isEmpty()) {
             return Outcome.SKIPPED;

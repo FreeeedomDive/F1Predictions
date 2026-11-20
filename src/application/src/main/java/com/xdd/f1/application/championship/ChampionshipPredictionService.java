@@ -10,7 +10,6 @@ import com.xdd.f1.application.race.RaceRepository;
 import com.xdd.f1.application.race.lineup.RaceLineupNotFoundException;
 import com.xdd.f1.application.race.lineup.RaceLineupRepository;
 import com.xdd.f1.domain.championship.ChampionshipPrediction;
-import com.xdd.f1.domain.championship.ChampionshipPredictionSource;
 import com.xdd.f1.domain.championship.ChampionshipRulesVersion;
 import com.xdd.f1.domain.championship.ChampionshipSeason;
 import com.xdd.f1.domain.championship.ChampionshipStage;
@@ -18,6 +17,7 @@ import com.xdd.f1.domain.error.DomainValidationException;
 import com.xdd.f1.domain.league.League;
 import com.xdd.f1.domain.league.LeagueId;
 import com.xdd.f1.domain.league.LeagueParticipantId;
+import com.xdd.f1.domain.race.Race;
 import com.xdd.f1.domain.race.RaceId;
 import com.xdd.f1.domain.race.RaceType;
 import com.xdd.f1.domain.race.lineup.Driver;
@@ -74,43 +74,53 @@ public class ChampionshipPredictionService {
     public ChampionshipSeason openStage(int season, ChampionshipStage stage, RaceId lineupRaceId) {
         lock.acquire("championship:" + season);
         var current = getSeason(season);
-        boolean canOpen = switch (stage) {
-            case PRE_SEASON -> !current.stageStarted();
-            case MID_SEASON -> current.stage() == PRE_SEASON && current.isPublished(PRE_SEASON);
-        };
-        if (!canOpen) {
-            throw new ChampionshipConflictException(season, "cannot open " + stage);
+        if (current.stage() == stage && current.isOpen()) {
+            return current;
+        }
+        var roster = current.roster(stage);
+        if (roster.isEmpty()) {
+            roster = loadRoster(season, lineupRaceId);
+        }
+        var opened = new ChampionshipSeason(season, current.rulesVersion(), stage, true, true,
+                stage == PRE_SEASON ? roster : current.preSeasonRoster(),
+                stage == MID_SEASON ? roster : current.midSeasonRoster());
+        return saveStageState(current, opened);
+    }
+
+    private List<String> loadRoster(int season, RaceId lineupRaceId) {
+        if (lineupRaceId == null) {
+            throw new DomainValidationException("A race lineup is required to open a stage without a driver list");
         }
         var lineupRace = races.findById(lineupRaceId).orElseThrow(() -> new RaceNotFoundException(lineupRaceId));
         if (lineupRace.season() != season || lineupRace.type() != RaceType.RACE) {
             throw new DomainValidationException("Championship roster must come from a race in the same season");
         }
         var lineup = lineups.findByRaceId(lineupRaceId).orElseThrow(() -> new RaceLineupNotFoundException(lineupRaceId));
-        var roster = lineup.teams().stream().flatMap(team -> team.drivers().stream()).map(Driver::name).toList();
-        var opened = new ChampionshipSeason(season, current.rulesVersion(), stage, true, true,
-                stage == PRE_SEASON ? roster : current.preSeasonRoster(),
-                stage == MID_SEASON ? roster : current.midSeasonRoster());
-        seasons.save(opened);
-        return opened;
+        return lineup.teams().stream().flatMap(team -> team.drivers().stream()).map(Driver::name).toList();
     }
 
     @Transactional
     public ChampionshipSeason closeStage(int season, ChampionshipStage stage) {
         lock.acquire("championship:" + season);
         var current = getSeason(season);
-        if (current.isPublished(stage)) {
+        if (current.stage() == stage && !current.isOpen()) {
             return current;
-        }
-        if (current.stage() != stage || !current.isOpen()) {
-            throw new ChampionshipConflictException(season, "cannot close " + stage);
-        }
-        if (stage == MID_SEASON) {
-            copyPreSeasonPredictions(season);
         }
         var closed = new ChampionshipSeason(season, current.rulesVersion(), stage, true, false,
                 current.preSeasonRoster(), current.midSeasonRoster());
-        seasons.save(closed);
-        return closed;
+        return saveStageState(current, closed);
+    }
+
+    private ChampionshipSeason saveStageState(ChampionshipSeason current, ChampionshipSeason next) {
+        var wasPublished = current.isPublished(MID_SEASON);
+        var willBePublished = next.isPublished(MID_SEASON);
+        if (wasPublished && !willBePublished) {
+            predictions.deletePreSeasonCopies(current.season());
+        } else if (!wasPublished && willBePublished) {
+            copyPreSeasonPredictions(current.season());
+        }
+        seasons.save(next);
+        return next;
     }
 
     @Transactional
@@ -138,9 +148,14 @@ public class ChampionshipPredictionService {
     }
 
     @Transactional(readOnly = true)
-    public List<PredictionStatus> findPredictionStatuses(LeagueId leagueId, int season) {
+    public List<Race> findStageRosterRaces(int season) {
+        return races.findBySeasonAndTypeWithSavedLineup(season, RaceType.RACE);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ChampionshipPredictionStatus> findPredictionStatuses(LeagueId leagueId, int season) {
         var league = leagues.findById(leagueId).orElseThrow(() -> new LeagueNotFoundException(leagueId));
-        if (season < league.settings().firstSeason() || seasons.findBySeason(season).isEmpty()) {
+        if (season < league.settings().firstSeason()) {
             return List.of();
         }
         var leaguePredictions = predictions.findAllByLeagueAndSeason(leagueId, season);
@@ -149,7 +164,7 @@ public class ChampionshipPredictionService {
                 .map(ChampionshipPrediction::participantId).collect(Collectors.toSet());
         var midSeasonSources = leaguePredictions.stream().filter(prediction -> prediction.stage() == MID_SEASON)
                 .collect(Collectors.toMap(ChampionshipPrediction::participantId, ChampionshipPrediction::predictionSource));
-        return participants.findAllByLeague(leagueId).stream().map(participant -> new PredictionStatus(
+        return participants.findAllByLeague(leagueId).stream().map(participant -> new ChampionshipPredictionStatus(
                 participant.id(), participant.displayName(), preSeasonParticipants.contains(participant.id()),
                 midSeasonSources.get(participant.id())
         )).toList();
@@ -176,9 +191,5 @@ public class ChampionshipPredictionService {
             predictions.save(new ChampionshipPrediction(preSeason.leagueId(), season, preSeason.participantId(),
                     MID_SEASON, preSeason.orderedDrivers(), PRE_SEASON_COPY));
         }
-    }
-
-    public record PredictionStatus(LeagueParticipantId participantId, String displayName, boolean hasPreSeasonPrediction,
-                                   ChampionshipPredictionSource midSeasonPredictionSource) {
     }
 }

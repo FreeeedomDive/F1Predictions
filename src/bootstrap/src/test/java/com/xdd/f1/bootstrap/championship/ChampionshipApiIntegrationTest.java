@@ -36,7 +36,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -74,12 +76,13 @@ class ChampionshipApiIntegrationTest extends AbstractIntegrationTest {
     private final ChampionshipPredictionService predictions;
     private final TransactionTemplate transactions;
     private final JdbcClient jdbc;
+    private final Clock clock;
 
     @Autowired
     ChampionshipApiIntegrationTest(MockMvc mvc, LeagueRepository leagues, LeagueParticipantService participants,
                                    SessionService sessions, RightsService rights, RaceService races,
                                    RaceLineupRepository lineups, ChampionshipPredictionService predictions,
-                                   PlatformTransactionManager transactionManager, JdbcClient jdbc) {
+                                    PlatformTransactionManager transactionManager, JdbcClient jdbc, Clock clock) {
         this.mvc = mvc;
         this.leagues = leagues;
         this.participants = participants;
@@ -90,6 +93,7 @@ class ChampionshipApiIntegrationTest extends AbstractIntegrationTest {
         this.predictions = predictions;
         this.transactions = new TransactionTemplate(transactionManager);
         this.jdbc = jdbc;
+        this.clock = clock;
     }
 
     @AfterEach
@@ -152,8 +156,9 @@ class ChampionshipApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, containsString("no-store")))
                 .andExpect(jsonPath("$.rulesVersion").value("championship-v2027"))
-                .andExpect(jsonPath("$.window.isOpen").value(true))
-                .andExpect(jsonPath("$.window.preSeasonRoster", contains("Norris", "Verstappen")))
+                .andExpect(jsonPath("$.currentStage").value("PRE_SEASON"))
+                .andExpect(jsonPath("$.predictionsOpen").value(true))
+                .andExpect(jsonPath("$.preSeasonRoster", contains("Norris", "Verstappen")))
                 .andExpect(jsonPath("$.preSeasonPrediction.driverStandings", contains("Norris", "Verstappen")))
                 .andExpect(jsonPath("$.preSeasonPrediction.points").isEmpty());
         mvc.perform(put(internal + PRE_PREDICTION).header(HttpHeaders.AUTHORIZATION, BEARER)
@@ -186,7 +191,8 @@ class ChampionshipApiIntegrationTest extends AbstractIntegrationTest {
         createParticipant(league, "Pending");
         var admin = createParticipant(createLeague(), "Administrator");
         var cookie = cookie(admin);
-        var lineupBody = "{\"lineupRaceId\":\"" + createLineup().value() + "\"}";
+        var lineupRace = createLineup();
+        var lineupBody = "{\"lineupRaceId\":\"" + lineupRace.value() + "\"}";
         var configBody = "{\"rulesVersion\":\"championship-v2027\"}";
 
         mvc.perform(get(ADMIN)).andExpect(status().isUnauthorized());
@@ -195,10 +201,15 @@ class ChampionshipApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isForbidden());
         mvc.perform(put(ADMIN + "/standings").cookie(cookie).contentType(MediaType.APPLICATION_JSON).content(ORDER))
                 .andExpect(status().isForbidden());
+        mvc.perform(get(ADMIN + "/stage-roster-races").cookie(cookie)).andExpect(status().isForbidden());
         mvc.perform(get(ADMIN + "/prediction-statuses").cookie(cookie).param("leagueId", league.value().toString()))
                 .andExpect(status().isForbidden());
 
         rights.grant(admin.userId(), Right.EDIT_CHAMPIONSHIP);
+        races.create(SEASON, 2, RaceType.RACE, "Championship API race", START, START.plusSeconds(3600));
+        mvc.perform(get(ADMIN + "/stage-roster-races").cookie(cookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[*].id", contains(lineupRace.value().toString())));
         mvc.perform(get(ADMIN).cookie(cookie)).andExpect(status().isOk()).andExpect(jsonPath("$.configured").value(false));
         mvc.perform(put(ADMIN + "/configuration").cookie(cookie).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"rulesVersion\":\"unknown\"}"))
@@ -213,7 +224,7 @@ class ChampionshipApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(status().isNoContent());
         mvc.perform(get(ADMIN).cookie(cookie)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.driverStandings", contains("Verstappen", "Norris")))
-                .andExpect(jsonPath("$.window.isOpen").value(true));
+                .andExpect(jsonPath("$.predictionsOpen").value(true));
         mvc.perform(put(ADMIN + "/stages/PRE_SEASON/close").cookie(cookie)).andExpect(status().isNoContent());
         mvc.perform(put(ADMIN + "/stages/MID_SEASON/open").cookie(cookie)
                         .contentType(MediaType.APPLICATION_JSON).content(lineupBody))
@@ -240,6 +251,40 @@ class ChampionshipApiIntegrationTest extends AbstractIntegrationTest {
                 .andExpect(jsonPath("$.rows[0].driverStandings").doesNotExist());
     }
 
+    @Test
+    void distinguishesCurrentAndFormerDriversWithoutUsingFutureLineups() throws Exception {
+        var member = createParticipant(createLeague(), "Member");
+        predictions.configure(SEASON, V2027);
+        var now = clock.instant();
+        createLineup(1, now.minus(14, ChronoUnit.DAYS), "OLD", List.of(new Driver("Norris"), new Driver("Verstappen")));
+        createLineup(2, now.minus(7, ChronoUnit.DAYS), "NEW", List.of(new Driver("Norris"), new Driver("Piastri")));
+        createLineup(3, now.plus(7, ChronoUnit.DAYS), "FUT", List.of(new Driver("Norris"), new Driver("Russell")));
+
+        mvc.perform(get(nativeUrl(member.leagueId())).cookie(cookie(member)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentDrivers", contains("Norris", "Piastri")))
+                .andExpect(jsonPath("$.teams", hasSize(2)))
+                .andExpect(jsonPath("$.teams[0].badge").value("NEW"))
+                .andExpect(jsonPath("$.teams[0].drivers", contains("Norris", "Piastri")))
+                .andExpect(jsonPath("$.teams[1].badge").value("OLD"))
+                .andExpect(jsonPath("$.teams[1].drivers", contains("Verstappen")));
+    }
+
+    @Test
+    void usesTheEarliestPreparedLineupBeforeTheFirstRace() throws Exception {
+        var member = createParticipant(createLeague(), "Member");
+        predictions.configure(SEASON, V2027);
+        var now = clock.instant();
+        createLineup(1, now.plus(7, ChronoUnit.DAYS), "TEM", List.of(new Driver("Norris"), new Driver("Verstappen")));
+        createLineup(2, now.plus(14, ChronoUnit.DAYS), "FUT", List.of(new Driver("Norris"), new Driver("Piastri")));
+
+        mvc.perform(get(nativeUrl(member.leagueId())).cookie(cookie(member)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentDrivers", contains("Norris", "Verstappen")))
+                .andExpect(jsonPath("$.teams", hasSize(1)))
+                .andExpect(jsonPath("$.teams[0].badge").value("TEM"));
+    }
+
     private LeagueId createLeague() {
         var league = new League(new LeagueId(UUID.randomUUID()), "Championship API league", new LeagueSource.Manual(),
                 new LeagueSettings(null, false, SEASON), START);
@@ -252,9 +297,12 @@ class ChampionshipApiIntegrationTest extends AbstractIntegrationTest {
     }
 
     private RaceId createLineup() {
-        var race = races.create(SEASON, 1, RaceType.RACE, "Championship API race", START, START.plusSeconds(3600));
-        var team = new Team(new TeamBranding("Team", "TEM", "#112233", "#FFFFFF"),
-                List.of(new Driver("Norris"), new Driver("Verstappen")));
+        return createLineup(1, START.plusSeconds(3600), "TEM", List.of(new Driver("Norris"), new Driver("Verstappen")));
+    }
+
+    private RaceId createLineup(int round, Instant closeAt, String badge, List<Driver> drivers) {
+        var race = races.create(SEASON, round, RaceType.RACE, "Championship API race", closeAt.minusSeconds(3600), closeAt);
+        var team = new Team(new TeamBranding("Team " + badge, badge, "#112233", "#FFFFFF"), drivers);
         transactions.executeWithoutResult(status -> lineups.createIfAbsent(new RaceLineup(race.id(), List.of(team))));
         return race.id();
     }

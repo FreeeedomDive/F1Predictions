@@ -24,6 +24,7 @@ interface Scenario {
 }
 
 interface ScenarioOptions {
+  season?: number
   sprintsEnabled?: boolean[]
   raceTypes?: RaceTypeDto[]
   adminRights?: RightDto[]
@@ -35,9 +36,9 @@ export const test = base.extend<{
 }>({
   createScenario: async ({ request }, fixtureUse) => {
     await fixtureUse(
-      async ({ sprintsEnabled = [false], raceTypes = [], adminRights = [] } = {}) => {
+      async ({ season, sprintsEnabled = [false], raceTypes = [], adminRights = [] } = {}) => {
         const response = await request.post('http://127.0.0.1:18081/e2e/fixtures', {
-          data: { sprintsEnabled, raceTypes, adminRights },
+          data: { season, sprintsEnabled, raceTypes, adminRights },
         })
         expect(response.status(), 'E2E fixture creation').toBe(200)
         return response.json()

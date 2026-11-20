@@ -1,6 +1,6 @@
 package com.xdd.f1.bootstrap.championship;
 
-import com.xdd.f1.application.championship.ChampionshipStandingsProvider.Snapshot;
+import com.xdd.f1.application.championship.ChampionshipStandingsSnapshot;
 import com.xdd.f1.infrastructure.http.jolpica.JolpicaChampionshipStandingsProvider;
 import com.xdd.f1.infrastructure.http.jolpica.JolpicaClient;
 import org.junit.jupiter.api.Test;
@@ -59,7 +59,7 @@ class JolpicaChampionshipStandingsProviderTest {
     void loadsCompleteStandingsInNumericOrderUsingAntiClownBotNames() {
         server.expect(requestTo(URL)).andRespond(withSuccess(STANDINGS, MediaType.APPLICATION_JSON));
 
-        assertThat(provider.loadStandings(SEASON)).contains(new Snapshot(20, List.of(
+        assertThat(provider.loadStandings(SEASON)).contains(new ChampionshipStandingsSnapshot(20, List.of(
                 "Verstappen", "Perez", "Hulkenberg", "Norris", "Piastri", "Sainz", "Hamilton", "Albon", "Russell", "Camara", "Lindblad")));
         server.verify();
     }

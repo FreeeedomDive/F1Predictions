@@ -33,6 +33,11 @@ public class RaceRepositoryAdapter implements RaceRepository {
     }
 
     @Override
+    public List<Race> findBySeasonAndTypeWithSavedLineup(int season, RaceType type) {
+        return repository.findBySeasonAndTypeWithSavedLineup(season, type.name()).stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public List<Race> findFinishedBySeason(int season) {
         return repository.findAllBySeasonAndStatusOrderByOpenAtAsc(season, RaceStatus.FINISHED.name())
                 .stream()

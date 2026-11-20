@@ -74,6 +74,20 @@ const router = createBrowserRouter([
             },
           },
           {
+            path: 'championship',
+            lazy: async () => {
+              const { default: ChampionshipPage } = await import('./routes/ChampionshipPage')
+              return {
+                element: (
+                  <>
+                    <title>{withDevPrefix('Championship')}</title>
+                    <ChampionshipPage />
+                  </>
+                ),
+              }
+            },
+          },
+          {
             path: 'statistics',
             lazy: async () => {
               const { default: StatisticsPage } = await import('./routes/StatisticsPage')
@@ -172,6 +186,26 @@ const router = createBrowserRouter([
               }
             },
           })),
+          {
+            path: 'admin/championship',
+            lazy: async () => {
+              const { default: AdminChampionshipPage } =
+                await import('./routes/AdminChampionshipPage')
+              return {
+                element: (
+                  <>
+                    <title>{withDevPrefix('[Admin] Championship')}</title>
+                    <RightsWrapper
+                      requiredRights={['EDIT_CHAMPIONSHIP']}
+                      fallback={accessDeniedScreen}
+                    >
+                      <AdminChampionshipPage />
+                    </RightsWrapper>
+                  </>
+                ),
+              }
+            },
+          },
           {
             path: 'admin/rights',
             lazy: async () => {

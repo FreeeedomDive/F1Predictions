@@ -1,7 +1,7 @@
 package com.xdd.f1.bootstrap.championship;
 
 import com.xdd.f1.application.championship.ChampionshipDetails;
-import com.xdd.f1.application.championship.ChampionshipDetails.ParticipantPoints;
+import com.xdd.f1.application.championship.ChampionshipParticipantPoints;
 import com.xdd.f1.application.championship.ChampionshipPredictionRepository;
 import com.xdd.f1.application.championship.ChampionshipPredictionService;
 import com.xdd.f1.application.championship.ChampionshipSeasonNotFoundException;
@@ -154,8 +154,8 @@ class ChampionshipStandingsServiceIntegrationTest extends AbstractIntegrationTes
         assertThat(whileOpen.midSeasonPrediction().prediction()).isEqualTo(mid);
         assertThat(whileOpen.midSeasonPrediction().points()).isEmpty();
         var tiedRows = Stream.of(bob, carol).sorted(Comparator.comparing(member -> member.id().value()))
-                .map(member -> new ParticipantPoints(member.id(), member.displayName(), 28)).toList();
-        assertThat(whileOpen.rows()).containsExactly(new ParticipantPoints(alice.id(), "Alice", 40),
+                .map(member -> new ChampionshipParticipantPoints(member.id(), member.displayName(), 28)).toList();
+        assertThat(whileOpen.rows()).containsExactly(new ChampionshipParticipantPoints(alice.id(), "Alice", 40),
                 tiedRows.getFirst(), tiedRows.getLast());
         assertThat(details(bob).midSeasonPrediction()).isNull();
 
@@ -163,14 +163,14 @@ class ChampionshipStandingsServiceIntegrationTest extends AbstractIntegrationTes
         var closed = details(alice);
         assertThat(closed.driverStandings()).isEqualTo(whileOpen.driverStandings());
         assertThat(closed.midSeasonPrediction().points()).containsExactly(6, 6);
-        assertThat(closed.rows().getFirst()).isEqualTo(new ParticipantPoints(alice.id(), "Alice", 52));
-        assertThat(closed.rows()).contains(new ParticipantPoints(onlyMid.id(), onlyMid.displayName(), 20));
+        assertThat(closed.rows().getFirst()).isEqualTo(new ChampionshipParticipantPoints(alice.id(), "Alice", 52));
+        assertThat(closed.rows()).contains(new ChampionshipParticipantPoints(onlyMid.id(), onlyMid.displayName(), 20));
         var copy = details(bob).midSeasonPrediction();
         assertThat(copy.prediction().predictionSource()).isEqualTo(PRE_SEASON_COPY);
         assertThat(copy.points()).containsExactly(0, 10);
 
         service.saveStandings(SEASON, List.of("Verstappen", "Norris", "Piastri", "Hamilton"));
-        assertThat(details(alice).rows().getFirst()).isEqualTo(new ParticipantPoints(alice.id(), "Alice", 48));
+        assertThat(details(alice).rows().getFirst()).isEqualTo(new ChampionshipParticipantPoints(alice.id(), "Alice", 48));
     }
 
     private ChampionshipDetails details(LeagueParticipant member) {

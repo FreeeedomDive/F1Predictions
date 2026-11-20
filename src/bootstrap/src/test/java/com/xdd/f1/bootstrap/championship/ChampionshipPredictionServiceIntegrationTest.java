@@ -95,7 +95,7 @@ class ChampionshipPredictionServiceIntegrationTest extends AbstractIntegrationTe
     }
 
     @Test
-    void opensOnlyTheNextStageAndFreezesItsRaceRosterAndRules() {
+    void switchesStagesInEitherDirectionAndKeepsTheirFrozenRostersAndRules() {
         var sprint = createLineup(1, RaceType.SPRINT, PRE_ROSTER);
         var preRace = createLineup(1, RaceType.RACE, PRE_ROSTER);
         var midRace = createLineup(2, RaceType.RACE, MID_ROSTER);
@@ -103,23 +103,23 @@ class ChampionshipPredictionServiceIntegrationTest extends AbstractIntegrationTe
         var configured = service.configure(SEASON, V2027);
         assertThat(service.configure(SEASON, V2027)).isEqualTo(configured);
         assertThatThrownBy(() -> service.configure(SEASON, V2026)).isInstanceOf(ChampionshipConflictException.class);
-        assertThatThrownBy(() -> service.openStage(SEASON, MID_SEASON, midRace)).isInstanceOf(ChampionshipConflictException.class);
-        assertThatThrownBy(() -> service.closeStage(SEASON, PRE_SEASON)).isInstanceOf(ChampionshipConflictException.class);
+        assertThatThrownBy(() -> service.openStage(SEASON, PRE_SEASON, null)).isInstanceOf(DomainValidationException.class);
         assertThatThrownBy(() -> service.openStage(SEASON, PRE_SEASON, sprint)).isInstanceOf(DomainValidationException.class);
 
         var opened = service.openStage(SEASON, PRE_SEASON, preRace);
         transactions.executeWithoutResult(status -> lineups.update(lineup(preRace, MID_ROSTER)));
         assertThat(seasons.findBySeason(SEASON)).contains(opened);
-        assertThatThrownBy(() -> service.openStage(SEASON, MID_SEASON, midRace)).isInstanceOf(ChampionshipConflictException.class);
-        service.closeStage(SEASON, PRE_SEASON);
-        assertThatThrownBy(() -> service.openStage(SEASON, PRE_SEASON, preRace)).isInstanceOf(ChampionshipConflictException.class);
-
         var mid = service.openStage(SEASON, MID_SEASON, midRace);
         assertThat(mid.preSeasonRoster()).containsExactlyElementsOf(PRE_ROSTER);
         assertThat(mid.midSeasonRoster()).containsExactlyElementsOf(MID_ROSTER);
         assertThat(mid.rulesVersion()).isEqualTo(V2027);
-        assertThatThrownBy(() -> service.openStage(SEASON, MID_SEASON, preRace)).isInstanceOf(ChampionshipConflictException.class);
-        assertThat(seasons.findBySeason(SEASON)).contains(mid);
+        assertThat(service.openStage(SEASON, MID_SEASON, null)).isEqualTo(mid);
+        var preClosed = service.closeStage(SEASON, PRE_SEASON);
+        assertThat(preClosed.stage()).isEqualTo(PRE_SEASON);
+        assertThat(preClosed.isOpen()).isFalse();
+        assertThat(preClosed.isPublished(MID_SEASON)).isFalse();
+        assertThat(service.openStage(SEASON, PRE_SEASON, null).preSeasonRoster()).containsExactlyElementsOf(PRE_ROSTER);
+        assertThat(service.openStage(SEASON, MID_SEASON, null)).isEqualTo(mid);
     }
 
     @Test
@@ -206,6 +206,37 @@ class ChampionshipPredictionServiceIntegrationTest extends AbstractIntegrationTe
         assertThat(identical.predictionSource()).isEqualTo(USER);
         assertThat(find(member, MID_SEASON)).contains(imported);
         assertThat(find(other, MID_SEASON)).contains(identical);
+    }
+
+    @Test
+    void rollingBackMidSeasonPublicationRemovesOnlyCopiesAndAllowsNewPredictions() {
+        var member = createParticipant(identity(), SEASON);
+        var other = participants.ensureParticipant(member.leagueId(), identity(), "Other");
+        var preRace = createLineup(1, RaceType.RACE, PRE_ROSTER);
+        var midRace = createLineup(2, RaceType.RACE, MID_ROSTER);
+        service.configure(SEASON, V2027);
+        service.openStage(SEASON, PRE_SEASON, preRace);
+        save(member, PRE_SEASON, PRE_ROSTER);
+        service.openStage(SEASON, MID_SEASON, midRace);
+        var ownMid = save(other, MID_SEASON, MID_ROSTER.reversed());
+        service.closeStage(SEASON, MID_SEASON);
+        assertThat(find(member, MID_SEASON)).get().extracting(ChampionshipPrediction::predictionSource)
+                .isEqualTo(PRE_SEASON_COPY);
+
+        service.openStage(SEASON, PRE_SEASON, null);
+        assertThat(find(member, MID_SEASON)).isEmpty();
+        assertThat(find(other, MID_SEASON)).contains(ownMid);
+        var updatedPre = save(member, PRE_SEASON, PRE_ROSTER.reversed());
+        service.closeStage(SEASON, MID_SEASON);
+        assertThat(find(member, MID_SEASON)).get().extracting(ChampionshipPrediction::orderedDrivers)
+                .isEqualTo(updatedPre.orderedDrivers());
+
+        service.openStage(SEASON, MID_SEASON, null);
+        assertThat(find(member, MID_SEASON)).isEmpty();
+        var ownUpdatedMid = save(member, MID_SEASON, MID_ROSTER);
+        service.closeStage(SEASON, MID_SEASON);
+        assertThat(find(member, MID_SEASON)).contains(ownUpdatedMid);
+        assertThat(find(other, MID_SEASON)).contains(ownMid);
     }
 
     @Test

@@ -1,19 +1,24 @@
 package com.xdd.f1.contract.championship;
 
+import com.xdd.f1.contract.race.lineup.RaceLineupTeamDto;
+
 import java.util.List;
-import java.util.UUID;
 
 public record ChampionshipDetailsDto(
         int season,
         boolean configured,
         String rulesVersion,
-        ChampionshipSeasonDto.Window window,
+        ChampionshipStageDto currentStage,
+        boolean stageStarted,
+        boolean predictionsOpen,
+        List<String> preSeasonRoster,
+        List<String> midSeasonRoster,
         List<String> driverStandings,
-        ChampionshipSeasonDto.StandingsUpdate standingsUpdate,
+        ChampionshipStandingsUpdateDto standingsUpdate,
         ChampionshipPredictionDto preSeasonPrediction,
         ChampionshipPredictionDto midSeasonPrediction,
-        List<ParticipantPoints> rows
+        List<ChampionshipParticipantPointsDto> rows,
+        List<RaceLineupTeamDto> teams,
+        List<String> currentDrivers
 ) {
-    public record ParticipantPoints(UUID participantId, String displayName, int totalPoints) {
-    }
 }

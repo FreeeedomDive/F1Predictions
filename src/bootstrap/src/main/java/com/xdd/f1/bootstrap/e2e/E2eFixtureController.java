@@ -25,6 +25,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -44,7 +45,7 @@ import java.util.stream.IntStream;
 @Profile("e2e")
 @RestController
 public class E2eFixtureController {
-    private static final int SEASON = 2026;
+    private static final int DEFAULT_SEASON = 2026;
     private static final List<Team> TEAMS = IntStream.rangeClosed(1, 5)
             .mapToObj(i -> new Team(
                     new TeamBranding("Team " + i, "T" + i, "#64748B", "#FFFFFF"),
@@ -81,6 +82,7 @@ public class E2eFixtureController {
     @PostMapping("/e2e/fixtures")
     @Transactional
     public ResponseEntity<Fixture> create(@Valid @RequestBody FixtureRequest request) {
+        int season = request.season() == null ? DEFAULT_SEASON : request.season();
         var suffix = UUID.randomUUID().toString().substring(0, 8);
         var now = clock.instant();
         var leagueRefs = new ArrayList<LeagueRef>();
@@ -88,20 +90,20 @@ public class E2eFixtureController {
             var id = new LeagueId(UUID.randomUUID());
             var name = "E2E League " + (leagueRefs.size() + 1) + " " + suffix;
             leagues.create(new League(id, name, new LeagueSource.Manual(),
-                    new LeagueSettings(null, sprintsEnabled, SEASON), now));
+                    new LeagueSettings(null, sprintsEnabled, season), now));
             leagueRefs.add(new LeagueRef(id.value(), name));
         }
 
         var member = createUser("E2E Player " + suffix, leagueRefs, List.of());
         var admin = request.adminRights().isEmpty() ? null
-                : createUser("E2E Admin " + suffix, leagueRefs.subList(0, 1), request.adminRights());
+                : createUser("E2E Admin " + suffix, leagueRefs, request.adminRights());
         var raceRefs = new ArrayList<RaceRef>();
         if (!request.raceTypes().isEmpty()) {
             lock.acquire("e2e:race-round");
-            var round = races.findAllBySeason(SEASON).stream().mapToInt(Race::round).max().orElse(0);
+            var round = races.findAllBySeason(season).stream().mapToInt(Race::round).max().orElse(0);
             for (var type : request.raceTypes()) {
                 var name = "E2E " + (type == RaceType.SPRINT ? "Sprint " : "Race ") + (++round);
-                var race = races.create(SEASON, round, type, name, now.minus(Duration.ofHours(1)),
+                var race = races.create(season, round, type, name, now.minus(Duration.ofHours(1)),
                         now.plus(Duration.ofDays(1)));
                 entityManager.flush();
                 if (!lineups.createIfAbsent(new RaceLineup(race.id(), TEAMS))) {
@@ -110,7 +112,7 @@ public class E2eFixtureController {
                 raceRefs.add(new RaceRef(race.id().value(), name));
             }
         }
-        var fixture = new Fixture(SEASON, member, admin, leagueRefs, raceRefs, DRIVERS);
+        var fixture = new Fixture(season, member, admin, leagueRefs, raceRefs, DRIVERS);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(fixture);
     }
 
@@ -125,7 +127,7 @@ public class E2eFixtureController {
         return new UserRef(name, sessions.create(id));
     }
 
-    public record FixtureRequest(@NotEmpty List<@NotNull Boolean> sprintsEnabled,
+    public record FixtureRequest(@Positive Integer season, @NotEmpty List<@NotNull Boolean> sprintsEnabled,
                                  @NotNull List<@NotNull RaceType> raceTypes,
                                  @NotNull List<@NotNull Right> adminRights) {}
     public record Fixture(int season, UserRef member, UserRef admin, List<LeagueRef> leagues,

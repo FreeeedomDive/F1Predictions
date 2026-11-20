@@ -48,6 +48,11 @@ public class ChampionshipPredictionRepositoryAdapter implements ChampionshipPred
         repository.save(entity);
     }
 
+    @Override
+    public void deletePreSeasonCopies(int season) {
+        repository.deletePreSeasonCopies(season);
+    }
+
     private ChampionshipPrediction toDomain(ChampionshipPredictionEntity entity) {
         return new ChampionshipPrediction(new LeagueId(entity.id.leagueId()), entity.id.season(),
                 new LeagueParticipantId(entity.id.participantId()), ChampionshipStage.valueOf(entity.id.stage()),

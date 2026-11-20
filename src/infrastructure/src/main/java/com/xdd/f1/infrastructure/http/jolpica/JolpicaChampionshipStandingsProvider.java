@@ -1,6 +1,7 @@
 package com.xdd.f1.infrastructure.http.jolpica;
 
 import com.xdd.f1.application.championship.ChampionshipStandingsProvider;
+import com.xdd.f1.application.championship.ChampionshipStandingsSnapshot;
 import org.springframework.stereotype.Component;
 
 import java.util.HashSet;
@@ -17,7 +18,7 @@ public class JolpicaChampionshipStandingsProvider implements ChampionshipStandin
     }
 
     @Override
-    public Optional<Snapshot> loadStandings(int season) {
+    public Optional<ChampionshipStandingsSnapshot> loadStandings(int season) {
         var response = client.getDriverStandings(season);
         var data = response == null ? null : response.mrData();
         if (data == null || data.standingsTable() == null || data.standingsTable().standingsLists() == null) {
@@ -62,7 +63,7 @@ public class JolpicaChampionshipStandingsProvider implements ChampionshipStandin
                 throw new IllegalStateException("Jolpica returned duplicate drivers or invalid positions");
             }
         }
-        return Optional.of(new Snapshot(round, List.copyOf(positions.values())));
+        return Optional.of(new ChampionshipStandingsSnapshot(round, List.copyOf(positions.values())));
     }
 
     private int parseNumber(String value, String field) {

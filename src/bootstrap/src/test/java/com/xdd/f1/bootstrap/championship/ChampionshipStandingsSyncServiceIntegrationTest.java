@@ -3,7 +3,7 @@ package com.xdd.f1.bootstrap.championship;
 import com.xdd.f1.application.championship.ChampionshipPredictionService;
 import com.xdd.f1.application.championship.ChampionshipSeasonRepository;
 import com.xdd.f1.application.championship.ChampionshipStandingsProvider;
-import com.xdd.f1.application.championship.ChampionshipStandingsProvider.Snapshot;
+import com.xdd.f1.application.championship.ChampionshipStandingsSnapshot;
 import com.xdd.f1.application.championship.ChampionshipStandingsService;
 import com.xdd.f1.application.championship.ChampionshipStandingsSyncService;
 import com.xdd.f1.application.locking.TransactionLock;
@@ -86,7 +86,7 @@ class ChampionshipStandingsSyncServiceIntegrationTest extends AbstractIntegratio
         predictions.configure(SEASON, V2027);
         when(provider.loadStandings(SEASON)).thenAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
-            return Optional.of(new Snapshot(1, ORDER));
+            return Optional.of(new ChampionshipStandingsSnapshot(1, ORDER));
         });
         sync.syncStandings();
         assertThat(saved()).isEqualTo(new ChampionshipDriverStandings(SEASON, ORDER, 1, NOW));
@@ -141,7 +141,7 @@ class ChampionshipStandingsSyncServiceIntegrationTest extends AbstractIntegratio
         when(provider.loadStandings(SEASON)).thenAnswer(invocation -> {
             assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
             standings.saveStandings(SEASON, manual);
-            return Optional.of(new Snapshot(6, ORDER.reversed()));
+            return Optional.of(new ChampionshipStandingsSnapshot(6, ORDER.reversed()));
         });
         service(Clock.fixed(NOW.plusSeconds(1), ZoneOffset.UTC)).syncStandings();
         assertThat(saved().orderedDrivers()).containsExactlyElementsOf(manual);
@@ -158,7 +158,7 @@ class ChampionshipStandingsSyncServiceIntegrationTest extends AbstractIntegratio
     }
 
     private void syncRound(int round, List<String> order, Instant now) {
-        doReturn(Optional.of(new Snapshot(round, order))).when(provider).loadStandings(SEASON);
+        doReturn(Optional.of(new ChampionshipStandingsSnapshot(round, order))).when(provider).loadStandings(SEASON);
         service(Clock.fixed(now, ZoneOffset.UTC)).syncStandings();
     }
 

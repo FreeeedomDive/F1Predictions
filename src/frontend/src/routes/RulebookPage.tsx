@@ -1,10 +1,16 @@
 import { Alert, Container, Stack, Typography } from '@mui/material'
 import { CURRENT_SEASON } from '../app/season'
+import ChampionshipRulebook from '../components/rulebook/ChampionshipRulebook'
 import RaceRulebook from '../components/rulebook/RaceRulebook'
+import RulebookLinks from '../components/rulebook/RulebookLinks'
 import { useLeague } from '../context/league'
+import { useChampionship } from '../queries/championship'
 
 export default function RulebookPage() {
-  const { selectedLeague, selectedSeason } = useLeague()
+  const { profile, selectedLeague, selectedSeason } = useLeague()
+  const championship = useChampionship(profile.userId, selectedLeague?.leagueId, selectedSeason)
+  const rulebookSeason =
+    selectedSeason ?? Math.max(CURRENT_SEASON, selectedLeague?.firstSeason ?? CURRENT_SEASON)
 
   return (
     <Container
@@ -23,13 +29,20 @@ export default function RulebookPage() {
           </Typography>
         </Stack>
         {selectedLeague ? (
-          <RaceRulebook
-            firstSeason={selectedLeague.firstSeason}
-            selectedSeason={selectedSeason ?? Math.max(CURRENT_SEASON, selectedLeague.firstSeason)}
-          />
+          <>
+            <RaceRulebook
+              firstSeason={selectedLeague.firstSeason}
+              selectedSeason={rulebookSeason}
+            />
+            <ChampionshipRulebook
+              season={rulebookSeason}
+              rulesVersion={championship.data?.rulesVersion}
+            />
+          </>
         ) : (
           <Alert severity="info">The rulebook will be available once you join a league.</Alert>
         )}
+        <RulebookLinks />
       </Stack>
     </Container>
   )
