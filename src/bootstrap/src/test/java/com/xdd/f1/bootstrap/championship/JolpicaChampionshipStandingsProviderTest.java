@@ -56,7 +56,7 @@ class JolpicaChampionshipStandingsProviderTest {
             HttpServiceProxyFactory.builderFor(RestClientAdapter.create(builder.build())).build().createClient(JolpicaClient.class));
 
     @Test
-    void loadsCompleteStandingsInNumericOrderUsingAntiClownBotNames() {
+    void loadsCompleteStandingsInNumericOrder() {
         server.expect(requestTo(URL)).andRespond(withSuccess(STANDINGS, MediaType.APPLICATION_JSON));
 
         assertThat(provider.loadStandings(SEASON)).contains(new ChampionshipStandingsSnapshot(20, List.of(

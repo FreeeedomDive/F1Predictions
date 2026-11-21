@@ -79,7 +79,6 @@ public class JolpicaChampionshipStandingsProvider implements ChampionshipStandin
                 || driverId.chars().anyMatch(Character::isWhitespace)) {
             throw new IllegalStateException("Jolpica returned an invalid driver ID");
         }
-        // Keep the same names as the AntiClownBot standings and stored predictions.
         var name = driverId.substring(driverId.lastIndexOf('_') + 1);
         return Character.toUpperCase(name.charAt(0)) + name.substring(1);
     }
