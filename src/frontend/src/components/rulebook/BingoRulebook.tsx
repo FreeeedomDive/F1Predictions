@@ -13,9 +13,7 @@ export default function BingoRulebook() {
           On your first visit during the active season, a personal board is created automatically
           once all 25 cards are available.
         </Rule>
-        <Rule>
-          Cards and event progress are shared by all players.
-        </Rule>
+        <Rule>Cards and event progress are shared by all players.</Rule>
         <Rule>Cards with an info icon include an explanation of the event conditions.</Rule>
       </RulebookCard>
       <RulebookCard title="Events and bingo" badge="No race points" badgeColor="warning">

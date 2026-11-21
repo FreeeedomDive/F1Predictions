@@ -42,9 +42,7 @@ function BingoEditor({ state, userId }: { state: BingoAdminDetailsDto; userId: s
   const update = useUpdateAdminBingo(userId)
   const languages = [
     'en',
-    ...Array.from(
-      new Set(state.data.flatMap((card) => Object.keys(card.translations))),
-    )
+    ...Array.from(new Set(state.data.flatMap((card) => Object.keys(card.translations))))
       .filter((code) => code !== 'en')
       .sort(),
   ]
@@ -54,11 +52,7 @@ function BingoEditor({ state, userId }: { state: BingoAdminDetailsDto; userId: s
   return (
     <Stack spacing={2}>
       <Stack direction="row" sx={{ flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
-        <Chip
-          variant="outlined"
-          label={`${state.data.length} / 25 cards`}
-          sx={{ height: 40 }}
-        />
+        <Chip variant="outlined" label={`${state.data.length} / 25 cards`} sx={{ height: 40 }} />
         {state.data.length > 0 && (
           <TextField
             select
