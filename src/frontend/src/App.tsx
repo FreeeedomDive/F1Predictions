@@ -88,6 +88,20 @@ const router = createBrowserRouter([
             },
           },
           {
+            path: 'bingo',
+            lazy: async () => {
+              const { default: BingoPage } = await import('./routes/BingoPage')
+              return {
+                element: (
+                  <>
+                    <title>{withDevPrefix('Bingo')}</title>
+                    <BingoPage />
+                  </>
+                ),
+              }
+            },
+          },
+          {
             path: 'statistics',
             lazy: async () => {
               const { default: StatisticsPage } = await import('./routes/StatisticsPage')
@@ -200,6 +214,22 @@ const router = createBrowserRouter([
                       fallback={accessDeniedScreen}
                     >
                       <AdminChampionshipPage />
+                    </RightsWrapper>
+                  </>
+                ),
+              }
+            },
+          },
+          {
+            path: 'admin/bingo',
+            lazy: async () => {
+              const { default: AdminBingoPage } = await import('./routes/AdminBingoPage')
+              return {
+                element: (
+                  <>
+                    <title>{withDevPrefix('[Admin] Bingo')}</title>
+                    <RightsWrapper requiredRights={['EDIT_BINGO']} fallback={accessDeniedScreen}>
+                      <AdminBingoPage />
                     </RightsWrapper>
                   </>
                 ),

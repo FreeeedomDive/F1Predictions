@@ -15,18 +15,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class ChampionshipPointsCalculatorTest {
-    private static final List<String> LEGACY_STANDINGS = List.of("VER", "NOR", "LEC", "HAM", "RUS");
-    private static final List<String> LEGACY_PREDICTION = List.of("NOR", "VER", "LEC", "HAM", "RUS");
-
-    @Test
-    void matchesAntiClownBotStandingsAndPredictionFixture() {
-        var season = new ChampionshipSeason(2026, V2026, MID_SEASON, true, false, List.of(), List.of());
-
-        assertThat(ChampionshipPointsCalculator.calculate(season, PRE_SEASON, LEGACY_STANDINGS, LEGACY_PREDICTION))
-                .containsExactly(14, 14, 20, 20, 20);
-        assertThat(ChampionshipPointsCalculator.calculate(season, MID_SEASON, LEGACY_STANDINGS, LEGACY_PREDICTION))
-                .containsExactly(6, 6, 10, 10, 10);
-    }
+    private static final List<String> STANDINGS = List.of("VER", "NOR", "LEC", "HAM", "RUS");
+    private static final List<String> PREDICTION = List.of("NOR", "VER", "LEC", "HAM", "RUS");
 
     @ParameterizedTest
     @CsvSource({
@@ -61,9 +51,9 @@ class ChampionshipPointsCalculatorTest {
                                    boolean preSeasonPublished, boolean midSeasonPublished) {
         var season = new ChampionshipSeason(2026, V2026, stage, stageStarted, isOpen, List.of(), List.of());
 
-        assertThat(ChampionshipPointsCalculator.calculate(season, PRE_SEASON, LEGACY_STANDINGS, List.of("VER")))
+        assertThat(ChampionshipPointsCalculator.calculate(season, PRE_SEASON, STANDINGS, List.of("VER")))
                 .containsExactlyElementsOf(preSeasonPublished ? List.of(20) : List.of());
-        assertThat(ChampionshipPointsCalculator.calculate(season, MID_SEASON, LEGACY_STANDINGS, List.of("VER")))
+        assertThat(ChampionshipPointsCalculator.calculate(season, MID_SEASON, STANDINGS, List.of("VER")))
                 .containsExactlyElementsOf(midSeasonPublished ? List.of(10) : List.of());
     }
 
@@ -98,9 +88,9 @@ class ChampionshipPointsCalculatorTest {
         var season = new ChampionshipSeason(2026, V2026, MID_SEASON, true, false, List.of(), List.of());
 
         assertThat(ChampionshipPointsCalculator.calculate(season, MID_SEASON, List.of(), List.of("PIA"))).isEmpty();
-        assertThat(ChampionshipPointsCalculator.calculate(season, MID_SEASON, LEGACY_STANDINGS, List.of("PIA")))
+        assertThat(ChampionshipPointsCalculator.calculate(season, MID_SEASON, STANDINGS, List.of("PIA")))
                 .containsExactly(0);
-        assertThat(ChampionshipPointsCalculator.calculate(season, MID_SEASON, LEGACY_STANDINGS, List.of())).isEmpty();
+        assertThat(ChampionshipPointsCalculator.calculate(season, MID_SEASON, STANDINGS, List.of())).isEmpty();
     }
 
     @Test

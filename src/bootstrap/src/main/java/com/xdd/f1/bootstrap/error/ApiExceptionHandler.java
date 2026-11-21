@@ -1,5 +1,7 @@
 package com.xdd.f1.bootstrap.error;
 
+import com.xdd.f1.application.bingo.BingoCardNotFoundException;
+import com.xdd.f1.application.bingo.BingoConflictException;
 import com.xdd.f1.application.championship.ChampionshipConflictException;
 import com.xdd.f1.application.championship.ChampionshipPredictionsClosedException;
 import com.xdd.f1.application.championship.ChampionshipSeasonNotFoundException;
@@ -41,6 +43,7 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler({
+            BingoCardNotFoundException.class,
             LeagueNotFoundException.class,
             UserNotFoundException.class,
             LeagueParticipantNotFoundException.class,
@@ -57,6 +60,7 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler({
+            BingoConflictException.class,
             InvalidRaceStatusException.class,
             RaceLineupConflictException.class,
             RaceLineupNotPreparedException.class,

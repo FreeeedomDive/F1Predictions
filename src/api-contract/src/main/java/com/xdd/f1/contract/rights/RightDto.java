@@ -5,5 +5,6 @@ public enum RightDto {
     EDIT_PREDICTIONS,
     EDIT_RACE_LINEUPS,
     EDIT_CHAMPIONSHIP,
+    EDIT_BINGO,
     EDIT_RIGHTS
 }
