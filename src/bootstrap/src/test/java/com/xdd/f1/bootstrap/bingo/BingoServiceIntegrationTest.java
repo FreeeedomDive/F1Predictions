@@ -4,6 +4,7 @@ import com.xdd.f1.application.bingo.BingoBoardDetails;
 import com.xdd.f1.application.bingo.BingoBoardRepository;
 import com.xdd.f1.application.bingo.BingoCardNotFoundException;
 import com.xdd.f1.application.bingo.BingoCardRepository;
+import com.xdd.f1.application.bingo.BingoConflictException;
 import com.xdd.f1.application.bingo.BingoService;
 import com.xdd.f1.application.league.LeagueParticipantNotFoundException;
 import com.xdd.f1.application.league.LeagueParticipantService;
@@ -108,7 +109,7 @@ class BingoServiceIntegrationTest extends AbstractIntegrationTest {
         createCards(SEASON, count);
 
         assertThat(find(alice, SEASON)).isEmpty();
-        assertThatThrownBy(() -> create(alice, SEASON)).isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> create(alice, SEASON)).isInstanceOf(BingoConflictException.class);
         assertThat(boards.findAllBySeason(SEASON)).isEmpty();
         assertThat(events.stream(BingoAchievedEvent.class)).isEmpty();
     }
@@ -140,9 +141,9 @@ class BingoServiceIntegrationTest extends AbstractIntegrationTest {
         var unknown = new UserId(UUID.randomUUID());
 
         for (var userId : List.of(foreign.userId(), unknown)) {
-            assertThatThrownBy(() -> service.findOwn(userId, alice.leagueId(), SEASON))
+            assertThatThrownBy(() -> service.getOwn(userId, alice.leagueId(), Optional.of(SEASON)))
                     .isInstanceOf(LeagueParticipantNotFoundException.class);
-            assertThatThrownBy(() -> service.createOwn(userId, alice.leagueId(), SEASON))
+            assertThatThrownBy(() -> service.createOwn(userId, alice.leagueId(), Optional.of(SEASON)))
                     .isInstanceOf(LeagueParticipantNotFoundException.class);
         }
         assertThat(boards.findAllBySeason(SEASON)).isEmpty();
@@ -161,8 +162,8 @@ class BingoServiceIntegrationTest extends AbstractIntegrationTest {
         assertThat(details.completedLines()).isEmpty();
         assertThat(create(alice, SEASON - 1)).isEqualTo(details);
         assertThat(find(bob, SEASON - 1)).isEmpty();
-        assertThatThrownBy(() -> create(bob, SEASON - 1)).isInstanceOf(DomainValidationException.class);
-        assertThatThrownBy(() -> create(alice, SEASON + 1)).isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> create(bob, SEASON - 1)).isInstanceOf(BingoConflictException.class);
+        assertThatThrownBy(() -> create(alice, SEASON + 1)).isInstanceOf(BingoConflictException.class);
         assertThat(events.stream(BingoAchievedEvent.class)).isEmpty();
     }
 
@@ -172,7 +173,7 @@ class BingoServiceIntegrationTest extends AbstractIntegrationTest {
         var future = participant(SEASON + 1, "Future participant");
 
         assertThat(find(future, SEASON)).isEmpty();
-        assertThatThrownBy(() -> create(future, SEASON)).isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> create(future, SEASON)).isInstanceOf(BingoConflictException.class);
         assertThat(boards.findAllBySeason(SEASON)).isEmpty();
     }
 
@@ -318,11 +319,11 @@ class BingoServiceIntegrationTest extends AbstractIntegrationTest {
     }
 
     private Optional<BingoBoardDetails> find(LeagueParticipant participant, int season) {
-        return service.findOwn(participant.userId(), participant.leagueId(), season);
+        return Optional.ofNullable(service.getOwn(participant.userId(), participant.leagueId(), Optional.of(season)).board());
     }
 
     private BingoBoardDetails create(LeagueParticipant participant, int season) {
-        return service.createOwn(participant.userId(), participant.leagueId(), season);
+        return service.createOwn(participant.userId(), participant.leagueId(), Optional.of(season)).board();
     }
 
     private List<BingoCard> createCards(int season, int count) {

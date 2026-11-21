@@ -57,32 +57,39 @@ public class BingoService {
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
-    public Optional<BingoBoardDetails> findOwn(UserId userId, LeagueId leagueId, int season) {
+    public BingoDetails getOwn(UserId userId, LeagueId leagueId, Optional<Integer> requestedSeason) {
+        int activeSeason = activeSeason();
+        int season = resolveSeason(requestedSeason, activeSeason);
         var participant = access.checkAccess(userId, leagueId);
         if (season < firstSeason(leagueId)) {
-            return Optional.empty();
+            return new BingoDetails(season, activeSeason, false, null);
         }
-        return boards.findByLeagueAndSeasonAndParticipant(leagueId, season, participant.id())
-                .map(board -> toDetails(board, cards.findAllBySeason(season)));
+        var seasonCards = cards.findAllBySeason(season);
+        var board = boards.findByLeagueAndSeasonAndParticipant(leagueId, season, participant.id())
+                .map(value -> toDetails(value, seasonCards)).orElse(null);
+        return new BingoDetails(season, activeSeason,
+                board == null && season == activeSeason && seasonCards.size() == 25, board);
     }
 
     @Transactional
-    public BingoBoardDetails createOwn(UserId userId, LeagueId leagueId, int season) {
+    public BingoDetails createOwn(UserId userId, LeagueId leagueId, Optional<Integer> requestedSeason) {
+        int activeSeason = activeSeason();
+        int season = resolveSeason(requestedSeason, activeSeason);
         lock.acquire("bingo:" + season);
         var participant = access.checkAccess(userId, leagueId);
         if (season < firstSeason(leagueId)) {
-            throw new DomainValidationException("Bingo season is earlier than the league's first season");
+            throw new BingoConflictException("Bingo season is earlier than the league's first season");
         }
         var existing = boards.findByLeagueAndSeasonAndParticipant(leagueId, season, participant.id());
         var seasonCards = cards.findAllBySeason(season);
         if (existing.isPresent()) {
-            return toDetails(existing.get(), seasonCards);
+            return new BingoDetails(season, activeSeason, false, toDetails(existing.get(), seasonCards));
         }
-        if (season != activeSeason()) {
-            throw new DomainValidationException("Bingo boards can only be created for the current season");
+        if (season != activeSeason) {
+            throw new BingoConflictException("Bingo boards can only be created for the current season");
         }
         if (seasonCards.size() != 25) {
-            throw new DomainValidationException("A bingo season must contain exactly 25 cards to create a board");
+            throw new BingoConflictException("A bingo season must contain exactly 25 cards to create a board");
         }
         var order = new ArrayList<>(seasonCards.stream().map(BingoCard::id).toList());
         Collections.shuffle(order);
@@ -92,7 +99,7 @@ public class BingoService {
         if (board.bingoAchieved()) {
             publishAchievement(board);
         }
-        return toDetails(board, seasonCards);
+        return new BingoDetails(season, activeSeason, false, toDetails(board, seasonCards));
     }
 
     @Transactional
@@ -143,5 +150,13 @@ public class BingoService {
 
     private int activeSeason() {
         return Year.now(clock.withZone(ZoneOffset.UTC)).getValue();
+    }
+
+    private int resolveSeason(Optional<Integer> requestedSeason, int activeSeason) {
+        int season = requestedSeason.orElse(activeSeason);
+        if (season <= 0) {
+            throw new DomainValidationException("Bingo season must be greater than zero");
+        }
+        return season;
     }
 }
