@@ -2,7 +2,6 @@ import RefreshRounded from '@mui/icons-material/RefreshRounded'
 import {
   Alert,
   Button,
-  Chip,
   Container,
   IconButton,
   Skeleton,
@@ -11,7 +10,7 @@ import {
   Typography,
 } from '@mui/material'
 import { isAxiosError } from 'axios'
-import { Link as RouterLink, Navigate } from 'react-router'
+import { Navigate } from 'react-router'
 import { bingoErrorMessage } from '../api/bingo'
 import { isUnauthorized } from '../api/session'
 import BingoBoard from '../components/bingo/BingoBoard'
@@ -93,30 +92,10 @@ export default function BingoPage() {
                 progress is later corrected.
               </Alert>
             )}
-            <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
-              <Typography variant="body2" color="text.secondary">
-                Probability:
-              </Typography>
-              <Chip size="small" variant="outlined" color="error" label="Low" />
-              <Chip size="small" variant="outlined" color="warning" label="Medium" />
-              <Chip size="small" variant="outlined" color="success" label="High" />
-              <Button
-                component={RouterLink}
-                to="/rulebook"
-                size="small"
-                sx={{ ml: { sm: 'auto' } }}
-              >
-                Bingo rules
-              </Button>
-            </Stack>
             <BingoBoard
               key={`${profile.userId}:${leagueId}:${details.season}:${details.board.id}`}
               board={details.board}
             />
-            <Typography variant="body2" color="text.secondary">
-              The info icon shows any explanation. Administrators update events for everyone; your
-              card order stays the same.
-            </Typography>
           </>
         )}
       </Stack>

@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  MenuItem,
   Paper,
   Skeleton,
   Snackbar,
@@ -20,6 +21,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Tooltip,
   Typography,
 } from '@mui/material'
@@ -36,13 +38,43 @@ import { adminBingoKey, useAdminBingo, useUpdateAdminBingo } from '../queries/bi
 
 function BingoEditor({ state, userId }: { state: BingoAdminDetailsDto; userId: string }) {
   const [adding, setAdding] = useState(false)
+  const [language, setLanguage] = useState('en')
   const update = useUpdateAdminBingo(userId)
+  const languages = [
+    'en',
+    ...Array.from(
+      new Set(state.data.flatMap((card) => Object.keys(card.translations))),
+    )
+      .filter((code) => code !== 'en')
+      .sort(),
+  ]
+  const selectedLanguage = languages.includes(language) ? language : 'en'
   if (isUnauthorized(update.error)) return <Navigate to="/auth" replace />
 
   return (
     <Stack spacing={2}>
       <Stack direction="row" sx={{ flexWrap: 'wrap', alignItems: 'center', gap: 1 }}>
-        <Chip variant="outlined" label={`${state.data.length} / 25 cards`} />
+        <Chip
+          variant="outlined"
+          label={`${state.data.length} / 25 cards`}
+          sx={{ height: 40 }}
+        />
+        {state.data.length > 0 && (
+          <TextField
+            select
+            size="small"
+            label="Language"
+            value={selectedLanguage}
+            sx={{ minWidth: 110 }}
+            onChange={(event) => setLanguage(event.target.value)}
+          >
+            {languages.map((code) => (
+              <MenuItem key={code} value={code}>
+                {code}
+              </MenuItem>
+            ))}
+          </TextField>
+        )}
         {state.structureEditable && (
           <Button
             variant="contained"
@@ -65,12 +97,6 @@ function BingoEditor({ state, userId }: { state: BingoAdminDetailsDto; userId: s
           </Button>
         )}
       </Stack>
-      {!state.structureEditable && (
-        <Alert severity="info">
-          Boards have already been issued. Card count and repeat targets are locked. Text,
-          translations, probability and progress can still be edited.
-        </Alert>
-      )}
       {state.data.length === 0 ? (
         <Paper variant="outlined" sx={{ p: 3 }}>
           <Stack spacing={1}>
@@ -85,7 +111,7 @@ function BingoEditor({ state, userId }: { state: BingoAdminDetailsDto; userId: s
         </Paper>
       ) : (
         <TableContainer component={Paper} variant="outlined">
-          <Table aria-label="Bingo cards">
+          <Table size="small" aria-label="Bingo cards">
             <TableHead>
               <TableRow>
                 <TableCell sx={{ px: { xs: 1, sm: 2 } }}>Card</TableCell>
@@ -99,6 +125,7 @@ function BingoEditor({ state, userId }: { state: BingoAdminDetailsDto; userId: s
                   key={card.id}
                   card={card}
                   userId={userId}
+                  language={selectedLanguage}
                   structureEditable={state.structureEditable}
                 />
               ))}
@@ -109,7 +136,7 @@ function BingoEditor({ state, userId }: { state: BingoAdminDetailsDto; userId: s
       <Dialog
         open={adding}
         fullWidth
-        maxWidth="sm"
+        maxWidth="md"
         onClose={update.isPending ? undefined : () => setAdding(false)}
       >
         <DialogTitle>Add bingo card</DialogTitle>

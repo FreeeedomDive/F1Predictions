@@ -10,20 +10,49 @@ test.beforeEach(async ({ page }) => {
 })
 
 function board(prefix: string): BingoBoardDto {
+  const descriptions = [
+    'A driver wins at their home circuit',
+    'A race with no DNFs',
+    'Every team scores points',
+    'A double retirement for one team',
+    'A wet race',
+    'A driver gains ten or more positions by the end of a race',
+    'An eight-time champion',
+    'Two red flags in one race',
+    'The title fight goes to the final race',
+    'A team changes one of its drivers mid-season',
+    'Red flags in qualifying',
+    'A driver finishes the season without scoring a point',
+    'A penalty for incorrectly serving a previous penalty',
+    'A race win for a team outside the top four',
+    'No pit stop needed',
+    'An overtake for the win on the final lap',
+    'Five or more retirements in one race',
+    'A podium for a driver outside the top four teams',
+    'Fewer than three overtakes at Monaco',
+    'A first-lap crash',
+    'At least two drivers end the season with crash costs below €400,000 each',
+    'A driver is disqualified for insufficient fuel in the tank',
+    'A new champion',
+    'Teammates collide',
+    'Championship domination',
+  ]
   return {
     id: crypto.randomUUID(),
     participantId: crypto.randomUUID(),
     bingoAchieved: true,
     cards: Array.from({ length: 25 }, (_, position) => {
-      const description = `${prefix} event ${((position * 7) % 25) + 1}`
+      const description = descriptions[(position * 7) % 25]
+      const requiredRepeats = position % 4 === 0 ? 1 : position % 2 === 0 ? 5 : 3
       return {
         id: crypto.randomUUID(),
         description,
-        explanation: `Conditions for ${description}.`,
+        explanation: position % 3 === 0 ? `${prefix}: conditions for ${description}.` : null,
         language: 'en',
         probability: (['LOW', 'MEDIUM', 'HIGH'] as const)[position % 3],
-        requiredRepeats: 3,
-        completedRepeats: position === 0 ? 3 : position % 3,
+        requiredRepeats,
+        completedRepeats:
+          position === 0 ? requiredRepeats : Math.min(requiredRepeats - 1, position % 3),
         completed: position === 0,
       }
     }),
@@ -82,7 +111,19 @@ for (const mobile of [false, true]) {
     expect(first).not.toBeNull()
     expect(fifth?.y).toBe(first?.y)
     expect(sixth!.y).toBeGreaterThan(first!.y)
-    const info = tiles.first().getByRole('button', { name: 'Explanation for card 1', exact: true })
+    await expect(list.getByRole('progressbar')).toHaveCount(0)
+    await expect(list.getByText(/^\d+$/)).toHaveCount(0)
+    await expect(list.getByText(/^\d+ \/ \d+$/)).toHaveCount(0)
+    await expect(tiles.first().getByRole('img')).toHaveCount(0)
+    await expect(
+      tiles.nth(1).getByRole('img', { name: 'Progress: 1 of 3', exact: true }),
+    ).toBeVisible()
+    await expect(page.getByText('Probability:', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Bingo rules', exact: true })).toHaveCount(0)
+    await expect(page.getByText(/The info icon shows/)).toHaveCount(0)
+    const info = tiles
+      .first()
+      .getByRole('button', { name: `Explanation: ${saved.cards[0].description}`, exact: true })
     const tooltip = page.getByRole('tooltip', { name: saved.cards[0].explanation!, exact: true })
     await info.hover()
     await expect(tooltip).toBeVisible()
@@ -106,7 +147,7 @@ for (const mobile of [false, true]) {
     expect(writes).toBe(1)
     expect(languages.length).toBeGreaterThan(1)
     expect(languages.every((language) => language === 'en')).toBe(true)
-    await page.getByRole('link', { name: 'Bingo rules', exact: true }).click()
+    await page.goto('/rulebook')
     await expect(page.getByRole('heading', { name: 'Bingo', exact: true })).toBeVisible()
     await expect(
       page.getByText('Your board has 25 event cards and no free centre cell.', { exact: false }),

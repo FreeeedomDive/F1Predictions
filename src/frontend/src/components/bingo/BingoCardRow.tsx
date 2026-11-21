@@ -32,43 +32,37 @@ import BingoCardForm from './BingoCardForm'
 export default function BingoCardRow({
   card,
   userId,
+  language,
   structureEditable,
 }: {
   card: BingoAdminCardDto
   userId: string
+  language: string
   structureEditable: boolean
 }) {
   const [expanded, setExpanded] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [draftProgress, setDraftProgress] = useState<number | null>(null)
+  const [detailsState, setDetailsState] = useState({ dirty: false, valid: true })
   const update = useUpdateAdminBingo(userId)
   const progress = draftProgress ?? card.completedRepeats
-  const description = card.translations.en.description ?? ''
+  const description =
+    card.translations[language]?.description || card.translations.en.description || ''
+  const formId = `bingo-card-form-${card.id}`
+  const saveProgress = () => {
+    if (progress === card.completedRepeats) return
+    update.mutate(
+      { type: 'progress', cardId: card.id, completedRepeats: progress },
+      { onSuccess: () => setDraftProgress(null) },
+    )
+  }
   if (isUnauthorized(update.error)) return <Navigate to="/auth" replace />
 
   return (
     <>
       <TableRow aria-label={`Card: ${description}`} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-        <TableCell sx={{ px: { xs: 1, sm: 2 }, py: 1.5, overflowWrap: 'anywhere' }}>
+        <TableCell sx={{ px: { xs: 1, sm: 2 }, py: 1.25, overflowWrap: 'anywhere' }}>
           <Typography variant="body2">{description}</Typography>
-          {card.translations.en.explanation && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-              {card.translations.en.explanation}
-            </Typography>
-          )}
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-            Probability: {card.probability.toLowerCase()}
-          </Typography>
-          <Button
-            size="small"
-            endIcon={expanded ? <ExpandLessRounded /> : <ExpandMoreRounded />}
-            aria-expanded={expanded}
-            aria-controls={`bingo-card-${card.id}`}
-            onClick={() => setExpanded(!expanded)}
-            sx={{ px: 0, mt: 0.5, textAlign: 'left', justifyContent: 'flex-start' }}
-          >
-            Edit & translations
-          </Button>
         </TableCell>
         <TableCell sx={{ px: 0.5, width: 120 }}>
           <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'center', gap: 0.5 }}>
@@ -91,6 +85,10 @@ export default function BingoCardRow({
                 textAlign: 'center',
                 whiteSpace: 'nowrap',
                 fontWeight: 600,
+                bgcolor: 'action.selected',
+                borderRadius: 1,
+                px: 0.5,
+                py: 0.5,
                 color: progress === card.requiredRepeats ? 'success.main' : 'text.primary',
               }}
             >
@@ -107,26 +105,39 @@ export default function BingoCardRow({
             </IconButton>
           </Stack>
         </TableCell>
-        <TableCell sx={{ px: { xs: 0.5, sm: 2 }, width: 40 }}>
-          <Tooltip title="Save progress">
-            <span>
+        <TableCell sx={{ px: { xs: 0.5, sm: 2 }, width: 72 }}>
+          <Stack direction="row">
+            <Tooltip title="Save changes">
+              <span>
+                <IconButton
+                  type="submit"
+                  form={formId}
+                  size="small"
+                  color="primary"
+                  aria-label={`Save changes for ${description}`}
+                  loading={update.isPending}
+                  disabled={
+                    update.isPending ||
+                    (!detailsState.dirty && progress === card.completedRepeats) ||
+                    (detailsState.dirty && !detailsState.valid)
+                  }
+                >
+                  <SaveRounded fontSize="small" />
+                </IconButton>
+              </span>
+            </Tooltip>
+            <Tooltip title={expanded ? 'Hide editor' : 'Edit & translations'}>
               <IconButton
                 size="small"
-                color="primary"
-                aria-label={`Save progress for ${description}`}
-                loading={update.isPending && update.variables.type === 'progress'}
-                disabled={update.isPending || progress === card.completedRepeats}
-                onClick={() =>
-                  update.mutate(
-                    { type: 'progress', cardId: card.id, completedRepeats: progress },
-                    { onSuccess: () => setDraftProgress(null) },
-                  )
-                }
+                aria-label="Edit & translations"
+                aria-expanded={expanded}
+                aria-controls={`bingo-card-${card.id}`}
+                onClick={() => setExpanded(!expanded)}
               >
-                <SaveRounded fontSize="small" />
+                {expanded ? <ExpandLessRounded /> : <ExpandMoreRounded />}
               </IconButton>
-            </span>
-          </Tooltip>
+            </Tooltip>
+          </Stack>
         </TableCell>
       </TableRow>
       <TableRow>
@@ -136,18 +147,31 @@ export default function BingoCardRow({
               id={`bingo-card-${card.id}`}
               component="section"
               aria-label={`Edit ${description}`}
-              sx={{ p: 2, bgcolor: 'action.hover' }}
+              sx={{ p: { xs: 1, sm: 2 }, bgcolor: 'action.hover' }}
             >
               <BingoCardForm
+                id={formId}
                 card={card}
                 structureEditable={structureEditable}
                 busy={update.isPending}
-                onSave={(request, onSaved) =>
+                onStateChange={setDetailsState}
+                hasProgressChanges={draftProgress !== null}
+                onDiscardProgress={() => setDraftProgress(null)}
+                onSave={(request, onSaved) => {
+                  if (!detailsState.dirty) {
+                    saveProgress()
+                    return
+                  }
                   update.mutate(
                     { type: 'update', cardId: card.id, card: request },
-                    { onSuccess: onSaved },
+                    {
+                      onSuccess: () => {
+                        onSaved()
+                        saveProgress()
+                      },
+                    },
                   )
-                }
+                }}
                 onDelete={() => setConfirmDelete(true)}
               />
             </Box>

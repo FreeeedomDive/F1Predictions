@@ -4,14 +4,14 @@ import SaveRounded from '@mui/icons-material/SaveRounded'
 import {
   Box,
   Button,
-  Divider,
   IconButton,
   MenuItem,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type {
   BingoAdminCardDto,
   BingoCardProbabilityDto,
@@ -26,19 +26,27 @@ const emptyCard: SaveBingoCardRequestDto = {
 }
 
 export default function BingoCardForm({
+  id,
   card,
   structureEditable,
   busy,
   onSave,
   onDelete,
   onCancel,
+  onStateChange,
+  hasProgressChanges,
+  onDiscardProgress,
 }: {
+  id?: string
   card?: BingoAdminCardDto
   structureEditable: boolean
   busy: boolean
   onSave: (request: SaveBingoCardRequestDto, onSaved: () => void) => void
   onDelete?: () => void
   onCancel?: () => void
+  onStateChange?: (state: { dirty: boolean; valid: boolean }) => void
+  hasProgressChanges?: boolean
+  onDiscardProgress?: () => void
 }) {
   const initial = card
     ? {
@@ -56,6 +64,10 @@ export default function BingoCardForm({
     Number.isInteger(values.requiredRepeats) &&
     values.requiredRepeats > 0 &&
     values.requiredRepeats >= (card?.completedRepeats ?? 0)
+
+  useEffect(() => {
+    onStateChange?.({ dirty: draft !== null, valid })
+  }, [draft, onStateChange, valid])
 
   const changeTranslation = (code: string, field: keyof BingoCardTranslationDto, text: string) =>
     setDraft({
@@ -89,38 +101,24 @@ export default function BingoCardForm({
 
   return (
     <Stack
+      id={id}
       component="form"
       aria-label={card ? 'Card details' : 'New bingo card'}
       spacing={2}
       onSubmit={(event) => {
         event.preventDefault()
-        if (valid && !busy && (!card || draft)) onSave(values, () => setDraft(null))
+        if (valid && !busy) onSave(values, () => setDraft(null))
       }}
     >
-      <TextField
-        fullWidth
-        required
-        multiline
-        size="small"
-        label="English description"
-        value={values.translations.en?.description ?? ''}
-        disabled={busy}
-        onChange={(event) => changeTranslation('en', 'description', event.target.value)}
-      />
-      <TextField
-        fullWidth
-        multiline
-        size="small"
-        label="English explanation"
-        value={values.translations.en?.explanation ?? ''}
-        disabled={busy}
-        onChange={(event) => changeTranslation('en', 'explanation', event.target.value)}
-      />
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: 'minmax(0, 1fr)', sm: 'repeat(2, minmax(0, 1fr))' },
+          gridTemplateColumns: card
+            ? 'repeat(2, minmax(0, 1fr)) 120px'
+            : 'repeat(2, minmax(0, 1fr))',
+          alignItems: 'center',
           gap: 2,
+          maxWidth: card ? 600 : 400,
         }}
       >
         <TextField
@@ -149,18 +147,81 @@ export default function BingoCardForm({
           slotProps={{ htmlInput: { min: Math.max(1, card?.completedRepeats ?? 0), step: 1 } }}
           onChange={(event) => setDraft({ ...values, requiredRepeats: Number(event.target.value) })}
         />
+        {card && (draft || hasProgressChanges) && (
+          <Button
+            size="small"
+            disabled={busy}
+            onClick={() => {
+              setDraft(null)
+              onDiscardProgress?.()
+            }}
+          >
+            Discard changes
+          </Button>
+        )}
       </Box>
-      <Divider />
-      <Typography component="h3" variant="subtitle2">
-        Other languages (optional)
-      </Typography>
-      {Object.keys(values.translations)
-        .filter((code) => code !== 'en')
-        .sort()
-        .map((code) => (
-          <Stack key={code} spacing={1.5}>
-            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
-              <Typography variant="subtitle2">{code}</Typography>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '48px minmax(0, 1fr) minmax(0, 1fr) 28px',
+            sm: '80px minmax(0, 1fr) minmax(0, 1.5fr) 28px',
+          },
+          gap: { xs: 0.5, sm: 1 },
+          alignItems: 'start',
+          '& .MuiInputBase-input': { px: { xs: 0.75, sm: 1.25 } },
+          '& .MuiInputBase-multiline': { px: { xs: 0.75, sm: 1.25 } },
+          '& textarea.MuiInputBase-input': { px: 0 },
+        }}
+      >
+        {['Language', 'Title', 'Description', ''].map((heading, index) => (
+          <Typography key={index} variant="caption" color="text.secondary">
+            {heading}
+          </Typography>
+        ))}
+        {[
+          'en',
+          ...Object.keys(values.translations)
+            .filter((code) => code !== 'en')
+            .sort(),
+        ].map((code) => (
+          <Box
+            key={code}
+            role="group"
+            aria-label={`Translation (${code})`}
+            sx={{ display: 'contents' }}
+          >
+            <TextField
+              size="small"
+              value={code}
+              disabled={busy}
+              slotProps={{
+                input: { readOnly: true },
+                htmlInput: { 'aria-label': `Language (${code})` },
+              }}
+            />
+            <TextField
+              required={code === 'en'}
+              multiline
+              maxRows={4}
+              size="small"
+              value={values.translations[code].description ?? ''}
+              disabled={busy}
+              slotProps={{ htmlInput: { 'aria-label': `Title (${code})` } }}
+              onChange={(event) => changeTranslation(code, 'description', event.target.value)}
+            />
+            <TextField
+              multiline
+              maxRows={4}
+              size="small"
+              value={values.translations[code].explanation ?? ''}
+              disabled={busy}
+              slotProps={{ htmlInput: { 'aria-label': `Description (${code})` } }}
+              onChange={(event) => changeTranslation(code, 'explanation', event.target.value)}
+            />
+            {code === 'en' ? (
+              <Box />
+            ) : (
               <IconButton
                 size="small"
                 aria-label={`Remove translation ${code}`}
@@ -173,30 +234,12 @@ export default function BingoCardForm({
               >
                 <DeleteOutlineRounded fontSize="small" />
               </IconButton>
-            </Stack>
-            <TextField
-              fullWidth
-              multiline
-              size="small"
-              label={`Description (${code})`}
-              value={values.translations[code].description ?? ''}
-              disabled={busy}
-              onChange={(event) => changeTranslation(code, 'description', event.target.value)}
-            />
-            <TextField
-              fullWidth
-              multiline
-              size="small"
-              label={`Explanation (${code})`}
-              value={values.translations[code].explanation ?? ''}
-              disabled={busy}
-              onChange={(event) => changeTranslation(code, 'explanation', event.target.value)}
-            />
-          </Stack>
+            )}
+          </Box>
         ))}
-      <Stack direction="row" sx={{ alignItems: 'flex-start', gap: 1 }}>
+      </Box>
+      <Stack direction="row" sx={{ alignItems: 'flex-start', gap: 0.5 }}>
         <TextField
-          fullWidth
           size="small"
           label="Language code"
           placeholder="ru, de, pt-BR"
@@ -204,6 +247,7 @@ export default function BingoCardForm({
           disabled={busy}
           error={!!languageError}
           helperText={languageError}
+          sx={{ width: 160 }}
           onChange={(event) => {
             setLanguage(event.target.value)
             setLanguageError('')
@@ -215,49 +259,51 @@ export default function BingoCardForm({
             }
           }}
         />
-        <Button
-          startIcon={<AddRounded />}
-          disabled={busy || !language.trim()}
-          onClick={addLanguage}
-          sx={{ flexShrink: 0 }}
-        >
-          Add language
-        </Button>
+        <Tooltip title="Add language">
+          <span>
+            <IconButton
+              aria-label="Add language"
+              disabled={busy || !language.trim()}
+              onClick={addLanguage}
+            >
+              <AddRounded />
+            </IconButton>
+          </span>
+        </Tooltip>
       </Stack>
-      <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
-        <Button
-          type="submit"
-          variant="contained"
-          size="small"
-          startIcon={<SaveRounded />}
-          loading={busy}
-          disabled={busy || !valid || (!!card && !draft)}
-        >
-          {card ? 'Save card' : 'Create card'}
-        </Button>
-        {card && draft && (
-          <Button size="small" disabled={busy} onClick={() => setDraft(null)}>
-            Discard changes
-          </Button>
-        )}
-        {onCancel && (
-          <Button size="small" disabled={busy} onClick={onCancel}>
-            Cancel
-          </Button>
-        )}
-        {card && structureEditable && onDelete && (
-          <Button
-            color="error"
-            size="small"
-            startIcon={<DeleteOutlineRounded />}
-            disabled={busy}
-            onClick={onDelete}
-            sx={{ ml: 'auto' }}
-          >
-            Delete card
-          </Button>
-        )}
-      </Stack>
+      {(!card || onCancel || (card && structureEditable && onDelete)) && (
+        <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
+          {!card && (
+            <Button
+              type="submit"
+              variant="contained"
+              size="small"
+              startIcon={<SaveRounded />}
+              loading={busy}
+              disabled={busy || !valid}
+            >
+              Create card
+            </Button>
+          )}
+          {onCancel && (
+            <Button size="small" disabled={busy} onClick={onCancel}>
+              Cancel
+            </Button>
+          )}
+          {card && structureEditable && onDelete && (
+            <Button
+              color="error"
+              size="small"
+              startIcon={<DeleteOutlineRounded />}
+              disabled={busy}
+              onClick={onDelete}
+              sx={{ ml: 'auto' }}
+            >
+              Delete card
+            </Button>
+          )}
+        </Stack>
+      )}
     </Stack>
   )
 }

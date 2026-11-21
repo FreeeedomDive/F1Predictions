@@ -17,7 +17,7 @@ async function state(page: Page): Promise<BingoAdminDetailsDto> {
 async function addLanguage(form: Locator, code: string, description: string) {
   await form.getByRole('textbox', { name: 'Language code', exact: true }).fill(code)
   await form.getByRole('button', { name: 'Add language', exact: true }).click()
-  await form.getByRole('textbox', { name: `Description (${code})`, exact: true }).fill(description)
+  await form.getByRole('textbox', { name: `Title (${code})`, exact: true }).fill(description)
 }
 
 for (const mobile of [false, true]) {
@@ -43,11 +43,9 @@ for (const mobile of [false, true]) {
       await adminPage.getByRole('button', { name: 'Add card', exact: true }).click()
       const dialog = adminPage.getByRole('dialog', { name: 'Add bingo card' })
       await expect(dialog.getByRole('button', { name: 'Create card', exact: true })).toBeDisabled()
+      await dialog.getByRole('textbox', { name: 'Title (en)', exact: true }).fill(description)
       await dialog
-        .getByRole('textbox', { name: 'English description', exact: true })
-        .fill(description)
-      await dialog
-        .getByRole('textbox', { name: 'English explanation', exact: true })
+        .getByRole('textbox', { name: 'Description (en)', exact: true })
         .fill('A grid penalty is applied.')
       await dialog.getByRole('spinbutton', { name: 'Required repeats' }).fill('3')
       await addLanguage(dialog, 'ru', 'Штраф на стартовой решётке')
@@ -59,9 +57,12 @@ for (const mobile of [false, true]) {
       expect(cardId).toBeTruthy()
       const row = adminPage.getByRole('row', { name: `Card: ${description}`, exact: true })
       await expect(row).toBeVisible()
-      await expect(
-        adminPage.getByRole('textbox', { name: 'Description (ru)', exact: true }),
-      ).toHaveCount(0)
+      await expect(row).not.toContainText('Probability')
+      await expect(row).not.toContainText('A grid penalty is applied.')
+      await expect(row).not.toContainText('Edit & translations')
+      await expect(adminPage.getByRole('textbox', { name: 'Title (ru)', exact: true })).toHaveCount(
+        0,
+      )
       await row
         .getByRole('button', { name: `Increase progress for ${description}`, exact: true })
         .click()
@@ -72,7 +73,7 @@ for (const mobile of [false, true]) {
         '2 / 3',
       )
       await row
-        .getByRole('button', { name: `Save progress for ${description}`, exact: true })
+        .getByRole('button', { name: `Save changes for ${description}`, exact: true })
         .click()
       await expect
         .poll(
@@ -83,29 +84,33 @@ for (const mobile of [false, true]) {
 
       await row.getByRole('button', { name: 'Edit & translations', exact: true }).click()
       const form = adminPage.getByRole('form', { name: 'Card details', exact: true })
-      await form
-        .getByRole('textbox', { name: 'English description', exact: true })
-        .fill(updatedDescription)
+      await expect(form.getByRole('button', { name: 'Save card', exact: true })).toHaveCount(0)
+      await form.getByRole('textbox', { name: 'Title (en)', exact: true }).fill(updatedDescription)
       await row
         .getByRole('button', { name: `Decrease progress for ${description}`, exact: true })
         .click()
       await row
-        .getByRole('button', { name: `Save progress for ${description}`, exact: true })
+        .getByRole('button', { name: `Save changes for ${description}`, exact: true })
         .click()
+      const updatedRow = adminPage.getByRole('row', {
+        name: `Card: ${updatedDescription}`,
+        exact: true,
+      })
+      await expect(updatedRow).toBeVisible()
       await expect
         .poll(
           async () =>
             (await state(adminPage)).data.find((card) => card.id === cardId)?.completedRepeats,
         )
         .toBe(1)
-      await expect(
-        form.getByRole('textbox', { name: 'English description', exact: true }),
-      ).toHaveValue(updatedDescription)
-      await row
-        .getByRole('button', { name: `Increase progress for ${description}`, exact: true })
+      await expect(form.getByRole('textbox', { name: 'Title (en)', exact: true })).toHaveValue(
+        updatedDescription,
+      )
+      await updatedRow
+        .getByRole('button', { name: `Increase progress for ${updatedDescription}`, exact: true })
         .click()
-      await row
-        .getByRole('button', { name: `Save progress for ${description}`, exact: true })
+      await updatedRow
+        .getByRole('button', { name: `Save changes for ${updatedDescription}`, exact: true })
         .click()
       await expect
         .poll(
@@ -117,34 +122,43 @@ for (const mobile of [false, true]) {
       await expect(
         adminPage.getByRole('button', { name: 'Refresh bingo', exact: true }),
       ).toBeEnabled()
-      await expect(
-        form.getByRole('textbox', { name: 'English description', exact: true }),
-      ).toHaveValue(updatedDescription)
-      await row.getByRole('button', { name: 'Edit & translations', exact: true }).click()
-      await row.getByRole('button', { name: 'Edit & translations', exact: true }).click()
-      await expect(
-        form.getByRole('textbox', { name: 'English description', exact: true }),
-      ).toHaveValue(updatedDescription)
+      await expect(form.getByRole('textbox', { name: 'Title (en)', exact: true })).toHaveValue(
+        updatedDescription,
+      )
+      await updatedRow.getByRole('button', { name: 'Edit & translations', exact: true }).click()
+      await updatedRow.getByRole('button', { name: 'Edit & translations', exact: true }).click()
+      await expect(form.getByRole('textbox', { name: 'Title (en)', exact: true })).toHaveValue(
+        updatedDescription,
+      )
       await addLanguage(form, 'de', 'Startplatzstrafe')
-      await form.getByRole('button', { name: 'Save card', exact: true }).click()
-      const updatedRow = adminPage.getByRole('row', {
-        name: `Card: ${updatedDescription}`,
-        exact: true,
-      })
-      await expect(updatedRow).toBeVisible()
+      await updatedRow
+        .getByRole('button', { name: `Save changes for ${updatedDescription}`, exact: true })
+        .click()
+      await expect(
+        updatedRow.getByRole('button', {
+          name: `Save changes for ${updatedDescription}`,
+          exact: true,
+        }),
+      ).toBeDisabled()
+      await expect
+        .poll(
+          async () =>
+            (await state(adminPage)).data.find((card) => card.id === cardId)?.translations.de
+              .description,
+        )
+        .toBe('Startplatzstrafe')
       const saved = (await state(adminPage)).data.find((card) => card.id === cardId)
       expect(saved?.completedRepeats).toBe(2)
       expect(saved?.translations.ru.description).toBe('Штраф на стартовой решётке')
-      expect(saved?.translations.de.description).toBe('Startplatzstrafe')
 
       await adminPage.reload()
       await expect(
         updatedRow.getByLabel(`Progress for ${updatedDescription}`, { exact: true }),
       ).toHaveText('2 / 3')
       await updatedRow.getByRole('button', { name: 'Edit & translations', exact: true }).click()
-      await expect(
-        form.getByRole('textbox', { name: 'Description (de)', exact: true }),
-      ).toHaveValue('Startplatzstrafe')
+      await expect(form.getByRole('textbox', { name: 'Title (de)', exact: true })).toHaveValue(
+        'Startplatzstrafe',
+      )
       await expect(
         form.getByRole('button', { name: 'Remove translation en', exact: true }),
       ).toHaveCount(0)
@@ -157,8 +171,12 @@ for (const mobile of [false, true]) {
         await adminPage.evaluate('document.documentElement.scrollWidth <= window.innerWidth'),
       ).toBe(true)
       await form.getByRole('button', { name: 'Remove translation ru', exact: true }).click()
-      await form.getByRole('button', { name: 'Save card', exact: true }).click()
-      await expect(form.getByRole('button', { name: 'Save card', exact: true })).toBeDisabled()
+      const saveChanges = updatedRow.getByRole('button', {
+        name: `Save changes for ${updatedDescription}`,
+        exact: true,
+      })
+      await saveChanges.click()
+      await expect(saveChanges).toBeDisabled()
       await expect
         .poll(
           async () =>
@@ -211,30 +229,30 @@ test('F1-E2E-20: bingo admin keeps local edits after a failed save and permits a
   })
   try {
     await adminPage.goto('/admin/bingo')
-    await adminPage
-      .getByRole('row', { name: 'Card: Event to edit', exact: true })
-      .getByRole('button', { name: 'Edit & translations', exact: true })
-      .click()
+    const row = adminPage.getByRole('row', { name: 'Card: Event to edit', exact: true })
+    await row.getByRole('button', { name: 'Edit & translations', exact: true }).click()
     const form = adminPage.getByRole('form', { name: 'Card details', exact: true })
-    await form
-      .getByRole('textbox', { name: 'English description', exact: true })
-      .fill('Edited event')
-    await form.getByRole('button', { name: 'Save card', exact: true }).click()
+    await form.getByRole('textbox', { name: 'Title (en)', exact: true }).fill('Edited event')
+    const saveChanges = row.getByRole('button', {
+      name: 'Save changes for Event to edit',
+      exact: true,
+    })
+    await saveChanges.click()
     await expect(
       adminPage.getByText('Please review the card and retry.', { exact: true }),
     ).toBeVisible()
-    await expect(
-      form.getByRole('textbox', { name: 'English description', exact: true }),
-    ).toHaveValue('Edited event')
+    await expect(form.getByRole('textbox', { name: 'Title (en)', exact: true })).toHaveValue(
+      'Edited event',
+    )
     expect(attempts).toBe(1)
-    await form.getByRole('button', { name: 'Save card', exact: true }).click()
+    await saveChanges.click()
     await expect(
       adminPage.getByRole('row', { name: 'Card: Edited event', exact: true }),
     ).toBeVisible()
     await expect(adminPage.getByText('Temporary refresh outage', { exact: true })).toBeVisible()
-    await expect(
-      form.getByRole('textbox', { name: 'English description', exact: true }),
-    ).toHaveValue('Edited event')
+    await expect(form.getByRole('textbox', { name: 'Title (en)', exact: true })).toHaveValue(
+      'Edited event',
+    )
     expect(attempts).toBe(2)
   } finally {
     await adminPage.request.delete(`${adminPath}/cards/${card.id}`)
@@ -283,10 +301,9 @@ test('F1-E2E-21: bingo admin shows copied cards, zero progress and locked repeat
   await adminPage.getByRole('button', { name: 'Refresh bingo', exact: true }).click()
   await first.getByRole('button', { name: 'Edit & translations', exact: true }).click()
   const form = adminPage.getByRole('form', { name: 'Card details', exact: true })
+  await expect(adminPage.getByText(/Boards have already been issued/)).toHaveCount(0)
   await expect(form.getByRole('spinbutton', { name: 'Required repeats' })).toBeDisabled()
-  await expect(
-    form.getByRole('textbox', { name: 'English description', exact: true }),
-  ).toBeEnabled()
+  await expect(form.getByRole('textbox', { name: 'Title (en)', exact: true })).toBeEnabled()
   await expect(form.getByRole('combobox', { name: 'Probability', exact: true })).toBeEnabled()
   await expect(form.getByRole('button', { name: 'Delete card', exact: true })).toHaveCount(0)
 })
