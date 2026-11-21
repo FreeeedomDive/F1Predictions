@@ -2,11 +2,7 @@ package com.xdd.f1.discord.notifications;
 
 import com.xdd.f1.contract.league.LeagueApi;
 import com.xdd.f1.contract.league.LeagueDto;
-import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.MessageEmbed;
-import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -17,14 +13,12 @@ import java.util.UUID;
 @ConditionalOnProperty(prefix = "discord", name = "enabled", havingValue = "true")
 public class RaceNotificationSender {
 
-    private static final Logger log = LoggerFactory.getLogger(RaceNotificationSender.class);
-
     private final LeagueApi leagueApi;
-    private final JDA jda;
+    private final LeagueNotificationSender notificationSender;
 
-    public RaceNotificationSender(LeagueApi leagueApi, JDA jda) {
+    public RaceNotificationSender(LeagueApi leagueApi, LeagueNotificationSender notificationSender) {
         this.leagueApi = leagueApi;
-        this.jda = jda;
+        this.notificationSender = notificationSender;
     }
 
     public void sendToLeagues(String raceType, MessageEmbed embed) {
@@ -55,17 +49,6 @@ public class RaceNotificationSender {
         if (raceType.equals("SPRINT") && !league.settings().sprintsEnabled()) {
             return;
         }
-        var channelId = league.settings().notificationsChannelId();
-        if (channelId == null || channelId.isBlank()) {
-            return;
-        }
-        var channel = jda.getChannelById(GuildMessageChannel.class, channelId);
-        if (channel == null) {
-            log.warn("Discord notification channel {} for league {} was not found", channelId, league.id());
-            return;
-        }
-        for (var embed : embeds) {
-            channel.sendMessageEmbeds(embed).complete();
-        }
+        notificationSender.send(league, embeds);
     }
 }

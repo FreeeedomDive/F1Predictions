@@ -4,6 +4,7 @@ import com.xdd.f1.contract.league.LeagueApi;
 import com.xdd.f1.contract.league.LeagueDto;
 import com.xdd.f1.contract.league.LeagueSettingsDto;
 import com.xdd.f1.contract.race.RaceStartingGridUpdatedEvent;
+import com.xdd.f1.discord.notifications.LeagueNotificationSender;
 import com.xdd.f1.discord.notifications.RaceNotificationSender;
 import net.dv8tion.jda.api.JDA;
 import net.dv8tion.jda.api.entities.MessageEmbed;
@@ -35,7 +36,8 @@ class RaceStartingGridUpdatedConsumerTest {
     void setUp() {
         leagues = mock(LeagueApi.class);
         jda = mock(JDA.class);
-        consumer = new RaceStartingGridUpdatedConsumer(new RaceNotificationSender(leagues, jda));
+        consumer = new RaceStartingGridUpdatedConsumer(
+                new RaceNotificationSender(leagues, new LeagueNotificationSender(leagues, jda)));
     }
 
     @ParameterizedTest
