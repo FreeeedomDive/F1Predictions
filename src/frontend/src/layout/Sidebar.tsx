@@ -146,6 +146,23 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         </ListItemButton>
         <ListItemButton
           component={NavLink}
+          to="/bingo"
+          onClick={onClose}
+          sx={{
+            borderRadius: 1,
+            '&.active': { bgcolor: 'rgba(165, 180, 252, 0.1)', color: 'primary.main' },
+          }}
+        >
+          <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+            <GridOnRounded fontSize="small" />
+          </ListItemIcon>
+          <ListItemText
+            primary="Bingo"
+            slotProps={{ primary: { sx: { fontSize: 14, fontWeight: 500 } } }}
+          />
+        </ListItemButton>
+        <ListItemButton
+          component={NavLink}
           to="/statistics"
           onClick={onClose}
           sx={{

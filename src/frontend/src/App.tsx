@@ -88,6 +88,20 @@ const router = createBrowserRouter([
             },
           },
           {
+            path: 'bingo',
+            lazy: async () => {
+              const { default: BingoPage } = await import('./routes/BingoPage')
+              return {
+                element: (
+                  <>
+                    <title>{withDevPrefix('Bingo')}</title>
+                    <BingoPage />
+                  </>
+                ),
+              }
+            },
+          },
+          {
             path: 'statistics',
             lazy: async () => {
               const { default: StatisticsPage } = await import('./routes/StatisticsPage')

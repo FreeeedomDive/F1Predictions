@@ -1,6 +1,7 @@
 import { Alert, Container, Stack, Typography } from '@mui/material'
 import { CURRENT_SEASON } from '../app/season'
 import ChampionshipRulebook from '../components/rulebook/ChampionshipRulebook'
+import BingoRulebook from '../components/rulebook/BingoRulebook'
 import RaceRulebook from '../components/rulebook/RaceRulebook'
 import RulebookLinks from '../components/rulebook/RulebookLinks'
 import { useLeague } from '../context/league'
@@ -38,6 +39,7 @@ export default function RulebookPage() {
               season={rulebookSeason}
               rulesVersion={championship.data?.rulesVersion}
             />
+            <BingoRulebook />
           </>
         ) : (
           <Alert severity="info">The rulebook will be available once you join a league.</Alert>

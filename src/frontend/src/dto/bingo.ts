@@ -1,5 +1,30 @@
 export type BingoCardProbabilityDto = 'LOW' | 'MEDIUM' | 'HIGH'
 
+export interface BingoCardDto {
+  id: string
+  description: string
+  explanation: string | null
+  language: string
+  probability: BingoCardProbabilityDto
+  requiredRepeats: number
+  completedRepeats: number
+  completed: boolean
+}
+
+export interface BingoBoardDto {
+  id: string
+  participantId: string
+  bingoAchieved: boolean
+  cards: BingoCardDto[]
+}
+
+export interface BingoDetailsDto {
+  season: number
+  activeSeason: number
+  canCreate: boolean
+  board: BingoBoardDto | null
+}
+
 export interface BingoCardTranslationDto {
   description: string | null
   explanation: string | null

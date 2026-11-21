@@ -1,10 +1,24 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { isAxiosError } from 'axios'
-import { getAdminBingo, updateAdminBingo } from '../api/bingo'
+import { getAdminBingo, getOwnBingo, updateAdminBingo } from '../api/bingo'
 import type { BingoAdminAction } from '../api/bingo'
 import type { BingoAdminDetailsDto } from '../dto/bingo'
 
 export const adminBingoKey = (userId: string) => ['admin', 'bingo', userId] as const
+
+export function useOwnBingo(userId: string, leagueId: string | undefined, season: number | null) {
+  return useQuery({
+    queryKey: ['bingo', userId, leagueId, season, 'en'],
+    queryFn:
+      leagueId && season !== null
+        ? ({ signal }) => getOwnBingo(leagueId, season, signal)
+        : skipToken,
+    staleTime: 15_000,
+    retry: false,
+    refetchInterval: (query) =>
+      query.state.status === 'success' && query.state.data?.board ? 30_000 : false,
+  })
+}
 
 export function useAdminBingo(userId: string) {
   return useQuery({

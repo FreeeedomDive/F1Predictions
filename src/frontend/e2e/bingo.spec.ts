@@ -29,7 +29,7 @@ for (const mobile of [false, true]) {
     if (mobile) await adminPage.setViewportSize({ width: 390, height: 844 })
     await signIn(adminPage, admin)
     if (mobile) await adminPage.getByRole('button', { name: 'Open sidebar' }).click()
-    await adminPage.getByRole('link', { name: 'Bingo', exact: true }).click()
+    await adminPage.locator('a[href="/admin/bingo"]').click()
     await expect(adminPage.getByRole('heading', { name: 'Bingo administration' })).toBeVisible()
     const serverSeason = (await state(adminPage)).season
     await expect(
