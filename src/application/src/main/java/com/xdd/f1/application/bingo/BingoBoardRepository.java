@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface BingoBoardRepository {
+    Optional<BingoBoard> findById(BingoBoardId id);
     Optional<BingoBoard> findByLeagueAndSeasonAndParticipant(LeagueId leagueId, int season, LeagueParticipantId participantId);
     List<BingoBoard> findAllBySeason(int season);
     boolean existsBySeason(int season);

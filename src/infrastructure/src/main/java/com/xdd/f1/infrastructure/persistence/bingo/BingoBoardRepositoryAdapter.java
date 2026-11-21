@@ -25,6 +25,11 @@ public class BingoBoardRepositoryAdapter implements BingoBoardRepository {
     }
 
     @Override
+    public Optional<BingoBoard> findById(BingoBoardId id) {
+        return repository.findById(id.value()).map(this::toDomain);
+    }
+
+    @Override
     public Optional<BingoBoard> findByLeagueAndSeasonAndParticipant(
             LeagueId leagueId, int season, LeagueParticipantId participantId
     ) {
