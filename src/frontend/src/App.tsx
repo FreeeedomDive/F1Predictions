@@ -207,6 +207,22 @@ const router = createBrowserRouter([
             },
           },
           {
+            path: 'admin/bingo',
+            lazy: async () => {
+              const { default: AdminBingoPage } = await import('./routes/AdminBingoPage')
+              return {
+                element: (
+                  <>
+                    <title>{withDevPrefix('[Admin] Bingo')}</title>
+                    <RightsWrapper requiredRights={['EDIT_BINGO']} fallback={accessDeniedScreen}>
+                      <AdminBingoPage />
+                    </RightsWrapper>
+                  </>
+                ),
+              }
+            },
+          },
+          {
             path: 'admin/rights',
             lazy: async () => {
               const { default: AdminRightsPage } = await import('./routes/AdminRightsPage')
