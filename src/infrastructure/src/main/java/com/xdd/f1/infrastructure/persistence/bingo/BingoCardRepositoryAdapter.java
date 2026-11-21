@@ -39,20 +39,35 @@ public class BingoCardRepositoryAdapter implements BingoCardRepository {
         var entity = new BingoCardEntity();
         entity.id = card.id().value();
         entity.season = card.season();
-        entity.translations = card.translations().entrySet().stream().collect(Collectors.toMap(
-                Map.Entry::getKey,
-                entry -> new BingoCardTranslationData(entry.getValue().description(), entry.getValue().explanation())
-        ));
-        entity.probability = card.probability().name();
-        entity.requiredRepeats = card.requiredRepeats();
+        setDefinition(entity, card);
         entity.completedRepeats = card.completedRepeats();
         entityManager.persist(entity);
+    }
+
+    @Override
+    public void updateDefinition(BingoCard card) {
+        var entity = repository.findById(card.id().value()).orElseThrow(() -> new BingoCardNotFoundException(card.id()));
+        setDefinition(entity, card);
+    }
+
+    @Override
+    public void delete(BingoCardId id) {
+        repository.deleteById(id.value());
     }
 
     @Override
     public void updateProgress(BingoCardId id, int completedRepeats) {
         var entity = repository.findById(id.value()).orElseThrow(() -> new BingoCardNotFoundException(id));
         entity.completedRepeats = completedRepeats;
+    }
+
+    private void setDefinition(BingoCardEntity entity, BingoCard card) {
+        entity.translations = card.translations().entrySet().stream().collect(Collectors.toMap(
+                Map.Entry::getKey,
+                entry -> new BingoCardTranslationData(entry.getValue().description(), entry.getValue().explanation())
+        ));
+        entity.probability = card.probability().name();
+        entity.requiredRepeats = card.requiredRepeats();
     }
 
     private BingoCard toDomain(BingoCardEntity entity) {

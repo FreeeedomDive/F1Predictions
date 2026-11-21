@@ -108,7 +108,7 @@ public class BingoService {
         lock.acquire("bingo:" + season);
         var current = cards.findById(cardId).orElseThrow(() -> new BingoCardNotFoundException(cardId));
         if (current.season() != season) {
-            throw new DomainValidationException("Bingo progress can only be updated for the current season");
+            throw new BingoConflictException("Bingo progress can only be updated for the current season");
         }
         var updated = current.updateProgress(completedRepeats);
         if (updated.equals(current)) {

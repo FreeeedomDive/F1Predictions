@@ -241,7 +241,7 @@ class BingoServiceIntegrationTest extends AbstractIntegrationTest {
 
         assertThatThrownBy(() -> service.updateProgress(new BingoCardId(UUID.randomUUID()), 1))
                 .isInstanceOf(BingoCardNotFoundException.class);
-        assertThatThrownBy(() -> service.updateProgress(archived.id(), 1)).isInstanceOf(DomainValidationException.class);
+        assertThatThrownBy(() -> service.updateProgress(archived.id(), 1)).isInstanceOf(BingoConflictException.class);
         assertThat(cards.findById(archived.id())).contains(archived);
     }
 

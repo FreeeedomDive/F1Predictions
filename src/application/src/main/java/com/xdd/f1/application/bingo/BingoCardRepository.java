@@ -10,5 +10,7 @@ public interface BingoCardRepository {
     Optional<BingoCard> findById(BingoCardId id);
     List<BingoCard> findAllBySeason(int season);
     void create(BingoCard card);
+    void updateDefinition(BingoCard card);
+    void delete(BingoCardId id);
     void updateProgress(BingoCardId id, int completedRepeats);
 }

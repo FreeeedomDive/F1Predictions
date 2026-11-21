@@ -38,6 +38,11 @@ public class BingoBoardRepositoryAdapter implements BingoBoardRepository {
     }
 
     @Override
+    public boolean existsBySeason(int season) {
+        return repository.existsBySeason(season);
+    }
+
+    @Override
     public void create(BingoBoard board) {
         var entity = new BingoBoardEntity();
         entity.id = board.id().value();

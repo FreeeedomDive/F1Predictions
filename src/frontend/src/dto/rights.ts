@@ -3,6 +3,7 @@ export const rightLabels = {
   EDIT_PREDICTIONS: 'Edit predictions',
   EDIT_RACE_LINEUPS: 'Edit race lineups',
   EDIT_CHAMPIONSHIP: 'Edit championship',
+  EDIT_BINGO: 'Edit bingo',
   EDIT_RIGHTS: 'Manage rights',
 } as const
 

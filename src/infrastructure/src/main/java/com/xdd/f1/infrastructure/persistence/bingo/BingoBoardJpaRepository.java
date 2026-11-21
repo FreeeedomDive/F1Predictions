@@ -8,6 +8,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface BingoBoardJpaRepository extends JpaRepository<BingoBoardEntity, UUID> {
+    boolean existsBySeason(int season);
+
     @EntityGraph(attributePaths = "cells")
     Optional<BingoBoardEntity> findByLeagueIdAndSeasonAndParticipantId(UUID leagueId, int season, UUID participantId);
 
